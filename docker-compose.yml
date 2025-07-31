@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  graphiti-api:
+    build: .
+    container_name: graphiti-api-service
+    ports:
+      - "8000:8000"
+    environment:
+      # FalkorDB Connection
+      - FALKORDB_HOST=${FALKORDB_HOST:-falkordb}
+      - FALKORDB_PORT=${FALKORDB_PORT:-6379}
+      - FALKORDB_USERNAME=${FALKORDB_USERNAME:-}
+      - FALKORDB_PASSWORD=${FALKORDB_PASSWORD:-}
+      
+      # OpenAI Configuration
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      - MODEL_NAME=${MODEL_NAME:-gpt-4o-mini}
+      - EMBEDDING_MODEL_NAME=${EMBEDDING_MODEL_NAME:-text-embedding-3-small}
+      
+      # Service Configuration
+      - PORT=8000
+      - DEBUG=${DEBUG:-false}
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    restart: unless-stopped
+    
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 256M
+    
+    depends_on:
+      - falkordb
+    
+    networks:
+      - graphiti-network
+
+  # Optional: Include FalkorDB service for local development
+  falkordb:
+    image: redis:7.2-alpine
+    container_name: falkordb-local
+    ports:
+      - "6379:6379"
+    volumes:
+      - falkordb_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - graphiti-network
+
+volumes:
+  falkordb_data:
+    driver: local
+
+networks:
+  graphiti-network:
+    driver: bridge
