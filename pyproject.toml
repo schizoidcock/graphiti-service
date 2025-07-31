@@ -1,9 +1,8 @@
 [project]
 name = "graphiti-api-service"
 version = "1.0.0"
-description = "Graphiti API service that connects to standalone FalkorDB"
+description = "Zep-Compatible Graphiti API service with FalkorDB backend"
 authors = [{name = "Zep AI", email = "support@getzep.com"}]
-readme = "README.md"
 license = {text = "Apache-2.0"}
 requires-python = ">=3.10"
 
