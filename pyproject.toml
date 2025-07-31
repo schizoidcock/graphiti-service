@@ -16,6 +16,7 @@ dependencies = [
     # Database and Redis
     "redis>=5.0.0",
     "falkordb>=1.1.2",
+    "neo4j>=5.26.0",
     
     # AI and ML
     "openai>=1.0.0",
