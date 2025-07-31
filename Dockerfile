@@ -16,10 +16,10 @@ RUN apt-get update && apt-get install -y \
 RUN pip install uv
 
 # Copy dependency files
-COPY pyproject.toml uv.lock ./
+COPY pyproject.toml ./
 
-# Install Python dependencies
-RUN uv sync --frozen
+# Install Python dependencies (without lock file for Railway compatibility)
+RUN uv sync
 
 # Copy application code
 COPY graphiti_core/ ./graphiti_core/
