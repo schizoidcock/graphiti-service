@@ -287,7 +287,7 @@ class ZepGraphiti(Graphiti):
                             logger.error(f"❌ Embedding generation failed for {node.name}: {embedding_error}")
                             continue
                     else:
-                        logger.warning(f"⚠️ No embedder available for node {node.name}")
+                        logger.warning(f"⚠️  No embedder available for node {node.name}")
                         continue
                 
                 # Check if node has proper summary
@@ -384,7 +384,7 @@ class ZepGraphiti(Graphiti):
                                 logger.error(f"❌ Embedding generation failed for {node.name}: {embedding_error}")
                                 continue
                         else:
-                            logger.warning(f"⚠️ No embedder available for node {node.name}")
+                            logger.warning(f"⚠️  No embedder available for node {node.name}")
                             continue
                     
                     # Check if node has proper summary (EntityNodes only)
@@ -432,7 +432,7 @@ class ZepGraphiti(Graphiti):
         # Generate name embedding - this is critical for node functionality
         try:
             if self.embedder is None:
-                logger.warning(f"⚠️ No embedder available for entity '{name}' - node will not be saveable")
+                logger.warning(f"⚠️  No embedder available for entity '{name}' - node will not be saveable")
                 logger.info(f"Embedder config - embedder: {self.embedder}, hasattr config: {hasattr(self.embedder, 'config') if self.embedder else 'N/A'}")
                 raise Exception("Embedder not configured")
             
@@ -472,7 +472,7 @@ class ZepGraphiti(Graphiti):
                 logger.debug(f"All values are numbers: {all(isinstance(x, (int, float)) for x in new_node.name_embedding)}")
             
             if new_node.name_embedding is None or len(new_node.name_embedding) == 0:
-                logger.warning(f"⚠️ Failed to generate embedding for entity '{name}' - empty result")
+                logger.warning(f"⚠️  Failed to generate embedding for entity '{name}' - empty result")
                 logger.debug(f"name_embedding value: {new_node.name_embedding}")
                 raise Exception("Empty embedding generated")
                 
