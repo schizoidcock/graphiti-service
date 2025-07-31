@@ -152,6 +152,10 @@ async def root():
             'nodes': '/api/v2/graph/nodes/{uuid}',
             'edges': '/api/v2/graph/edges/{uuid}',
             'episodes': '/api/v2/graph/episodes/{uuid}',
+            'delete_edge': 'DELETE /api/v2/graph/edges/{uuid}',
+            'delete_episode': 'DELETE /api/v2/graph/episodes/{uuid}',
+            'user_episodes': 'GET /api/v2/graph/episodes/user/{user_id}',
+            'session_episodes': 'GET /api/v2/graph/episodes/session/{session_id}',
             'docs': '/docs'
         },
         'compatibility': 'Official Zep Cloud API v2',

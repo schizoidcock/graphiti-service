@@ -5,7 +5,7 @@ import uuid as uuid_lib
 
 from fastapi import APIRouter, HTTPException, Request, status, Query
 from graph_service.config import ZepEnvDep
-from graph_service.zep_graphiti import get_or_create_pooled_client, extract_user_id_from_request, update_user_context_from_group_id
+from graph_service.zep_graphiti import get_or_create_pooled_client, extract_user_id_from_request, update_user_context_from_group_id, ZepGraphitiDep
 from graph_service.dto.graph import (
     EntityNode,
     EntityEdge, 
@@ -19,6 +19,20 @@ from graph_service.dto.graph import (
     NodeRelationshipsResponse,
     ZepFactResult
 )
+
+# Import episode response model for user/session episode endpoints
+from typing import List
+try:
+    from graph_service.routers.episodes import EpisodeResponse
+except ImportError:
+    # Fallback definition if import fails
+    from typing import Dict, Any
+    from pydantic import BaseModel, Field
+    class EpisodeResponse(BaseModel):
+        uuid: str = Field(..., description='Episode UUID')
+        content: str = Field(..., description='Episode content/body')
+        source: str = Field(..., description='Episode source type')
+        created_at: Optional[datetime] = Field(None, description='Episode creation timestamp')
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v2/graph", tags=["graph"])
@@ -439,6 +453,30 @@ async def delete_edge(
         )
 
 
+@router.delete("/episodes/{episode_uuid}")
+async def delete_episode(
+    episode_uuid: str,
+    settings: ZepEnvDep,
+    http_request: Request
+):
+    """Delete a specific episode"""
+    user_id = extract_user_id_from_request(http_request) or "default_user"
+    graphiti = get_or_create_pooled_client(user_id, settings)
+    
+    try:
+        # Delete episode using Graphiti
+        await graphiti.delete_episode(episode_uuid)
+        
+        return {"message": f"Episode {episode_uuid} deleted successfully", "success": True}
+        
+    except Exception as e:
+        logger.error(f"Failed to delete episode {episode_uuid}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete episode: {str(e)}"
+        )
+
+
 @router.get("/users/{user_id}/triplets", response_model=List[Dict[str, Any]])
 async def get_user_graph_triplets(
     user_id: str,
@@ -603,3 +641,168 @@ async def search_legacy(
         "total_results": len(facts),
         "search_metadata": result.search_metadata
     }
+
+
+@router.get("/episodes/user/{user_id}", response_model=List[EpisodeResponse])
+async def get_user_episodes_via_graph(
+    user_id: str,
+    settings: ZepEnvDep,
+    http_request: Request,
+    limit: int = Query(100, description="Maximum number of episodes to return")
+):
+    """
+    Get episodes for a specific user - accessible via zep-server proxy
+    This endpoint handles requests forwarded from zep-server at /api/v2/graph/episodes/user/{user_id}
+    """
+    try:
+        graphiti = get_or_create_pooled_client(user_id, settings)
+        
+        logger.info(f"🔍 Fetching episodes for user: {user_id} (via graph endpoint)")
+        
+        # Query for Episodic nodes where group_id starts with user_id
+        query = """
+        MATCH (e:Episodic) 
+        WHERE e.group_id STARTS WITH $user_prefix
+        RETURN e.uuid as uuid, e.name as name, e.content as content, 
+               e.source as source, e.source_description as source_description,
+               e.created_at as created_at, e.updated_at as updated_at,
+               e.group_id as group_id
+        ORDER BY e.created_at DESC
+        LIMIT $limit
+        """
+        
+        user_prefix = f"{user_id}:"
+        result = await graphiti.driver.execute_query(
+            query, 
+            user_prefix=user_prefix, 
+            limit=limit
+        )
+        
+        episodes = []
+        for record in result:
+            if record is None:
+                continue
+            
+            # Handle both dictionary and list formats from FalkorDB
+            if isinstance(record, dict):
+                record_data = record
+            elif isinstance(record, list):
+                # Skip header rows
+                if len(record) == 8 and all(isinstance(item, str) for item in record if item is not None):
+                    continue
+                # Map list to field names
+                field_names = ['uuid', 'name', 'content', 'source', 'source_description', 'created_at', 'updated_at', 'group_id']
+                if len(record) == len(field_names):
+                    record_data = dict(zip(field_names, record))
+                else:
+                    continue
+            else:
+                continue
+            
+            try:
+                episode = EpisodeResponse(
+                    uuid=record_data.get('uuid', ''),
+                    content=record_data.get('content', ''),
+                    source=record_data.get('source', 'unknown'),
+                    source_description=record_data.get('source_description'),
+                    created_at=record_data.get('created_at'),
+                    updated_at=record_data.get('updated_at')
+                )
+                episodes.append(episode)
+            except Exception as e:
+                logger.warning(f"Failed to create episode from record: {e}")
+                continue
+        
+        logger.info(f"✅ Found {len(episodes)} episodes for user {user_id}")
+        return episodes
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to fetch episodes for user {user_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get user episodes: {str(e)}"
+        )
+
+
+@router.get("/episodes/session/{session_id}", response_model=List[EpisodeResponse])
+async def get_session_episodes_via_graph(
+    session_id: str,
+    settings: ZepEnvDep,
+    http_request: Request,
+    user_id: str = Query(..., description="User ID that owns the session"),
+    limit: int = Query(100, description="Maximum number of episodes to return")
+):
+    """
+    Get episodes for a specific session - accessible via zep-server proxy
+    This endpoint handles requests forwarded from zep-server at /api/v2/graph/episodes/session/{session_id}
+    """
+    try:
+        graphiti = get_or_create_pooled_client(user_id, settings)
+        
+        logger.info(f"🔍 Fetching episodes for session: {session_id} (user: {user_id}) (via graph endpoint)")
+        
+        # Construct group_id for the session
+        group_id = f"{user_id}:{session_id}"
+        
+        # Query for episodes with exact group_id match
+        query = """
+        MATCH (e:Episodic) 
+        WHERE e.group_id = $group_id
+        RETURN e.uuid as uuid, e.name as name, e.content as content, 
+               e.source as source, e.source_description as source_description,
+               e.created_at as created_at, e.updated_at as updated_at,
+               e.group_id as group_id
+        ORDER BY e.created_at DESC
+        LIMIT $limit
+        """
+        
+        result = await graphiti.driver.execute_query(
+            query, 
+            group_id=group_id, 
+            limit=limit
+        )
+        
+        episodes = []
+        for record in result:
+            if record is None:
+                continue
+            
+            # Handle both dictionary and list formats
+            if isinstance(record, dict):
+                record_data = record
+            elif isinstance(record, list):
+                # Skip header rows
+                if len(record) == 8 and all(isinstance(item, str) for item in record if item is not None):
+                    continue
+                # Map list to field names
+                field_names = ['uuid', 'name', 'content', 'source', 'source_description', 'created_at', 'updated_at', 'group_id']
+                if len(record) == len(field_names):
+                    record_data = dict(zip(field_names, record))
+                else:
+                    continue
+            else:
+                continue
+            
+            try:
+                episode = EpisodeResponse(
+                    uuid=record_data.get('uuid', ''),
+                    content=record_data.get('content', ''),
+                    source=record_data.get('source', 'unknown'),
+                    source_description=record_data.get('source_description'),
+                    created_at=record_data.get('created_at'),
+                    updated_at=record_data.get('updated_at')
+                )
+                episodes.append(episode)
+            except Exception as e:
+                logger.warning(f"Failed to create episode from record: {e}")
+                continue
+        
+        logger.info(f"✅ Found {len(episodes)} episodes for session {session_id}")
+        return episodes
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to fetch episodes for session {session_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get session episodes: {str(e)}"
+        )
