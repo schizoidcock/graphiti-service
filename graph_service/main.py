@@ -7,7 +7,7 @@ import logging
 import sys
 import logging.config
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -196,70 +196,27 @@ async def debug_config():
 
 @app.get('/debug/nlp-test')
 async def debug_nlp_test():
-    """Test endpoint to verify NLP capabilities"""
-    from graph_service.zep_graphiti import get_graphiti
+    """Test endpoint to verify NLP capabilities without database access"""
     settings = get_settings()
     
     try:
-        # Test LLM client directly
-        async for graphiti in get_graphiti(settings):
-            if not graphiti.llm_client:
-                return JSONResponse(content={
-                    'status': 'error',
-                    'message': 'LLM client not initialized'
-                }, status_code=500)
-            
-            # Test a simple completion to verify connectivity
-            if hasattr(graphiti.llm_client, 'generate_response'):
-                test_response = await graphiti.llm_client.generate_response([
-                    {"role": "system", "content": "You are a helpful assistant. Respond with exactly: {'test': 'success'}"},
-                    {"role": "user", "content": "Test connection"}
-                ])
-            elif hasattr(graphiti.llm_client, 'complete_chat'):
-                test_response = await graphiti.llm_client.complete_chat([
-                    {"role": "system", "content": "You are a helpful assistant. Respond with exactly: {'test': 'success'}"},
-                    {"role": "user", "content": "Test connection"}
-                ])
-            elif hasattr(graphiti.llm_client, 'chat'):
-                test_response = await graphiti.llm_client.chat([
-                    {"role": "system", "content": "You are a helpful assistant. Respond with exactly: {'test': 'success'}"},
-                    {"role": "user", "content": "Test connection"}
-                ])
-            elif hasattr(graphiti.llm_client, 'complete'):
-                test_response = await graphiti.llm_client.complete([
-                    {"role": "system", "content": "You are a helpful assistant. Respond with exactly: {'test': 'success'}"},
-                    {"role": "user", "content": "Test connection"}
-                ])
-            else:
-                return JSONResponse(content={
-                    'status': 'error',
-                    'message': 'Unknown LLM client methods',
-                    'available_methods': [method for method in dir(graphiti.llm_client) if not method.startswith('_')]
-                }, status_code=500)
-            
-            # Test entity extraction with token-optimized content
-            test_entities = await graphiti.extract_entities_from_text(
-                "John ordered coffee from the local cafe and talked to Sarah about the new project.",
-                "test-group"
-            )
-            
-            # Test contextual summary with small content
-            test_summary = await graphiti.get_contextual_summary("test-group", max_episodes=3)
-            
+        # Test LLM configuration without creating database connections
+        if not settings.openai_api_key:
             return JSONResponse(content={
-                'status': 'success',
-                'llm_client_available': True,
-                'test_response': test_response[:100] + "..." if len(test_response) > 100 else test_response,
-                'model': graphiti.llm_client.model if hasattr(graphiti.llm_client, 'model') else 'unknown',
-                'entity_extraction_test': {
-                    'entities_found': len(test_entities),
-                    'sample_entities': test_entities[:3] if test_entities else []
-                },
-                'summary_test': {
-                    'summary_generated': bool(test_summary and test_summary.get('summary')),
-                    'summary_preview': test_summary.get('summary', '')[:100] + "..." if test_summary and test_summary.get('summary') else 'No summary'
-                }
-            }, status_code=200)
+                'status': 'error',
+                'message': 'OpenAI API key not configured'
+            }, status_code=500)
+        
+        # Simple configuration check without database initialization
+        return JSONResponse(content={
+            'status': 'success',
+            'message': 'NLP configuration verified',
+            'openai_configured': bool(settings.openai_api_key),
+            'openai_base_url': settings.openai_base_url,
+            'model_name': settings.model_name,
+            'embedding_model': settings.embedding_model_name,
+            'note': 'Database connections are created lazily when users send messages'
+        })
             
     except Exception as e:
         return JSONResponse(content={

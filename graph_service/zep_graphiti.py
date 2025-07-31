@@ -199,11 +199,11 @@ class ZepGraphiti(Graphiti):
                 database_name = sanitized_user_id
             else:
                 database_name = f"user_{sanitized_user_id}"
-            logger.info(f"🔐 DATABASE CREATION: user_id='{user_id}' → sanitized='{sanitized_user_id}' → database='{database_name}'")
+            logger.debug(f"🔐 DATABASE CONNECTION: user_id='{user_id}' → sanitized='{sanitized_user_id}' → database='{database_name}'")
         else:
             sanitized_user_id = None
             database_name = "default_db"
-            logger.info(f"🔐 DATABASE CREATION: user_id='{user_id}' → database='{database_name}' (using default)")
+            logger.debug(f"🔐 DATABASE CONNECTION: user_id='{user_id}' → database='{database_name}' (using default)")
         
         falkor_driver = FalkorDriver(
             host=host, 
