@@ -25,6 +25,8 @@ RUN pip install \
     python-multipart>=0.0.6 \
     redis>=5.0.0 \
     falkordb>=1.1.2 \
+    neo4j>=5.26.0 \
+    diskcache>=5.6.3 \
     openai>=1.0.0 \
     anthropic>=0.7.0 \
     google-generativeai>=0.3.0 \
@@ -41,7 +43,8 @@ RUN pip install \
     async-timeout>=4.0.0 \
     python-dotenv>=1.0.0 \
     python-dateutil>=2.8.0 \
-    pytz>=2023.3
+    pytz>=2023.3 \
+    posthog>=3.0.0
 
 # Create non-root user
 RUN groupadd -r app && useradd -r -g app app
