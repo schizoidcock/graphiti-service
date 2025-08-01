@@ -52,6 +52,12 @@ class EntityClassification(BaseModel):
     )
 
 
+class EntitySummary(BaseModel):
+    summary: str = Field(
+        description='Summary containing the important information about the entity. Under 250 words'
+    )
+
+
 class Prompt(Protocol):
     extract_message: PromptVersion
     extract_json: PromptVersion
@@ -59,6 +65,7 @@ class Prompt(Protocol):
     reflexion: PromptVersion
     classify_nodes: PromptVersion
     extract_attributes: PromptVersion
+    extract_summary: PromptVersion
 
 
 class Versions(TypedDict):
@@ -68,6 +75,7 @@ class Versions(TypedDict):
     reflexion: PromptFunction
     classify_nodes: PromptFunction
     extract_attributes: PromptFunction
+    extract_summary: PromptFunction
 
 
 def extract_message(context: dict[str, Any]) -> list[Message]:
@@ -270,6 +278,48 @@ def extract_attributes(context: dict[str, Any]) -> list[Message]:
     ]
 
 
+def extract_summary(context: dict[str, Any]) -> list[Message]:
+    sys_prompt = """You are an AI assistant that generates concise entity summaries. 
+    Your task is to create or update a summary for an entity based on provided information."""
+
+    user_prompt = f"""
+<ENTITY INFORMATION>
+Entity Name: {context['node']['name']}
+Current Summary: {context['node']['summary']}
+Entity Types: {context['node']['entity_types']}
+Current Attributes: {context['node']['attributes']}
+</ENTITY INFORMATION>
+
+<EPISODE CONTENT>
+{context['episode_content']}
+</EPISODE CONTENT>
+
+<PREVIOUS EPISODES>
+{context['previous_episodes']}
+</PREVIOUS EPISODES>
+
+Instructions:
+1. Create or update a comprehensive summary for this entity based on all available information
+2. Include important details from the episode content and previous episodes
+3. Keep the summary under 250 words
+4. Focus on the most relevant and significant information about the entity
+5. If the current summary already exists, enhance it with new information rather than replacing it entirely
+
+Generate a concise, informative summary that captures the essence of this entity.
+    """
+
+    return [
+        Message(
+            role='system',
+            content=sys_prompt,
+        ),
+        Message(
+            role='user', 
+            content=user_prompt,
+        ),
+    ]
+
+
 versions: Versions = {
     'extract_message': extract_message,
     'extract_json': extract_json,
@@ -277,4 +327,5 @@ versions: Versions = {
     'reflexion': reflexion,
     'classify_nodes': classify_nodes,
     'extract_attributes': extract_attributes,
+    'extract_summary': extract_summary,
 }
