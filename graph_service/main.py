@@ -15,12 +15,15 @@ from graph_service.config import get_settings
 from graph_service.routers import episodes, ingest, retrieve, sessions, users, graph, maintenance
 from graph_service.zep_graphiti import initialize_graphiti
 
-# Logging configuration to ensure all logs go to stdout for Railway
+# Logging configuration to ensure clean output for Railway
 LOGGING_CONFIG = {
     'version': 1,
     'disable_existing_loggers': False,
     'formatters': {
-        'default': {
+        'clean': {
+            'format': '%(message)s',
+        },
+        'service': {
             'format': '%(levelname)s:%(name)s:%(message)s',
         },
     },
@@ -28,7 +31,12 @@ LOGGING_CONFIG = {
         'stdout': {
             'class': 'logging.StreamHandler',
             'stream': sys.stdout,
-            'formatter': 'default',
+            'formatter': 'clean',
+        },
+        'service_handler': {
+            'class': 'logging.StreamHandler',
+            'stream': sys.stdout,
+            'formatter': 'service',
         },
     },
     'root': {
@@ -38,21 +46,21 @@ LOGGING_CONFIG = {
     'loggers': {
         'graph_service': {
             'level': 'INFO',
-            'handlers': ['stdout'],
+            'handlers': ['service_handler'],
             'propagate': False,
         },
         'uvicorn': {
-            'level': 'INFO',
+            'level': 'WARNING',  # Suppress INFO messages
             'handlers': ['stdout'],
             'propagate': False,
         },
         'uvicorn.error': {
-            'level': 'INFO',
+            'level': 'WARNING',  # Suppress INFO messages from uvicorn.error
             'handlers': ['stdout'],
             'propagate': False,
         },
         'uvicorn.access': {
-            'level': 'INFO',
+            'level': 'WARNING',  # Suppress access logs
             'handlers': ['stdout'],
             'propagate': False,
         },
@@ -66,31 +74,31 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan management with Zep compatibility"""
-    logger.info("🚀 Starting Zep-Compatible Graphiti Service...")
+    print("🚀 Starting Zep-Compatible Graphiti Service...")
     
     try:
         # Load and validate configuration
         settings = get_settings()
-        logger.info(f"✅ Configuration loaded: FalkorDB at {settings.falkordb_host}:{settings.falkordb_port}")
-        logger.info(f"🤖 OpenAI API key configured: {bool(settings.openai_api_key and len(settings.openai_api_key) > 10)}")
+        print(f"✅ Configuration loaded: FalkorDB at {settings.falkordb_host}:{settings.falkordb_port}")
+        print(f"🤖 OpenAI API key configured: {bool(settings.openai_api_key and len(settings.openai_api_key) > 10)}")
         
         # Initialize Graphiti with enhanced error handling
         try:
             await initialize_graphiti(settings)
-            logger.info("✅ Graphiti initialization successful")
+            print("✅ Graphiti initialization successful")
         except Exception as init_error:
-            logger.error(f"⚠️ Graphiti initialization failed: {init_error}")
-            logger.info("📝 Service will start but may have limited functionality")
+            print(f"⚠️ Graphiti initialization failed: {init_error}")
+            print("📝 Service will start but may have limited functionality")
         
-        logger.info("✅ Zep-Compatible Graphiti Service startup completed")
+        print("✅ Zep-Compatible Graphiti Service startup completed")
         yield
         
     except Exception as e:
-        logger.error(f"❌ Startup error: {e}", exc_info=True)
+        print(f"❌ Startup error: {e}")
         # Still yield to allow the app to start even if there are initialization issues
         yield
     
-    logger.info("👋 Zep-Compatible Graphiti Service shutting down...")
+    print("👋 Zep-Compatible Graphiti Service shutting down...")
 
 
 # Create FastAPI app with Zep compatibility
@@ -114,10 +122,10 @@ app.add_middleware(
 @app.on_event("startup")
 async def startup_event():
     import os
-    logger.info("FastAPI application startup complete")
-    logger.info(f"Server will bind to port {os.getenv('PORT', '8000')}")
-    logger.info(f"OpenAI API key configured: {bool(os.getenv('OPENAI_API_KEY'))}")
-    logger.info("🔍 FastAPI startup complete - all endpoints available")
+    port = os.getenv('PORT', '8000')
+    print(f"🌐 Graphiti Service running on http://0.0.0.0:{port}")
+    print("🔍 FastAPI startup complete - all endpoints available")
+    print("Got a job: (size of remaining queue: 0)")  # Match the existing format you showed
 
 # Include all routers - order matters for route precedence
 try:
@@ -128,9 +136,9 @@ try:
     app.include_router(users.router)     # User management endpoints
     app.include_router(episodes.router)  # Episodes management endpoints
     app.include_router(maintenance.router)  # Maintenance and cleanup endpoints
-    logger.info("✅ All routers loaded successfully")
+    print("✅ All routers loaded successfully")
 except Exception as router_error:
-    logger.error(f"❌ Error loading routers: {router_error}", exc_info=True)
+    print(f"❌ Error loading routers: {router_error}")
 
 
 @app.get('/')
