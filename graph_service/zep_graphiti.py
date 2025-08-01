@@ -207,9 +207,9 @@ class ZepGraphiti(Graphiti):
         
         falkor_driver = FalkorDriver(
             host=host, 
-            port=int(port), 
-            username=username, 
-            password=password,
+            port=int(port) if port and port.strip() else 6379, 
+            username=username if username and username.strip() else None, 
+            password=password if password and password.strip() else None,
             database=database_name
         )
         super().__init__(graph_driver=falkor_driver, llm_client=llm_client)
