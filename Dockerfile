@@ -62,5 +62,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 ENV PYTHONPATH=/app
 ENV PORT=8000
 
-# Start the FastAPI server with dual-stack IPv4/IPv6 support for Railway
-CMD ["python", "-m", "uvicorn", "graph_service.main:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "warning", "--no-access-log"]
+# Start the FastAPI server with debug logging to diagnose connection issues
+CMD ["python", "-m", "uvicorn", "graph_service.main:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "info", "--access-log"]

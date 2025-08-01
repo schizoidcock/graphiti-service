@@ -118,13 +118,60 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Add startup logging
+# Add request logging middleware for debugging
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    import time
+    start_time = time.time()
+    
+    # Log incoming request
+    client_host = request.client.host if request.client else "unknown"
+    print(f"📥 Incoming: {request.method} {request.url.path} from {client_host}")
+    
+    response = await call_next(request)
+    
+    # Log response
+    process_time = time.time() - start_time
+    print(f"📤 Response: {response.status_code} in {process_time:.3f}s")
+    
+    return response
+
+# Add startup logging with network debugging
 @app.on_event("startup")
 async def startup_event():
     import os
+    import socket
     port = os.getenv('PORT', '8000')
-    print(f"🌐 Graphiti Service running on http://0.0.0.0:{port}")
-    print("🔍 FastAPI startup complete - all endpoints available")
+    
+    print(f"🌐 Graphiti Service starting on http://0.0.0.0:{port}")
+    print(f"🔍 FastAPI startup complete - all endpoints available")
+    print(f"📡 Server will listen on all interfaces (0.0.0.0:{port})")
+    
+    # Debug network interfaces
+    try:
+        hostname = socket.gethostname()
+        local_ip = socket.gethostbyname(hostname)
+        print(f"🖥️  Hostname: {hostname}")
+        print(f"🔗 Local IP: {local_ip}")
+        
+        # Check if we can bind to the port
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            s.bind(('0.0.0.0', int(port)))
+            print(f"✅ Successfully bound to 0.0.0.0:{port}")
+        
+        # Check IPv6 capability
+        try:
+            with socket.socket(socket.AF_INET6, socket.SOCK_STREAM) as s6:
+                s6.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                s6.bind(('::', int(port)))
+                print(f"✅ IPv6 capable - can bind to [::]:{port}")
+        except Exception as e:
+            print(f"⚠️  IPv6 binding test failed: {e}")
+            
+    except Exception as e:
+        print(f"❌ Network interface debug failed: {e}")
+    
     print("Got a job: (size of remaining queue: 0)")  # Match the existing format you showed
 
 # Include all routers - order matters for route precedence
