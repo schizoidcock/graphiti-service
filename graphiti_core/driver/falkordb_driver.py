@@ -107,45 +107,70 @@ class FalkorDriver(GraphDriver):
     def _configure_redis_for_railway(self):
         """Configure Redis settings to avoid persistence issues on Railway"""
         try:
-            logger.info("🔧 Configuring Redis for Railway environment...")
+            import asyncio
             
-            # Use FalkorDB's underlying Redis connection to configure settings
-            # These settings prevent persistence issues on Railway's ephemeral filesystem
-            redis_commands = [
-                ('CONFIG', 'SET', 'save', ''),  # Disable RDB snapshots
-                ('CONFIG', 'SET', 'stop-writes-on-bgsave-error', 'no'),  # Don't block writes on save errors
-                ('CONFIG', 'SET', 'appendonly', 'no'),  # Disable AOF persistence
-            ]
-            
-            # Try to execute configuration commands synchronously
-            success_count = 0
-            for cmd in redis_commands:
+            async def _config_redis():
+                """Async Redis configuration for Railway environment"""
                 try:
-                    # Try using FalkorDB's execute method for Redis commands
-                    if hasattr(self.client, 'redis') and hasattr(self.client.redis, 'execute_command'):
-                        self.client.redis.execute_command(*cmd)
-                        success_count += 1
-                    elif hasattr(self.client, 'execute_command'):
-                        self.client.execute_command(*cmd)
-                        success_count += 1
+                    logger.info("🔧 Configuring Redis for Railway environment...")
+                    
+                    # Redis commands to prevent persistence issues on Railway's ephemeral filesystem
+                    redis_commands = [
+                        ('CONFIG', 'SET', 'save', ''),  # Disable RDB snapshots
+                        ('CONFIG', 'SET', 'stop-writes-on-bgsave-error', 'no'),  # Don't block writes on save errors
+                        ('CONFIG', 'SET', 'appendonly', 'no'),  # Disable AOF persistence
+                    ]
+                    
+                    success_count = 0
+                    for cmd in redis_commands:
+                        try:
+                            # Try different FalkorDB client interfaces for Redis commands
+                            if hasattr(self.client, 'redis') and hasattr(self.client.redis, 'execute_command'):
+                                # Use redis client directly if available
+                                await self.client.redis.execute_command(*cmd)
+                                success_count += 1
+                            elif hasattr(self.client, 'execute_command'):
+                                # Try FalkorDB's execute_command method
+                                await self.client.execute_command(*cmd)
+                                success_count += 1
+                            elif hasattr(self.client, '_redis') and hasattr(self.client._redis, 'execute_command'):
+                                # Try internal redis connection
+                                await self.client._redis.execute_command(*cmd)
+                                success_count += 1
+                        except Exception as cmd_err:
+                            logger.debug(f"Redis config command {cmd[1]} failed: {cmd_err}")
+                            continue
+                    
+                    if success_count > 0:
+                        logger.info(f"✅ Redis configured for Railway ({success_count}/3 settings applied)")
                     else:
-                        # Alternative: try direct Redis connection
-                        if hasattr(self.client, '_client') and hasattr(self.client._client, 'execute_command'):
-                            self.client._client.execute_command(*cmd)
-                            success_count += 1
-                except Exception as cmd_err:
-                    logger.debug(f"Redis config command {cmd[1]} failed: {cmd_err}")
-                    continue
+                        logger.warning("⚠️ Could not apply Redis configuration - using default settings")
+                        logger.info("Service may experience persistence issues on Railway")
+                        
+                except Exception as config_err:
+                    logger.warning(f"Redis configuration error: {config_err}")
+                    logger.info("Proceeding with default Redis configuration")
             
-            if success_count > 0:
-                logger.info(f"✅ Redis configured for Railway ({success_count}/3 settings applied)")
-            else:
-                logger.warning("⚠️ Could not apply Redis configuration - using default settings")
-                logger.info("Service may experience persistence issues on Railway")
+            # Handle async execution properly without blocking
+            try:
+                # Check if we're already in an async context
+                loop = asyncio.get_running_loop()
+                # If we're in an async context, schedule the task
+                asyncio.create_task(_config_redis())
+                logger.debug("Redis configuration scheduled as async task")
                 
+            except RuntimeError:
+                # No event loop running, we can run it directly
+                try:
+                    asyncio.run(_config_redis())
+                    logger.debug("Redis configuration completed synchronously")
+                except Exception as run_err:
+                    logger.warning(f"Could not run Redis configuration: {run_err}")
+                    logger.info("Redis configuration will be attempted during first query")
+                    
         except Exception as e:
-            logger.warning(f"Redis configuration failed: {e}")
-            logger.info("Proceeding with default Redis configuration")
+            logger.warning(f"Redis configuration setup failed: {e}")
+            logger.info("Service will continue with default Redis configuration")
 
     def _get_graph(self, graph_name: str | None) -> FalkorGraph:
         # FalkorDB requires a non-None database name for multi-tenant graphs; the default is "default_db"
