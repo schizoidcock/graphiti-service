@@ -72,9 +72,6 @@ class FalkorDriverSession(GraphDriverSession):
 
 class FalkorDriver(GraphDriver):
     provider = GraphProvider.FALKORDB
-    
-    # Class-level flag to prevent duplicate Redis configuration
-    _redis_configured = False
 
     def __init__(
         self,
@@ -102,10 +99,8 @@ class FalkorDriver(GraphDriver):
             # Initialize FalkorDB client with Railway-compatible settings
             self.client = FalkorDB(host=host, port=port, username=username, password=password)
             
-        # Try to configure Redis to avoid persistence issues (only once per class)
-        if not FalkorDriver._redis_configured:
-            self._configure_redis_for_railway()
-            FalkorDriver._redis_configured = True
+        # Skip Redis configuration for now to avoid connection issues
+        # self._configure_redis_for_railway()
 
         self.fulltext_syntax = '@'  # FalkorDB uses a redisearch-like syntax for fulltext queries see https://redis.io/docs/latest/develop/ai/search-and-query/query/full-text/
 
