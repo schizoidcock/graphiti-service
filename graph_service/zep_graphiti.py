@@ -1295,6 +1295,19 @@ async def get_graphiti(settings: ZepEnvDep, request: Request):
         pass
 
 
+async def get_graphiti_for_user(user_id: str, settings: ZepEnvDep):
+    """Create graphiti client for a specific user_id (used by session creation)"""
+    current_user_context.set(user_id)
+    
+    # Fast client lookup/creation using optimized pooling
+    client = get_or_create_pooled_client(user_id, settings)
+    try:
+        yield client
+    finally:
+        # Keep client in pool for reuse
+        pass
+
+
 async def initialize_graphiti(settings: ZepEnvDep):
     # Use a global flag to prevent multiple initializations
     if hasattr(initialize_graphiti, '_initialized'):
@@ -1339,3 +1352,4 @@ def get_fact_result_from_edge(edge: EntityEdge):
 
 
 ZepGraphitiDep = Annotated[ZepGraphiti, Depends(get_graphiti)]
+ZepGraphitiForUserDep = Annotated[ZepGraphiti, Depends(get_graphiti_for_user)]

@@ -16,7 +16,7 @@ from graph_service.dto.session import (
     SessionMessage,
     SessionMessagesResponse
 )
-from graph_service.zep_graphiti import ZepGraphitiDep
+from graph_service.zep_graphiti import ZepGraphitiDep, ZepGraphitiForUserDep, get_or_create_pooled_client, current_user_context, ZepEnvDep
 
 # Async helper function for non-blocking entity extraction
 async def extract_entities_async(graphiti, content: str, group_id: str, session_id: str):
@@ -56,7 +56,7 @@ sessions_store: Dict[str, Dict[str, Any]] = {}
 @router.post('/sessions', status_code=status.HTTP_201_CREATED, response_model=SessionResponse)
 async def add_session(
     request: SessionRequest,
-    graphiti: ZepGraphitiDep
+    settings: ZepEnvDep
 ):
     """Create a new session following Zep Cloud API structure"""
     
@@ -96,6 +96,10 @@ async def add_session(
     
     # Initialize Graphiti knowledge graph for this session
     try:
+        # Create graphiti client for this user
+        current_user_context.set(request.user_id)
+        graphiti = get_or_create_pooled_client(request.user_id, settings)
+        
         # Create initial context in knowledge graph
         group_id = f"{request.user_id}_{request.session_id}"  # Combine for uniqueness
         logger.info(f"🔧 Initializing Graphiti with group_id: {group_id}")
