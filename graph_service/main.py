@@ -74,31 +74,47 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan management with Zep compatibility"""
-    print("🚀 Starting Zep-Compatible Graphiti Service...")
+    print("🚀  Starting Zep-Compatible Graphiti Service...")
     
     try:
+        # Debug network configuration
+        import os
+        import socket
+        port = os.getenv('PORT')
+        print(f"🔧  Railway assigned PORT: {port}")
+        
+        try:
+            hostname = socket.gethostname()
+            local_ip = socket.gethostbyname(hostname)
+            print(f"🖥️  Hostname: {hostname}")
+            print(f"🔗  Local IP: {local_ip}")
+            print(f"🌐  Will listen on http://0.0.0.0:{port}")
+            print(f"🏥  Health endpoint: http://0.0.0.0:{port}/healthcheck")
+        except Exception as net_error:
+            print(f"⚠️  Network debug failed: {net_error}")
+        
         # Load and validate configuration
         settings = get_settings()
-        print(f"✅ Configuration loaded: FalkorDB at {settings.falkordb_host}:{settings.falkordb_port}")
-        print(f"🤖 OpenAI API key configured: {bool(settings.openai_api_key and len(settings.openai_api_key) > 10)}")
+        print(f"✅  Configuration loaded: FalkorDB at {settings.falkordb_host}:{settings.falkordb_port}")
+        print(f"🤖  OpenAI API key configured: {bool(settings.openai_api_key and len(settings.openai_api_key) > 10)}")
         
         # Initialize Graphiti with enhanced error handling
         try:
             await initialize_graphiti(settings)
-            print("✅ Graphiti initialization successful")
+            print("✅  Graphiti initialization successful")
         except Exception as init_error:
-            print(f"⚠️ Graphiti initialization failed: {init_error}")
-            print("📝 Service will start but may have limited functionality")
+            print(f"⚠️  Graphiti initialization failed: {init_error}")
+            print("📝  Service will start but may have limited functionality")
         
-        print("✅ Zep-Compatible Graphiti Service startup completed")
+        print("✅  Zep-Compatible Graphiti Service startup completed")
         yield
         
     except Exception as e:
-        print(f"❌ Startup error: {e}")
+        print(f"❌  Startup error: {e}")
         # Still yield to allow the app to start even if there are initialization issues
         yield
     
-    print("👋 Zep-Compatible Graphiti Service shutting down...")
+    print("👋  Zep-Compatible Graphiti Service shutting down...")
 
 
 # Create FastAPI app with Zep compatibility
@@ -126,44 +142,16 @@ async def log_requests(request: Request, call_next):
     
     # Log incoming request
     client_host = request.client.host if request.client else "unknown"
-    print(f"📥 Incoming: {request.method} {request.url.path} from {client_host}")
+    print(f"📥  Incoming: {request.method} {request.url.path} from {client_host}")
     
     response = await call_next(request)
     
     # Log response
     process_time = time.time() - start_time
-    print(f"📤 Response: {response.status_code} in {process_time:.3f}s")
+    print(f"📤  Response: {response.status_code} in {process_time:.3f}s")
     
     return response
 
-# Add startup logging with network debugging
-@app.on_event("startup")
-async def startup_event():
-    import os
-    import socket
-    port = os.getenv('PORT', '8000')
-    
-    print(f"🌐 Graphiti Service starting on http://0.0.0.0:{port}")
-    print(f"🔍 FastAPI startup complete - all endpoints available")
-    print(f"📡 Server will listen on all interfaces (0.0.0.0:{port})")
-    
-    # Debug network interfaces
-    try:
-        hostname = socket.gethostname()
-        local_ip = socket.gethostbyname(hostname)
-        print(f"🖥️  Hostname: {hostname}")
-        print(f"🔗 Local IP: {local_ip}")
-        
-        print(f"🔧 Railway assigned PORT: {port}")
-        
-        # Note: We don't test binding here since uvicorn will handle it
-        print(f"✅ Will bind to 0.0.0.0:{port} (Railway managed)")
-        print(f"🌐 Health endpoint will be available at http://0.0.0.0:{port}/healthcheck")
-            
-    except Exception as e:
-        print(f"❌ Network interface debug failed: {e}")
-    
-    print("Got a job: (size of remaining queue: 0)")  # Match the existing format you showed
 
 # Include all routers - order matters for route precedence
 try:
@@ -174,9 +162,9 @@ try:
     app.include_router(users.router)     # User management endpoints
     app.include_router(episodes.router)  # Episodes management endpoints
     app.include_router(maintenance.router)  # Maintenance and cleanup endpoints
-    print("✅ All routers loaded successfully")
+    print("✅  All routers loaded successfully")
 except Exception as router_error:
-    print(f"❌ Error loading routers: {router_error}")
+    print(f"❌  Error loading routers: {router_error}")
 
 
 @app.get('/')
