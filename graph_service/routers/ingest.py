@@ -461,11 +461,11 @@ async def delete_database(user_id: str, settings: ZepEnvDep):
         logger.info(f"🗑️ Deleting database for user: {user_id}")
         
         # Ensure we have the right user context - this is for external API calls
-        resolved_user_id = update_user_context_from_group_id(user_id)
-        logger.debug(f"👤 Set user context to: {resolved_user_id}")
+        # user_id is already the full user ID, no need to resolve from group_id
+        logger.debug(f"👤 Set user context to: {user_id}")
         
-        # Call the direct deletion with the resolved user_id
-        return await delete_database_direct(resolved_user_id, settings)
+        # Call the direct deletion with the original user_id
+        return await delete_database_direct(user_id, settings)
         
     except Exception as e:
         logger.error(f"❌ Failed to delete database for user {user_id}: {e}", exc_info=True)
