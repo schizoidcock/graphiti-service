@@ -55,4 +55,5 @@ USER app
 ENV PYTHONPATH=/app
 
 # Start the FastAPI server with debug logging - use Railway's PORT
-CMD ["sh", "-c", "python -m uvicorn graph_service.main:app --host 0.0.0.0 --port ${PORT} --log-level info --access-log"]
+# Use :: to bind to all IPv6 interfaces (Railway internal network uses IPv6)
+CMD ["sh", "-c", "python -m uvicorn graph_service.main:app --host :: --port ${PORT} --log-level info --access-log"]
