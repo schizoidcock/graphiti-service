@@ -226,11 +226,22 @@ class ZepGraphiti(Graphiti):
         # Create user-specific database name for data isolation
         if user_id:
             sanitized_user_id = sanitize_user_id(user_id)
-            # Don't add extra "user_" prefix if already present
+            # Database name should always be the zep_ prefixed user ID (no user_ prefix)
+            # If user_id starts with user_, extract the zep_ part
             if sanitized_user_id.startswith("user_"):
+                # Extract the actual user ID after user_ prefix (should be zep_xxxx)
+                actual_user_id = sanitized_user_id[5:]  # Remove "user_" prefix
+                if actual_user_id.startswith("zep_"):
+                    database_name = actual_user_id
+                else:
+                    # If it doesn't start with zep_, add zep_ prefix
+                    database_name = f"zep_{actual_user_id}"
+            elif sanitized_user_id.startswith("zep_"):
+                # Already properly formatted
                 database_name = sanitized_user_id
             else:
-                database_name = f"user_{sanitized_user_id}"
+                # For other formats, add zep_ prefix
+                database_name = f"zep_{sanitized_user_id}"
             logger.debug(f"🔐 DATABASE CONNECTION: user_id='{user_id}' → sanitized='{sanitized_user_id}' → database='{database_name}'")
         else:
             sanitized_user_id = None
