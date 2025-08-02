@@ -32,6 +32,9 @@ _graphiti_pool: dict[str, "ZepGraphiti"] = {}
 
 def sanitize_user_id(user_id: str) -> str:
     """Sanitize user_id to be safe for database names"""
+    if not user_id:
+        raise ValueError("user_id cannot be empty")
+        
     # Remove any characters that aren't alphanumeric, underscore, or hyphen
     # Replace multiple consecutive non-alphanumeric chars with single underscore
     sanitized = re.sub(r'[^a-zA-Z0-9_-]+', '_', user_id)
@@ -44,7 +47,9 @@ def sanitize_user_id(user_id: str) -> str:
     
     # Limit length to prevent issues
     sanitized = sanitized[:50]
-    return sanitized or "default_user"
+    if not sanitized:
+        raise ValueError("user_id resulted in empty string after sanitization")
+    return sanitized
 
 
 # Cache for expensive operations
@@ -1247,7 +1252,11 @@ class ZepGraphiti(Graphiti):
 
 async def get_graphiti(settings: ZepEnvDep, request: Request):
     # Fast user context extraction
-    user_id = extract_user_id_from_request(request) or "default_user"
+    user_id = extract_user_id_from_request(request)
+    if not user_id:
+        # Return error instead of creating unwanted default graphs
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="User identification required. No valid user_id, session_id, or group_id found in request.")
     current_user_context.set(user_id)
     
     # Fast client lookup/creation using optimized pooling
