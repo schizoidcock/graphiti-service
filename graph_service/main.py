@@ -224,6 +224,7 @@ async def debug_config():
         'openai_api_key_prefix': settings.openai_api_key[:10] + "..." if settings.openai_api_key else None,
         'openai_base_url': settings.openai_base_url,
         'model_name': settings.model_name,
+        'temperature': settings.temperature,
         'falkordb_host': settings.falkordb_host,
         'falkordb_port': settings.falkordb_port,
         'falkordb_username_set': bool(settings.falkordb_username),
@@ -253,6 +254,7 @@ async def debug_nlp_test():
             'openai_base_url': settings.openai_base_url,
             'model_name': settings.model_name,
             'embedding_model': settings.embedding_model_name,
+            'temperature': settings.temperature,
             'note': 'Database connections are created lazily when users send messages'
         })
             

@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     openai_base_url: str | None = Field(default="https://api.openai.com/v1")
     model_name: str | None = Field(default="gpt-4o-mini")
     embedding_model_name: str | None = Field(default=None)
+    temperature: float = Field(default=0.1)  # LLM temperature for response creativity/consistency
     falkordb_host: str = Field(default="localhost")
     falkordb_port: str = Field(default="6379")
     falkordb_username: str | None = Field(default="")

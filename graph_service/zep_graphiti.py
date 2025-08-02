@@ -173,6 +173,7 @@ def get_or_create_pooled_client(user_id: str, settings) -> "ZepGraphiti":
             client.llm_client.config.base_url = settings.openai_base_url
         client.llm_client.config.api_key = settings.openai_api_key
         client.llm_client.model = settings.model_name or "gpt-4o-mini"
+        client.llm_client.config.temperature = settings.temperature
     
     # Fast embedder configuration
     if settings.openai_api_key and hasattr(client, 'embedder') and client.embedder and hasattr(client.embedder, 'config'):
@@ -621,8 +622,7 @@ class ZepGraphiti(Graphiti):
                     if hasattr(self.llm_client, 'generate_response'):
                         summary_response = await self.llm_client.generate_response(
                             messages, 
-                            max_tokens=300,  # Controlled response size
-                            temperature=0.1  # Low temperature for consistent structured output
+                            max_tokens=300  # Controlled response size
                         )
                     else:
                         logger.error(f"ZEP SUMMARY: LLM client missing generate_response method")
@@ -843,8 +843,7 @@ class ZepGraphiti(Graphiti):
                 if hasattr(self.llm_client, 'generate_response'):
                     response = await self.llm_client.generate_response(
                         messages, 
-                        max_tokens=100,  # Reduced tokens for faster response
-                        temperature=0.1  # Very low temperature for speed and consistency
+                        max_tokens=100  # Reduced tokens for faster response
                     )
                 else:
                     logger.error(f"ZEP EXTRACTION: LLM client missing generate_response method")
