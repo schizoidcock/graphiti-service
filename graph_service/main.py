@@ -45,7 +45,12 @@ LOGGING_CONFIG = {
     },
     'loggers': {
         'graph_service': {
-            'level': 'INFO',
+            'level': 'DEBUG',
+            'handlers': ['service_handler'],
+            'propagate': False,
+        },
+        'graph_service.zep_graphiti': {
+            'level': 'DEBUG',
             'handlers': ['service_handler'],
             'propagate': False,
         },
