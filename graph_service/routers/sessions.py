@@ -60,8 +60,11 @@ async def add_session(
 ):
     """Create a new session following Zep Cloud API structure"""
     
+    logger.info(f"🔄 Creating session: session_id='{request.session_id}', user_id='{request.user_id}'")
+    
     # Check if session already exists
     if request.session_id in sessions_store:
+        logger.warning(f"⚠️ Session '{request.session_id}' already exists")
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Session with id '{request.session_id}' already exists"
@@ -71,6 +74,8 @@ async def add_session(
     session_uuid = str(uuid_lib.uuid4())
     session_internal_id = len(sessions_store) + 1
     current_time = datetime.now(timezone.utc)
+    
+    logger.info(f"📝 Storing session data: uuid={session_uuid}, internal_id={session_internal_id}")
     
     # Store session data
     session_data = {
@@ -87,11 +92,13 @@ async def add_session(
     }
     
     sessions_store[request.session_id] = session_data
+    logger.info(f"✅ Session stored in sessions_store with user_id: {request.user_id}")
     
     # Initialize Graphiti knowledge graph for this session
     try:
         # Create initial context in knowledge graph
         group_id = f"{request.user_id}_{request.session_id}"  # Combine for uniqueness
+        logger.info(f"🔧 Initializing Graphiti with group_id: {group_id}")
         
         # Add session initialization episode
         await graphiti.enhanced_add_episode(

@@ -75,30 +75,40 @@ def _get_cached_user_db(user_id: str) -> str:
 def extract_user_id_from_request(request: Request) -> str | None:
     """Extract user_id from various sources in the request"""
     
+    logger.debug(f"🔍 Extracting user_id from request: path={request.url.path}, params={request.path_params}")
+    
     # Method 1: Check if there's a session_id in path parameters
     if "session_id" in request.path_params:
         session_id = request.path_params["session_id"]
+        logger.debug(f"🔍 Found session_id in path: {session_id}")
         
         # Check if session exists in session store to get user_id
         from graph_service.routers.sessions import sessions_store
         if session_id in sessions_store:
-            return sessions_store[session_id]["user_id"]
+            user_id = sessions_store[session_id]["user_id"]
+            logger.info(f"✅ Found user_id from sessions_store: {user_id}")
+            return user_id
         
+        logger.warning(f"⚠️ Session {session_id} not found in sessions_store, generating auto_user")
         # Fallback: generate user_id from session_id for auto-created sessions
         return f"auto_user_{session_id[:8]}"
     
     # Method 2: Check for group_id in path parameters (format: user_id_session_id)
     if "group_id" in request.path_params:
         group_id = request.path_params["group_id"]
+        logger.debug(f"🔍 Found group_id in path: {group_id}")
         if "_" in group_id:
             user_id, _ = group_id.split("_", 1)
+            logger.info(f"✅ Extracted user_id from group_id: {user_id}")
             return user_id
         # Fallback: treat group_id as session_id
         return f"user_{group_id[:8]}"
     
     # Method 3: Check query parameters for user_id
     if "user_id" in request.query_params:
-        return request.query_params["user_id"]
+        user_id = request.query_params["user_id"]
+        logger.info(f"✅ Found user_id in query params: {user_id}")
+        return user_id
     
     # Method 4: Check URL path for user patterns
     path = request.url.path
@@ -108,10 +118,13 @@ def extract_user_id_from_request(request: Request) -> str | None:
         try:
             user_index = parts.index("users") + 1
             if user_index < len(parts):
-                return parts[user_index]
+                user_id = parts[user_index]
+                logger.info(f"✅ Extracted user_id from URL path: {user_id}")
+                return user_id
         except (ValueError, IndexError):
             pass
     
+    logger.warning("⚠️ No user_id found in request")
     return None
 
 
