@@ -272,7 +272,18 @@ class EntityNode(Node):
     async def generate_name_embedding(self, embedder: EmbedderClient):
         start = time()
         text = self.name.replace('\n', ' ')
-        self.name_embedding = await embedder.create(input_data=[text])
+        embeddings = await embedder.create(input_data=[text])
+        
+        # Handle case where embedder returns list of embeddings vs single embedding
+        if isinstance(embeddings, list) and len(embeddings) > 0:
+            if isinstance(embeddings[0], list):
+                # embeddings is a list of embedding vectors
+                self.name_embedding = embeddings[0]
+            else:
+                # embeddings is already a flat list (single embedding)
+                self.name_embedding = embeddings
+        else:
+            self.name_embedding = embeddings
         end = time()
         logger.debug(f'embedded {text} in {end - start} ms')
 
@@ -418,7 +429,18 @@ class CommunityNode(Node):
     async def generate_name_embedding(self, embedder: EmbedderClient):
         start = time()
         text = self.name.replace('\n', ' ')
-        self.name_embedding = await embedder.create(input_data=[text])
+        embeddings = await embedder.create(input_data=[text])
+        
+        # Handle case where embedder returns list of embeddings vs single embedding
+        if isinstance(embeddings, list) and len(embeddings) > 0:
+            if isinstance(embeddings[0], list):
+                # embeddings is a list of embedding vectors
+                self.name_embedding = embeddings[0]
+            else:
+                # embeddings is already a flat list (single embedding)
+                self.name_embedding = embeddings
+        else:
+            self.name_embedding = embeddings
         end = time()
         logger.debug(f'embedded {text} in {end - start} ms')
 

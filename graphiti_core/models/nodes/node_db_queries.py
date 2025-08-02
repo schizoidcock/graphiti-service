@@ -60,7 +60,9 @@ def get_entity_node_save_query(provider: GraphProvider, labels: str) -> str:
         MERGE (n:Entity {{uuid: $entity_data.uuid}})
         SET n:{labels}
         SET n = $entity_data
-        WITH n CALL db.create.setNodeVectorProperty(n, "name_embedding", $entity_data.name_embedding)
+        WITH n 
+        WHERE $entity_data.name_embedding IS NOT NULL
+        CALL db.create.setNodeVectorProperty(n, "name_embedding", $entity_data.name_embedding)
         RETURN n.uuid AS uuid
     """
 
@@ -78,6 +80,7 @@ def get_entity_node_save_bulk_query(provider: GraphProvider, nodes: list[dict]) 
                         SET n:{label}
                         SET n = node
                         WITH n, node
+                        WHERE node.name_embedding IS NOT NULL
                         SET n.name_embedding = vecf32(node.name_embedding)
                         RETURN n.uuid AS uuid
                         """,

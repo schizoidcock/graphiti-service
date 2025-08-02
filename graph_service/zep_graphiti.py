@@ -936,7 +936,9 @@ class ZepGraphiti(Graphiti):
                     logger.debug(f"ZEP EXTRACTION: Parsing response text: {response_text[:200]}...")
                     
                     import json
+                    import ast
                     try:
+                        # First try standard JSON parsing
                         parsed_response = json.loads(response_text)
                         
                         # Handle different response formats following Zep patterns
@@ -958,9 +960,35 @@ class ZepGraphiti(Graphiti):
                             return []
                             
                     except json.JSONDecodeError as json_error:
-                        logger.error(f"ZEP EXTRACTION: Failed to parse entity JSON: {json_error}")
-                        logger.error(f"Response text: {response_text[:500]}")
-                        return []
+                        logger.warning(f"ZEP EXTRACTION: Standard JSON parsing failed: {json_error}")
+                        
+                        # Try parsing as Python literal (handles single quotes)
+                        try:
+                            parsed_response = ast.literal_eval(response_text)
+                            logger.debug(f"ZEP EXTRACTION: Successfully parsed using ast.literal_eval")
+                            
+                            # Handle different response formats
+                            if isinstance(parsed_response, list):
+                                entities = parsed_response
+                                logger.debug(f"ZEP EXTRACTION: Parsed {len(entities)} entities from Python literal array")
+                            elif isinstance(parsed_response, dict):
+                                if 'name' in parsed_response and 'type' in parsed_response:
+                                    entities = [parsed_response]
+                                    logger.debug(f"ZEP EXTRACTION: Single entity object: {parsed_response['name']}")
+                                elif 'entities' in parsed_response:
+                                    entities = parsed_response['entities']
+                                    logger.debug(f"ZEP EXTRACTION: Found entities in dict: {len(entities)} entities")
+                                else:
+                                    logger.warning(f"ZEP EXTRACTION: Unexpected Python literal format: {parsed_response}")
+                                    return []
+                            else:
+                                logger.warning(f"ZEP EXTRACTION: Expected list or dict, got {type(parsed_response)}")
+                                return []
+                                
+                        except (ValueError, SyntaxError) as ast_error:
+                            logger.error(f"ZEP EXTRACTION: Failed to parse as Python literal: {ast_error}")
+                            logger.error(f"Response text: {response_text[:500]}")
+                            return []
                 
                 # Process and save entities using Zep patterns
                 saved_entities = []
