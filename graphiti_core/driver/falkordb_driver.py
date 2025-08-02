@@ -113,18 +113,23 @@ class FalkorDriver(GraphDriver):
                 try:
                     # Get the underlying Redis connection
                     redis_client = self.client
+                    config_success = False
+                    
                     if hasattr(redis_client, 'connection') and hasattr(redis_client.connection, 'execute_command'):
                         # Try to disable RDB snapshots and write blocking
                         await redis_client.connection.execute_command('CONFIG', 'SET', 'save', '')
                         await redis_client.connection.execute_command('CONFIG', 'SET', 'stop-writes-on-bgsave-error', 'no')
                         await redis_client.connection.execute_command('CONFIG', 'SET', 'appendonly', 'no')
-                        logger.info("✅ Redis configured for Railway: persistence disabled, write blocking disabled")
+                        config_success = True
                     elif hasattr(redis_client, 'execute_command'):
                         # Alternative method if connection structure is different
                         await redis_client.execute_command('CONFIG', 'SET', 'save', '')
                         await redis_client.execute_command('CONFIG', 'SET', 'stop-writes-on-bgsave-error', 'no')
                         await redis_client.execute_command('CONFIG', 'SET', 'appendonly', 'no')
-                        logger.info("✅ Redis configured for Railway: persistence disabled, write blocking disabled")
+                        config_success = True
+                    
+                    if config_success:
+                        logger.info("✅  Redis configured for Railway: persistence disabled, write blocking disabled")
                 except Exception as config_err:
                     logger.warning(f"Could not configure Redis settings: {config_err}")
                     logger.info("Proceeding with default Redis configuration - may cause persistence errors")

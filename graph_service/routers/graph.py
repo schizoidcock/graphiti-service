@@ -501,7 +501,7 @@ async def get_user_graph_triplets(
         # Step 1: Get all episodes for this user 
         # In Graphiti, episodes represent the temporal context of knowledge extraction
         from graphiti_core.nodes import EpisodicNode
-        episodes = await EpisodicNode.get_by_group_ids(graphiti.driver, [f"{user_id}:*"])
+        episodes = await EpisodicNode.get_by_group_ids(graphiti.driver, [f"{user_id}_*"])
         
         logger.info(f"📊 Found {len(episodes)} episodes for user {user_id}")
         
@@ -513,7 +513,7 @@ async def get_user_graph_triplets(
             try:
                 # Get entities and relationships extracted from this episode
                 # In Graphiti, these are stored with the same group_id as the episode
-                group_id = getattr(episode, 'group_id', f"{user_id}:session")
+                group_id = getattr(episode, 'group_id', f"{user_id}_session")
                 
                 # Get nodes that were extracted from this episode's group
                 from graphiti_core.nodes import EntityNode
@@ -742,7 +742,7 @@ async def get_session_episodes_via_graph(
         logger.info(f"🔍 Fetching episodes for session: {session_id} (user: {user_id}) (via graph endpoint)")
         
         # Construct group_id for the session
-        group_id = f"{user_id}:{session_id}"
+        group_id = f"{user_id}_{session_id}"
         
         # Query for episodes with exact group_id match
         query = """

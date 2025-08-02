@@ -70,14 +70,14 @@ async def add_messages(
     
     logger = logging.getLogger(__name__)
     
-    # Extract session information from group_id (format: user_id:session_id)
+    # Extract session information from group_id (format: user_id_session_id)
     user_id = update_user_context_from_group_id(request.group_id)
     
     # Get pooled client for this user to avoid creating duplicates
     graphiti = get_or_create_pooled_client(user_id, settings)
     
-    if ':' in request.group_id:
-        _, session_id = request.group_id.split(':', 1)
+    if '_' in request.group_id:
+        _, session_id = request.group_id.split('_', 1)
     else:
         # Fallback: treat group_id as session_id
         session_id = request.group_id

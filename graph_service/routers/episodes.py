@@ -66,7 +66,7 @@ async def get_user_episodes(
         # We need to query for episodes associated with this user
         
         # Create group ID pattern for this user (matching sessions.py pattern)
-        # Episodes are typically stored with group_id like "user_id:session_id"
+        # Episodes are typically stored with group_id like "user_id_session_id"
         # We'll search for all episodes that start with this user_id
         
         logger.info(f"🔍 Fetching episodes for user: {user_id}")
@@ -326,7 +326,7 @@ async def get_session_episodes(
         LIMIT $limit
         """
         
-        group_id = f"{user_id}:{session_id}"
+        group_id = f"{user_id}_{session_id}"
         result = await graphiti.driver.execute_query(
             query, 
             group_id=group_id, 

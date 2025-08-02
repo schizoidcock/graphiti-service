@@ -91,7 +91,7 @@ async def add_session(
     # Initialize Graphiti knowledge graph for this session
     try:
         # Create initial context in knowledge graph
-        group_id = f"{request.user_id}:{request.session_id}"  # Combine for uniqueness
+        group_id = f"{request.user_id}_{request.session_id}"  # Combine for uniqueness
         
         # Add session initialization episode
         await graphiti.enhanced_add_episode(
@@ -212,7 +212,7 @@ async def add_memory_to_session(
         )
     
     session_data = sessions_store[session_id]
-    group_id = f"{session_data['user_id']}:{session_id}"
+    group_id = f"{session_data['user_id']}_{session_id}"
     
     # Process and store messages
     processed_messages = []
@@ -301,7 +301,7 @@ async def get_session_memory(
         )
     
     session_data = sessions_store[session_id]
-    group_id = f"{session_data['user_id']}:{session_id}"
+    group_id = f"{session_data['user_id']}_{session_id}"
     
     try:
         # Get contextual memory using Graphiti's enhanced capabilities
@@ -408,7 +408,7 @@ async def delete_session_memory(session_id: str, graphiti: ZepGraphitiDep):
         )
     
     session_data = sessions_store[session_id]
-    group_id = f"{session_data['user_id']}:{session_id}"
+    group_id = f"{session_data['user_id']}_{session_id}"
     
     try:
         # Delete from Graphiti knowledge graph (group data)
@@ -443,7 +443,7 @@ async def delete_session(session_id: str, graphiti: ZepGraphitiDep):
         )
     
     session_data = sessions_store[session_id]
-    group_id = f"{session_data['user_id']}:{session_id}"
+    group_id = f"{session_data['user_id']}_{session_id}"
     
     try:
         # Delete from Graphiti knowledge graph
@@ -477,7 +477,7 @@ async def search_session_memory(
         )
     
     session_data = sessions_store[session_id]
-    group_id = f"{session_data['user_id']}:{session_id}"
+    group_id = f"{session_data['user_id']}_{session_id}"
     
     try:
         # Use Graphiti's search capabilities with contextual enhancement

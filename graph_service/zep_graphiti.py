@@ -69,11 +69,11 @@ def extract_user_id_from_request(request: Request) -> str | None:
         # Fallback: generate user_id from session_id for auto-created sessions
         return f"auto_user_{session_id[:8]}"
     
-    # Method 2: Check for group_id in path parameters (format: user_id:session_id)
+    # Method 2: Check for group_id in path parameters (format: user_id_session_id)
     if "group_id" in request.path_params:
         group_id = request.path_params["group_id"]
-        if ":" in group_id:
-            user_id, _ = group_id.split(":", 1)
+        if "_" in group_id:
+            user_id, _ = group_id.split("_", 1)
             return user_id
         # Fallback: treat group_id as session_id
         return f"user_{group_id[:8]}"
@@ -133,9 +133,9 @@ def update_user_context_from_group_id(group_id: str) -> str:
     import logging
     logger = logging.getLogger(__name__)
     
-    if ':' in group_id:
-        user_id, _ = group_id.split(':', 1)
-        logger.info(f"🔍 USER DERIVATION: group_id='{group_id}' → split on ':' → user_id='{user_id}'")
+    if '_' in group_id:
+        user_id, _ = group_id.split('_', 1)
+        logger.info(f"🔍 USER DERIVATION: group_id='{group_id}' → split on '_' → user_id='{user_id}'")
     else:
         # Check cache first for performance
         if group_id in _session_user_mapping:
