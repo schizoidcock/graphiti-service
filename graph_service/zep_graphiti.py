@@ -39,19 +39,23 @@ def sanitize_user_id(user_id: str) -> str:
     # Replace multiple consecutive non-alphanumeric chars with single underscore
     sanitized = re.sub(r'[^a-zA-Z0-9_-]+', '_', user_id)
     
-    # Only keep the part after "auto_user_" if it starts with that pattern
+    # Handle different prefix patterns
     if sanitized.startswith("auto_user_"):
         # Extract just the ID part after "auto_user_"
         id_part = sanitized[10:]  # Remove "auto_user_" prefix
         sanitized = id_part
-    
-    # Don't add "user_" prefix if it already starts with "user_"
-    if not sanitized.startswith("user_"):
-        # Ensure it doesn't start with a number or special char
+    elif sanitized.startswith("zep_"):
+        # For zep_ prefixed users, keep the zep_ part
+        # Don't add additional user_ prefix
+        pass  # Keep as-is
+    elif sanitized.startswith("user_"):
+        # Already has user_ prefix, keep as-is
+        pass
+    else:
+        # For other cases, add user_ prefix if needed
         if sanitized and sanitized[0].isdigit():
             sanitized = f"user_{sanitized}"
-        else:
-            # Always add user_ prefix if it doesn't have it
+        elif not sanitized.startswith("user_"):
             sanitized = f"user_{sanitized}"
     
     # Limit length to prevent issues
