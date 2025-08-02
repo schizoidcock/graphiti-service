@@ -51,16 +51,8 @@ RUN groupadd -r app && useradd -r -g app app
 RUN chown -R app:app /app
 USER app
 
-# Expose port
-EXPOSE 8000
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
-
 # Set environment variables
 ENV PYTHONPATH=/app
-ENV PORT=8000
 
-# Start the FastAPI server with debug logging to diagnose connection issues
-CMD ["python", "-m", "uvicorn", "graph_service.main:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "info", "--access-log"]
+# Start the FastAPI server with debug logging - use Railway's PORT
+CMD ["sh", "-c", "python -m uvicorn graph_service.main:app --host 0.0.0.0 --port ${PORT:-8000} --log-level info --access-log"]
