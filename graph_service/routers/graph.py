@@ -220,11 +220,27 @@ async def add_graph_data(
         
         # Get statistics from the episode result (AddEpisodeResults object)
         # AddEpisodeResults has: episode, episodic_edges, nodes, edges, communities, community_edges
-        entities_created = len(getattr(episode_result, 'nodes', []))
-        relationships_created = len(getattr(episode_result, 'edges', []))
+        try:
+            entities_created = len(getattr(episode_result, 'nodes', []))
+            relationships_created = len(getattr(episode_result, 'edges', []))
+            logger.debug(f"Episode result type: {type(episode_result)}, entities: {entities_created}, relationships: {relationships_created}")
+        except Exception as e:
+            logger.error(f"Error processing episode result: {e}, episode_result: {episode_result}")
+            entities_created = 0
+            relationships_created = 0
+        
+        # Safe episode UUID extraction with error handling
+        try:
+            if hasattr(episode_result, 'episode') and episode_result.episode:
+                episode_uuid = getattr(episode_result.episode, 'uuid', None) or str(uuid_lib.uuid4())
+            else:
+                episode_uuid = str(uuid_lib.uuid4())
+        except Exception as e:
+            logger.error(f"Error extracting episode UUID: {e}, episode_result type: {type(episode_result)}")
+            episode_uuid = str(uuid_lib.uuid4())
         
         return GraphAddResponse(
-            episode_uuid=getattr(episode_result.episode, 'uuid', None) or str(uuid_lib.uuid4()),
+            episode_uuid=episode_uuid,
             entities_created=entities_created,
             relationships_created=relationships_created,
             processing_time_ms=processing_time,
