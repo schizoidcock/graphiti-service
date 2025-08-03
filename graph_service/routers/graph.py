@@ -720,7 +720,7 @@ async def get_user_episodes_via_graph(
         LIMIT $limit
         """
         
-        user_prefix = f"{user_id}:"
+        user_prefix = f"{user_id}_"
         result = await graphiti.driver.execute_query(
             query, 
             user_prefix=user_prefix, 
