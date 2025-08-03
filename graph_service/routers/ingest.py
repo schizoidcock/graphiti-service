@@ -360,9 +360,19 @@ async def delete_database_direct(user_id: str, settings: ZepEnvDep):
         # Get database name using same logic as ZepGraphiti class
         sanitized_user_id = sanitize_user_id(user_id)
         if sanitized_user_id.startswith("user_"):
+            # Extract the actual user ID after user_ prefix (should be zep_xxxx)
+            actual_user_id = sanitized_user_id[5:]  # Remove "user_" prefix
+            if actual_user_id.startswith("zep_"):
+                db_name = actual_user_id
+            else:
+                # If it doesn't start with zep_, add zep_ prefix
+                db_name = f"zep_{actual_user_id}"
+        elif sanitized_user_id.startswith("zep_"):
+            # Already properly formatted
             db_name = sanitized_user_id
         else:
-            db_name = f"user_{sanitized_user_id}"
+            # For other formats, add zep_ prefix
+            db_name = f"zep_{sanitized_user_id}"
             
         logger.debug(f"🔍 Target database name: {db_name} (sanitized from: {user_id})")
         
