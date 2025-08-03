@@ -70,11 +70,21 @@ async def search_graph(
     
     try:
         # Use Graphiti's advanced search with proper isolation
+        # TEMPORARY DEBUG: Search without group_id filtering if no results found
         search_results = await graphiti.search_(
             query=request.query,
             group_ids=search_group_ids,
             # Use default config which includes comprehensive search
         )
+        
+        # DEBUG: If no results found, try searching without group_id filtering
+        if not search_results.nodes and not search_results.episodes and not search_results.edges:
+            logger.info(f"🔍 No results with group_ids {search_group_ids}, trying without group filtering...")
+            search_results = await graphiti.search_(
+                query=request.query,
+                group_ids=None,  # Search all data in the user database
+                # Use default config which includes comprehensive search
+            )
         
         # SearchResults already contains separated collections - convert to our DTO format
         edges = []
