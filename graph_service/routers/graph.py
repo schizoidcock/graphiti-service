@@ -52,10 +52,10 @@ async def search_graph(
     user_id = request.user_id
     if not user_id and request.group_ids:
         user_id = update_user_context_from_group_id(request.group_ids[0])
-    else:
+    if not user_id:
         user_id = extract_user_id_from_request(http_request)
-        if not user_id:
-            user_id = "default_user"
+    if not user_id:
+        user_id = "default_user"
     
     graphiti = get_or_create_pooled_client(user_id, settings)
     
