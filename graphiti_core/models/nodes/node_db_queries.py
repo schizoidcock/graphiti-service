@@ -81,7 +81,7 @@ def get_entity_node_save_bulk_query(provider: GraphProvider, nodes: list[dict]) 
                         SET n = node
                         WITH n, node
                         WHERE node.name_embedding IS NOT NULL
-                        SET n.name_embedding = vecf32(node.name_embedding)
+                        SET n.name_embedding = node.name_embedding
                         RETURN n.uuid AS uuid
                         """,
                         {'nodes': [node]},
