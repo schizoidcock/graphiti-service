@@ -69,79 +69,84 @@ async def search_graph(
         search_group_ids = [f"{user_id}_session"]
     
     try:
-        # Use Graphiti's search with proper isolation
-        search_results = await graphiti.search(
-            group_ids=search_group_ids,
+        # Use Graphiti's advanced search with proper isolation
+        search_results = await graphiti.search_(
             query=request.query,
-            num_results=request.max_results
+            group_ids=search_group_ids,
+            # Use default config which includes comprehensive search
         )
         
-        # Initialize separate collections for Zep's architecture
+        # SearchResults already contains separated collections - convert to our DTO format
         edges = []
         episodes = []
         nodes = []
         
-        # Process search results based on their type
-        for result in search_results:
+        # Process EntityEdges from search results
+        for edge in search_results.edges:
             try:
-                # Check if result is an EntityEdge (relationship)
-                if hasattr(result, 'fact') and hasattr(result, 'source_node_uuid'):
-                    edge = EntityEdge(
-                        uuid=getattr(result, 'uuid', str(uuid_lib.uuid4())),
-                        source_node_uuid=getattr(result, 'source_node_uuid', ''),
-                        target_node_uuid=getattr(result, 'target_node_uuid', ''),
-                        name=getattr(result, 'name', getattr(result, 'relation', 'relates_to')),
-                        fact=getattr(result, 'fact', ''),
-                        predicate=getattr(result, 'relation', 'relates_to'),
-                        edge_type='relates_to',
-                        attributes=getattr(result, 'attributes', {}),
-                        episodes=getattr(result, 'episodes', []),
-                        created_at=getattr(result, 'created_at', datetime.now(timezone.utc)),
-                        updated_at=getattr(result, 'updated_at', datetime.now(timezone.utc)),
-                        valid_at=getattr(result, 'valid_at', None),
-                        expires_at=getattr(result, 'expires_at', None),
-                        invalid_at=getattr(result, 'invalid_at', None),
-                        metadata=getattr(result, 'metadata', {}),
-                        group_ids=request.group_ids,
-                        fact_rating=getattr(result, 'fact_rating', 1.0)
-                    )
-                    edges.append(edge)
-                
-                # Check if result is an EpisodicNode (episode)
-                elif hasattr(result, 'episode_body') or hasattr(result, 'content'):
-                    episode = EpisodicNode(
-                        uuid=getattr(result, 'uuid', str(uuid_lib.uuid4())),
-                        name=getattr(result, 'name', ''),
-                        content=getattr(result, 'episode_body', getattr(result, 'content', '')),
-                        episode_type=getattr(result, 'episode_type', 'text'),
-                        source=getattr(result, 'source', 'unknown'),
-                        created_at=getattr(result, 'created_at', datetime.now(timezone.utc)),
-                        updated_at=getattr(result, 'updated_at', datetime.now(timezone.utc)),
-                        metadata=getattr(result, 'metadata', {}),
-                        group_ids=request.group_ids,
-                        user_id=request.user_id,
-                        session_id=request.session_id
-                    )
-                    episodes.append(episode)
-                
-                # Check if result is an EntityNode
-                elif hasattr(result, 'summary'):
-                    node = EntityNode(
-                        uuid=getattr(result, 'uuid', str(uuid_lib.uuid4())),
-                        name=getattr(result, 'name', ''),
-                        summary=getattr(result, 'summary', ''),
-                        entity_type=getattr(result, 'entity_type', 'generic'),
-                        labels=getattr(result, 'labels', []),
-                        attributes=getattr(result, 'attributes', {}),
-                        created_at=getattr(result, 'created_at', datetime.now(timezone.utc)),
-                        updated_at=getattr(result, 'updated_at', datetime.now(timezone.utc)),
-                        metadata=getattr(result, 'metadata', {}),
-                        group_ids=request.group_ids
-                    )
-                    nodes.append(node)
-                
+                converted_edge = EntityEdge(
+                    uuid=getattr(edge, 'uuid', str(uuid_lib.uuid4())),
+                    source_node_uuid=getattr(edge, 'source_node_uuid', ''),
+                    target_node_uuid=getattr(edge, 'target_node_uuid', ''),
+                    name=getattr(edge, 'name', getattr(edge, 'relation', 'relates_to')),
+                    fact=getattr(edge, 'fact', ''),
+                    predicate=getattr(edge, 'relation', 'relates_to'),
+                    edge_type='relates_to',
+                    attributes=getattr(edge, 'attributes', {}),
+                    episodes=getattr(edge, 'episodes', []),
+                    created_at=getattr(edge, 'created_at', datetime.now(timezone.utc)),
+                    updated_at=getattr(edge, 'updated_at', datetime.now(timezone.utc)),
+                    valid_at=getattr(edge, 'valid_at', None),
+                    expires_at=getattr(edge, 'expires_at', None),
+                    invalid_at=getattr(edge, 'invalid_at', None),
+                    metadata=getattr(edge, 'metadata', {}),
+                    group_ids=search_group_ids,
+                    fact_rating=getattr(edge, 'fact_rating', 1.0)
+                )
+                edges.append(converted_edge)
             except Exception as e:
-                logger.warning(f"Failed to process search result: {e}")
+                logger.warning(f"Failed to process edge result: {e}")
+                continue
+        
+        # Process EpisodicNodes from search results
+        for episode in search_results.episodes:
+            try:
+                converted_episode = EpisodicNode(
+                    uuid=getattr(episode, 'uuid', str(uuid_lib.uuid4())),
+                    name=getattr(episode, 'name', ''),
+                    content=getattr(episode, 'content', getattr(episode, 'episode_body', '')),
+                    episode_type=getattr(episode, 'episode_type', 'text'),
+                    source=getattr(episode, 'source', 'unknown'),
+                    created_at=getattr(episode, 'created_at', datetime.now(timezone.utc)),
+                    updated_at=getattr(episode, 'updated_at', datetime.now(timezone.utc)),
+                    metadata=getattr(episode, 'metadata', {}),
+                    group_ids=search_group_ids,
+                    user_id=request.user_id,
+                    session_id=request.session_id
+                )
+                episodes.append(converted_episode)
+            except Exception as e:
+                logger.warning(f"Failed to process episode result: {e}")
+                continue
+        
+        # Process EntityNodes from search results
+        for node in search_results.nodes:
+            try:
+                converted_node = EntityNode(
+                    uuid=getattr(node, 'uuid', str(uuid_lib.uuid4())),
+                    name=getattr(node, 'name', ''),
+                    summary=getattr(node, 'summary', ''),
+                    entity_type=getattr(node, 'entity_type', 'generic'),
+                    labels=getattr(node, 'labels', []),
+                    attributes=getattr(node, 'attributes', {}),
+                    created_at=getattr(node, 'created_at', datetime.now(timezone.utc)),
+                    updated_at=getattr(node, 'updated_at', datetime.now(timezone.utc)),
+                    metadata=getattr(node, 'metadata', {}),
+                    group_ids=search_group_ids
+                )
+                nodes.append(converted_node)
+            except Exception as e:
+                logger.warning(f"Failed to process node result: {e}")
                 continue
         
         return GraphSearchResponse(
