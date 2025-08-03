@@ -48,21 +48,30 @@ async def search_graph(
     Search the knowledge graph using hybrid search (semantic + BM25 + RRF)
     Compatible with official Zep graph search API
     """
-    # Extract user context for proper database isolation
-    user_id = request.user_id
-    if not user_id and request.group_ids:
+    # Extract user context for proper database isolation (Zep v2 compatible)
+    if request.user_id:
+        # User-specific search: use user database with user-specific group_ids
+        user_id = request.user_id
+        graphiti = get_or_create_pooled_client(user_id, settings)
+        # For user searches, use user-specific group_id pattern or provided group_ids
+        search_group_ids = request.group_ids if request.group_ids else [f"{user_id}_session"]
+    elif request.group_ids:
+        # Group-specific search: extract user from group_id for database selection
         user_id = update_user_context_from_group_id(request.group_ids[0])
-    if not user_id:
+        graphiti = get_or_create_pooled_client(user_id, settings)
+        search_group_ids = request.group_ids
+    else:
+        # Fallback: extract from request headers
         user_id = extract_user_id_from_request(http_request)
-    if not user_id:
-        user_id = "default_user"
-    
-    graphiti = get_or_create_pooled_client(user_id, settings)
+        if not user_id:
+            user_id = "default_user"
+        graphiti = get_or_create_pooled_client(user_id, settings)
+        search_group_ids = [f"{user_id}_session"]
     
     try:
-        # Use Graphiti's search with enhanced context
+        # Use Graphiti's search with proper isolation
         search_results = await graphiti.search(
-            group_ids=request.group_ids,
+            group_ids=search_group_ids,
             query=request.query,
             num_results=request.max_results
         )
@@ -142,7 +151,7 @@ async def search_graph(
             search_metadata={
                 "execution_time_ms": 0,  # TODO: Add timing
                 "user_id": user_id,
-                "group_ids": request.group_ids,
+                "group_ids": search_group_ids,
                 "query_processed": request.query,
                 "search_type": request.search_type,
                 "reranker": request.reranker,
@@ -171,20 +180,34 @@ async def add_graph_data(
     Add data to the knowledge graph
     Compatible with official Zep graph.add API
     """
-    # Extract user context
-    user_id = request.user_id or update_user_context_from_group_id(request.group_id)
-    graphiti = get_or_create_pooled_client(user_id, settings)
+    # Zep v2 specification: Use either user_id OR group_id for isolation
+    if request.user_id:
+        # User-specific data: use user database with user-specific group_id
+        user_id = request.user_id
+        graphiti = get_or_create_pooled_client(user_id, settings)
+        # For user data, create a user-specific group_id pattern
+        group_id = f"{user_id}_session"  # Standard pattern for user isolation
+    elif request.group_id:
+        # Group-specific data: use shared database with exact group_id
+        user_id = update_user_context_from_group_id(request.group_id)
+        graphiti = get_or_create_pooled_client(user_id, settings) 
+        group_id = request.group_id
+    else:
+        # This shouldn't happen due to validator, but fallback to extract from request
+        user_id = extract_user_id_from_request(http_request) or "default_user"
+        graphiti = get_or_create_pooled_client(user_id, settings)
+        group_id = f"{user_id}_session"
     
     try:
         start_time = datetime.now()
         
-        # Add episode using Graphiti
+        # Add episode using Graphiti with proper isolation
         episode_result = await graphiti.add_episode(
             name=f"Episode_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
             episode_body=request.data,
             source=request.data_type,
-            source_description=f"Added via graph API - {request.data_type}",
-            group_id=request.group_id,
+            source_description=request.source_description or f"Added via graph API - {request.data_type}",
+            group_id=group_id,
             reference_time=datetime.now(timezone.utc)
         )
         
