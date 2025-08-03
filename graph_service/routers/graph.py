@@ -50,11 +50,11 @@ async def search_graph(
     """
     # Extract user context for proper database isolation (Zep v2 compatible)
     if request.user_id:
-        # User-specific search: use user database with user-specific group_ids
+        # User-specific search: use user database with provided group_ids or search all data
         user_id = request.user_id
         graphiti = get_or_create_pooled_client(user_id, settings)
-        # For user searches, use user-specific group_id pattern or provided group_ids
-        search_group_ids = request.group_ids if request.group_ids else [f"{user_id}_session"]
+        # FIXED: Use exact group_ids as provided (official Zep behavior) or None to search all
+        search_group_ids = request.group_ids if request.group_ids else None
     elif request.group_ids:
         # Group-specific search: extract user from group_id for database selection
         user_id = update_user_context_from_group_id(request.group_ids[0])
@@ -66,25 +66,16 @@ async def search_graph(
         if not user_id:
             user_id = "default_user"
         graphiti = get_or_create_pooled_client(user_id, settings)
-        search_group_ids = [f"{user_id}_session"]
+        # FIXED: Use None to search all data in user database (official Zep behavior)
+        search_group_ids = None
     
     try:
         # Use Graphiti's advanced search with proper isolation
-        # TEMPORARY DEBUG: Search without group_id filtering if no results found
         search_results = await graphiti.search_(
             query=request.query,
             group_ids=search_group_ids,
             # Use default config which includes comprehensive search
         )
-        
-        # DEBUG: If no results found, try searching without group_id filtering
-        if not search_results.nodes and not search_results.episodes and not search_results.edges:
-            logger.info(f"🔍 No results with group_ids {search_group_ids}, trying without group filtering...")
-            search_results = await graphiti.search_(
-                query=request.query,
-                group_ids=None,  # Search all data in the user database
-                # Use default config which includes comprehensive search
-            )
         
         # SearchResults already contains separated collections - convert to our DTO format
         edges = []
