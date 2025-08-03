@@ -26,6 +26,7 @@ class SessionResponse(BaseModel):
 class AddMemoryToSessionRequest(BaseModel):
     """Request model for adding memory to a session"""
     messages: list = Field(..., description='List of messages to add to session memory')
+    user_id: Optional[str] = Field(None, description='User ID for session auto-creation compatibility')
     metadata: Dict[str, Any] = Field(default_factory=dict, description='Optional memory metadata')
 
 

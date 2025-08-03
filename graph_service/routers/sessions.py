@@ -220,8 +220,8 @@ async def add_memory_to_session(
     if session_id not in sessions_store:
         logger.info(f"🔄 Auto-creating session {session_id} for memory request")
         
-        # Extract user_id from graphiti dependency or generate auto_user
-        user_id = getattr(graphiti, 'user_id', None) or f"auto_user_{session_id[:8]}"
+        # Extract user_id from request, graphiti dependency, or generate auto_user
+        user_id = request.user_id or getattr(graphiti, 'user_id', None) or f"auto_user_{session_id[:8]}"
         
         # Create session data
         session_uuid = str(uuid_lib.uuid4())
