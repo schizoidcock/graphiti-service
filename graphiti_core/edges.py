@@ -54,7 +54,7 @@ class Edge(BaseModel, ABC):
     async def delete(self, driver: GraphDriver):
         result = await driver.execute_query(
             """
-            MATCH (n)-[e:MENTIONS|RELATES_TO|HAS_MEMBER {uuid: $uuid}]->(m)
+            MATCH (n)-[e:MENTIONS|:RELATES_TO|:HAS_MEMBER {uuid: $uuid}]->(m)
             DELETE e
             """,
             uuid=self.uuid,

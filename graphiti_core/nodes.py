@@ -101,8 +101,11 @@ class Node(BaseModel, ABC):
         else:
             await driver.execute_query(
                 """
-                MATCH (n:Entity|Episodic|Community {uuid: $uuid})
-                DETACH DELETE n
+                MATCH (n:Entity {uuid: $uuid}) DETACH DELETE n
+                UNION ALL
+                MATCH (n:Episodic {uuid: $uuid}) DETACH DELETE n
+                UNION ALL
+                MATCH (n:Community {uuid: $uuid}) DETACH DELETE n
                 """,
                 uuid=self.uuid,
             )
@@ -131,8 +134,11 @@ class Node(BaseModel, ABC):
         else:
             await driver.execute_query(
                 """
-                MATCH (n:Entity|Episodic|Community {group_id: $group_id})
-                DETACH DELETE n
+                MATCH (n:Entity {group_id: $group_id}) DETACH DELETE n
+                UNION ALL
+                MATCH (n:Episodic {group_id: $group_id}) DETACH DELETE n
+                UNION ALL
+                MATCH (n:Community {group_id: $group_id}) DETACH DELETE n
                 """,
                 group_id=group_id,
             )

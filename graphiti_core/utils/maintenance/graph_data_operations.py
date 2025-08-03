@@ -71,7 +71,7 @@ async def clear_data(driver: GraphDriver, group_ids: list[str] | None = None):
 
         async def delete_group_ids(tx):
             await tx.run(
-                'MATCH (n:Entity|Episodic|Community) WHERE n.group_id IN $group_ids DETACH DELETE n',
+                'MATCH (n:Entity) WHERE n.group_id IN $group_ids DETACH DELETE n UNION ALL MATCH (n:Episodic) WHERE n.group_id IN $group_ids DETACH DELETE n UNION ALL MATCH (n:Community) WHERE n.group_id IN $group_ids DETACH DELETE n',
                 group_ids=group_ids,
             )
 
