@@ -213,20 +213,13 @@ async def add_graph_data(
         
         processing_time = (datetime.now() - start_time).total_seconds() * 1000
         
-        # Get statistics from the episode result
-        # Handle case where episode_result might be a string or different object
-        if hasattr(episode_result, 'extracted_entities'):
-            entities_created = len(getattr(episode_result, 'extracted_entities', []))
-        else:
-            entities_created = 0
-            
-        if hasattr(episode_result, 'extracted_edges'):
-            relationships_created = len(getattr(episode_result, 'extracted_edges', []))
-        else:
-            relationships_created = 0
+        # Get statistics from the episode result (AddEpisodeResults object)
+        # AddEpisodeResults has: episode, episodic_edges, nodes, edges, communities, community_edges
+        entities_created = len(getattr(episode_result, 'nodes', []))
+        relationships_created = len(getattr(episode_result, 'edges', []))
         
         return GraphAddResponse(
-            episode_uuid=getattr(episode_result, 'uuid', None) or str(uuid_lib.uuid4()),
+            episode_uuid=getattr(episode_result.episode, 'uuid', None) or str(uuid_lib.uuid4()),
             entities_created=entities_created,
             relationships_created=relationships_created,
             processing_time_ms=processing_time,
