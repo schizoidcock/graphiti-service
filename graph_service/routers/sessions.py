@@ -216,11 +216,33 @@ async def add_memory_to_session(
 ):
     """Add memory (messages) to a session"""
     
+    # Auto-create session if it doesn't exist (for compatibility with zep-server)
     if session_id not in sessions_store:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Session '{session_id}' not found"
-        )
+        logger.info(f"🔄 Auto-creating session {session_id} for memory request")
+        
+        # Extract user_id from graphiti dependency or generate auto_user
+        user_id = getattr(graphiti, 'user_id', None) or f"auto_user_{session_id[:8]}"
+        
+        # Create session data
+        session_uuid = str(uuid_lib.uuid4())
+        session_internal_id = len(sessions_store) + 1
+        current_time = datetime.now(timezone.utc)
+        
+        session_data = {
+            "uuid": session_uuid,
+            "id": session_internal_id,
+            "session_id": session_id,
+            "user_id": user_id,
+            "created_at": current_time,
+            "updated_at": current_time,
+            "metadata": {},
+            "summary": None,
+            "messages": [],
+            "memory_context": {}
+        }
+        
+        sessions_store[session_id] = session_data
+        logger.info(f"✅ Auto-created session {session_id} with user_id: {user_id}")
     
     session_data = sessions_store[session_id]
     group_id = f"{session_data['user_id']}_{session_id}"
