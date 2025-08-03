@@ -207,10 +207,14 @@ async def add_graph_data(
         start_time = datetime.now()
         
         # Add episode using Graphiti with proper isolation
+        # Convert string data_type to EpisodeType enum
+        from graphiti_core.nodes import EpisodeType
+        source_type = EpisodeType.from_str(request.data_type)
+        
         episode_result = await graphiti.add_episode(
             name=f"Episode_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
             episode_body=request.data,
-            source=request.data_type,
+            source=source_type,
             source_description=request.source_description or f"Added via graph API - {request.data_type}",
             group_id=group_id,
             reference_time=datetime.now(timezone.utc)
