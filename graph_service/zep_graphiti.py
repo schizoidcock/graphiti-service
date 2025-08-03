@@ -165,8 +165,19 @@ def update_user_context_from_group_id(group_id: str) -> str:
     logger = logging.getLogger(__name__)
     
     if '_' in group_id:
-        user_id, _ = group_id.split('_', 1)
-        logger.info(f"🔍 USER DERIVATION: group_id='{group_id}' → split on '_' → user_id='{user_id}'")
+        # Handle different group_id patterns:
+        # - "zep_233117be_233117be2a994b988fbe709804514ae9" → user_id: "zep_233117be" 
+        # - "233117be_session" → user_id: "233117be"
+        parts = group_id.split('_')
+        
+        if len(parts) >= 3 and parts[0] == 'zep':
+            # Pattern: zep_<user_id>_<session_id> → extract zep_<user_id>
+            user_id = f"{parts[0]}_{parts[1]}"
+        else:
+            # Traditional pattern: <user_id>_<session_id> → extract first part
+            user_id = parts[0]
+            
+        logger.info(f"🔍 USER DERIVATION: group_id='{group_id}' → extracted → user_id='{user_id}'")
     else:
         # Check cache first for performance
         if group_id in _session_user_mapping:
