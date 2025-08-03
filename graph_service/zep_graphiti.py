@@ -225,6 +225,16 @@ def get_or_create_pooled_client(user_id: str, settings) -> "ZepGraphiti":
         if hasattr(client.embedder, 'model'):
             client.embedder.model = settings.embedding_model_name or "text-embedding-3-small"
     
+    # CRITICAL FIX: Build indices for user-specific database
+    # This ensures search indices are created for episodes, edges, and nodes
+    import asyncio
+    try:
+        # Run index building in a background task to avoid blocking
+        asyncio.create_task(client.build_indices_and_constraints())
+        logger.info(f"🔧 Scheduled index building for user database: {client._database_name}")
+    except Exception as e:
+        logger.warning(f"Failed to schedule index building for {client._database_name}: {e}")
+    
     _graphiti_pool[pool_key] = client
     return client
 
