@@ -88,11 +88,11 @@ async def search_graph(
         if max_results <= 10 and len(request.query) <= 200:
             logger.info(f"🚀 Using fast search mode for graph search: {request.query[:50]}...")
             
-            # Use simplified search that bypasses complex hybrid algorithms
+            # Use simplified search_ method (returns SearchResults with nodes, edges, episodes)
             search_results = await graphiti.search_(
                 query=request.query,
                 group_ids=search_group_ids,
-                num_results=max_results
+                # search_ method doesn't take num_results, uses SearchConfig instead
             )
         else:
             # Use comprehensive search for complex queries
@@ -108,8 +108,8 @@ async def search_graph(
         episodes = []
         nodes = []
         
-        # Process EntityEdges from search results
-        for edge in search_results.edges:
+        # Process EntityEdges from search results (limit to max_results)
+        for edge in search_results.edges[:max_results]:
             try:
                 converted_edge = EntityEdge(
                     uuid=getattr(edge, 'uuid', str(uuid_lib.uuid4())),
@@ -135,8 +135,9 @@ async def search_graph(
                 logger.warning(f"Failed to process edge result: {e}")
                 continue
         
-        # Process EpisodicNodes from search results
-        for episode in search_results.episodes:
+        # Process EpisodicNodes from search results (limit remaining slots)
+        remaining_slots = max(0, max_results - len(edges))
+        for episode in search_results.episodes[:remaining_slots]:
             try:
                 converted_episode = EpisodicNode(
                     uuid=getattr(episode, 'uuid', str(uuid_lib.uuid4())),
@@ -156,8 +157,9 @@ async def search_graph(
                 logger.warning(f"Failed to process episode result: {e}")
                 continue
         
-        # Process EntityNodes from search results
-        for node in search_results.nodes:
+        # Process EntityNodes from search results (limit remaining slots)
+        remaining_slots = max(0, max_results - len(edges) - len(episodes))
+        for node in search_results.nodes[:remaining_slots]:
             try:
                 converted_node = EntityNode(
                     uuid=getattr(node, 'uuid', str(uuid_lib.uuid4())),

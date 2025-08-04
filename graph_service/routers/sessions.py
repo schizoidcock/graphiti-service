@@ -533,7 +533,7 @@ async def search_session_memory(
             search_results = await graphiti.search_(
                 query=query,
                 group_ids=[group_id],
-                num_results=top_k
+                # search_ method doesn't take num_results, limit results manually
             )
             
             # Convert to expected format quickly
