@@ -26,8 +26,12 @@ current_user_context: ContextVar[str | None] = ContextVar('current_user_context'
 # Global flag to track if indices have been built per database
 _indices_initialized = set()
 
-# Connection pool to reuse ZepGraphiti instances per user
+# Enhanced connection pool with limits and async management
 _graphiti_pool: dict[str, "ZepGraphiti"] = {}
+_pool_locks: dict[str, asyncio.Lock] = {}
+_pool_max_size = 50  # Maximum total connections across all users
+_pool_cleanup_interval = 300  # 5 minutes
+_pool_last_cleanup = time.time()
 
 
 def sanitize_user_id(user_id: str) -> str:
@@ -190,6 +194,93 @@ def update_user_context_from_group_id(group_id: str) -> str:
     
     current_user_context.set(user_id)
     return user_id
+
+
+async def cleanup_connection_pool():
+    """Clean up stale connections and enforce pool limits"""
+    global _pool_last_cleanup
+    current_time = time.time()
+    
+    # Only cleanup if interval has passed
+    if current_time - _pool_last_cleanup < _pool_cleanup_interval:
+        return
+    
+    logger.info(f"🧹 Starting connection pool cleanup, current size: {len(_graphiti_pool)}")
+    
+    # If pool is over limit, remove oldest connections
+    if len(_graphiti_pool) > _pool_max_size:
+        # Sort by creation time (we'll need to track this)
+        excess_count = len(_graphiti_pool) - _pool_max_size
+        oldest_keys = list(_graphiti_pool.keys())[:excess_count]
+        
+        for key in oldest_keys:
+            try:
+                client = _graphiti_pool.pop(key, None)
+                if client and hasattr(client, 'driver'):
+                    await client.driver.close()
+                logger.info(f"🗑️ Removed connection from pool: {key}")
+            except Exception as e:
+                logger.warning(f"Error closing connection {key}: {e}")
+    
+    _pool_last_cleanup = current_time
+    logger.info(f"✅ Pool cleanup completed, final size: {len(_graphiti_pool)}")
+
+
+async def get_or_create_pooled_client_async(user_id: str, settings) -> "ZepGraphiti":
+    """Async version of get_or_create_pooled_client with enhanced pooling"""
+    pool_key = f"{user_id}_{settings.falkordb_host}_{settings.falkordb_port}"
+    
+    # Periodic cleanup
+    await cleanup_connection_pool()
+    
+    # Fast path: return existing client
+    if pool_key in _graphiti_pool:
+        return _graphiti_pool[pool_key]
+    
+    # Use per-key locks to prevent race conditions
+    if pool_key not in _pool_locks:
+        _pool_locks[pool_key] = asyncio.Lock()
+    
+    async with _pool_locks[pool_key]:
+        # Double-check after acquiring lock
+        if pool_key in _graphiti_pool:
+            return _graphiti_pool[pool_key]
+        
+        # Create new client
+        client = ZepGraphiti(
+            host=settings.falkordb_host,
+            port=settings.falkordb_port,
+            username=settings.falkordb_username,
+            password=settings.falkordb_password,
+            user_id=user_id
+        )
+        
+        # Fast LLM configuration
+        if settings.openai_api_key and client.llm_client:
+            if settings.openai_base_url:
+                client.llm_client.config.base_url = settings.openai_base_url
+            client.llm_client.config.api_key = settings.openai_api_key
+            client.llm_client.model = settings.model_name or "gpt-4o-mini"
+            client.llm_client.config.temperature = settings.temperature
+        
+        # Fast embedder configuration
+        if settings.openai_api_key and hasattr(client, 'embedder') and client.embedder and hasattr(client.embedder, 'config'):
+            client.embedder.config.api_key = settings.openai_api_key
+            if settings.openai_base_url:
+                client.embedder.config.base_url = settings.openai_base_url
+            if hasattr(client.embedder, 'model'):
+                client.embedder.model = settings.embedding_model_name or "text-embedding-3-small"
+        
+        # Build indices asynchronously without blocking
+        try:
+            await client.build_indices_and_constraints()
+            logger.info(f"🔧 Built indices for user database: {client._database_name}")
+        except Exception as e:
+            logger.warning(f"Failed to build indices for {client._database_name}: {e}")
+        
+        _graphiti_pool[pool_key] = client
+        logger.info(f"📦 Added new connection to pool: {pool_key} (pool size: {len(_graphiti_pool)})")
+        return client
 
 
 def get_or_create_pooled_client(user_id: str, settings) -> "ZepGraphiti":

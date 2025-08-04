@@ -17,6 +17,7 @@ from graph_service.dto.session import (
     SessionMessagesResponse
 )
 from graph_service.zep_graphiti import ZepGraphitiDep, ZepGraphitiForUserDep, get_or_create_pooled_client, current_user_context, ZepEnvDep
+from graph_service.search_cache import search_cache
 
 # Async helper function for non-blocking entity extraction
 async def extract_entities_async(graphiti, content: str, group_id: str, session_id: str):
@@ -499,9 +500,10 @@ async def search_session_memory(
     graphiti: ZepGraphitiDep,
     query: str = Query(..., description="Search query for semantic retrieval"),
     top_k: int = Query(3, description="Number of results to return"),
-    search_type: str = Query("similarity", description="Search type: similarity or mmr")
+    search_type: str = Query("similarity", description="Search type: similarity or mmr"),
+    fast_mode: bool = Query(True, description="Use fast search for interactive queries")
 ):
-    """Search session memory using semantic similarity (following ZepRetriever pattern)"""
+    """Search session memory with optimized fast mode for interactive queries"""
     
     if session_id not in sessions_store:
         raise HTTPException(
@@ -513,22 +515,76 @@ async def search_session_memory(
     group_id = f"{session_data['user_id']}_{session_id}"
     
     try:
-        # Use Graphiti's search capabilities with contextual enhancement
-        search_results = await graphiti.search_with_context(
-            group_ids=[group_id],
-            query=query,
-            num_results=top_k,
-            include_summary=True
-        )
+        # Check cache first for fast responses
+        cached_result = search_cache.get(session_id, query, top_k, search_type)
+        if cached_result:
+            logger.info(f"⚡ Cache HIT for session {session_id}: {query[:50]}...")
+            cached_result["context"]["cache_hit"] = True
+            return cached_result
         
-        return {
-            "session_id": session_id,
-            "query": query,
-            "search_type": search_type,
-            "results": search_results["search_results"],
-            "context": search_results.get("context", {}),
-            "total_results": search_results["total_results"]
-        }
+        # Use fast mode for interactive queries to achieve <100ms response
+        if fast_mode and top_k <= 10 and len(query) <= 200:
+            logger.info(f"🚀 Using fast search mode for session {session_id}")
+            
+            # Use simplified search that bypasses complex hybrid algorithms
+            search_results = await graphiti.search_(
+                query=query,
+                group_ids=[group_id],
+                num_results=top_k
+            )
+            
+            # Convert to expected format quickly
+            results = []
+            for edge in search_results.edges[:top_k]:
+                results.append({
+                    "uuid": edge.uuid,
+                    "content": edge.fact,
+                    "score": getattr(edge, 'fact_rating', 1.0),
+                    "type": "edge"
+                })
+            
+            for episode in search_results.episodes[:top_k-len(results)]:
+                results.append({
+                    "uuid": episode.uuid,
+                    "content": getattr(episode, 'content', ''),
+                    "score": 1.0,
+                    "type": "episode"
+                })
+            
+            response = {
+                "session_id": session_id,
+                "query": query,
+                "search_type": "fast_" + search_type,
+                "results": results[:top_k],
+                "context": {"fast_mode": True, "cache_hit": False},
+                "total_results": len(results)
+            }
+            
+            # Cache the response for future requests
+            search_cache.put(session_id, query, top_k, search_type, response)
+            return response
+        else:
+            # Fall back to full search for complex queries
+            logger.info(f"🐌 Using full search mode for session {session_id}")
+            search_results = await graphiti.search_with_context(
+                group_ids=[group_id],
+                query=query,
+                num_results=top_k,
+                include_summary=True
+            )
+            
+            response = {
+                "session_id": session_id,
+                "query": query,
+                "search_type": search_type,
+                "results": search_results["search_results"],
+                "context": {**search_results.get("context", {}), "cache_hit": False},
+                "total_results": search_results["total_results"]
+            }
+            
+            # Cache the response for future requests
+            search_cache.put(session_id, query, top_k, search_type, response)
+            return response
         
     except Exception as e:
         logger.error(f"Search failed for session {session_id}: {e}")
@@ -537,7 +593,17 @@ async def search_session_memory(
             "query": query,
             "search_type": search_type,
             "results": [],
-            "context": {},
+            "context": {"error": str(e)},
             "total_results": 0,
             "error": str(e)
         }
+
+
+@router.get('/cache/stats', status_code=status.HTTP_200_OK)
+async def get_cache_stats():
+    """Get search cache statistics for monitoring"""
+    return {
+        "search_cache": search_cache.get_stats(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "service": "graphiti-service"
+    }
