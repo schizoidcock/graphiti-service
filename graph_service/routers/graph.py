@@ -101,7 +101,7 @@ async def search_graph(
                     expires_at=getattr(edge, 'expires_at', None),
                     invalid_at=getattr(edge, 'invalid_at', None),
                     metadata=getattr(edge, 'metadata', {}),
-                    group_ids=search_group_ids,
+                    group_ids=[getattr(edge, 'group_id')] if hasattr(edge, 'group_id') and edge.group_id else [],
                     fact_rating=getattr(edge, 'fact_rating', 1.0)
                 )
                 edges.append(converted_edge)
@@ -121,7 +121,7 @@ async def search_graph(
                     created_at=getattr(episode, 'created_at', datetime.now(timezone.utc)),
                     updated_at=getattr(episode, 'updated_at', datetime.now(timezone.utc)),
                     metadata=getattr(episode, 'metadata', {}),
-                    group_ids=search_group_ids,
+                    group_ids=[getattr(episode, 'group_id')] if hasattr(episode, 'group_id') and episode.group_id else [],
                     user_id=request.user_id,
                     session_id=request.session_id
                 )
@@ -143,7 +143,7 @@ async def search_graph(
                     created_at=getattr(node, 'created_at', datetime.now(timezone.utc)),
                     updated_at=getattr(node, 'updated_at', datetime.now(timezone.utc)),
                     metadata=getattr(node, 'metadata', {}),
-                    group_ids=search_group_ids
+                    group_ids=[getattr(node, 'group_id')] if hasattr(node, 'group_id') and node.group_id else []
                 )
                 nodes.append(converted_node)
             except Exception as e:

@@ -15,7 +15,7 @@ class EntityNode(BaseModel):
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
     metadata: Dict[str, Any] = Field(default_factory=dict)
-    group_ids: List[str] = Field(default_factory=list, description="Associated group IDs")
+    group_ids: Optional[List[str]] = Field(default_factory=list, description="Associated group IDs")
 
 
 class EntityEdge(BaseModel):
@@ -35,7 +35,7 @@ class EntityEdge(BaseModel):
     expires_at: Optional[datetime] = Field(None, description="Expiration time for temporal facts")
     invalid_at: Optional[datetime] = Field(None, description="When the fact becomes invalid")
     metadata: Dict[str, Any] = Field(default_factory=dict)
-    group_ids: List[str] = Field(default_factory=list, description="Associated group IDs")
+    group_ids: Optional[List[str]] = Field(default_factory=list, description="Associated group IDs")
     fact_rating: float = Field(default=1.0, description="Rating of fact importance")
 
 
@@ -49,7 +49,7 @@ class EpisodicNode(BaseModel):
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
     metadata: Dict[str, Any] = Field(default_factory=dict)
-    group_ids: List[str] = Field(default_factory=list, description="Associated group IDs")
+    group_ids: Optional[List[str]] = Field(default_factory=list, description="Associated group IDs")
     user_id: Optional[str] = Field(None, description="Associated user ID")
     session_id: Optional[str] = Field(None, description="Associated session ID")
 
