@@ -217,6 +217,9 @@ async def add_memory_to_session(
 ):
     """Add memory (messages) to a session"""
     
+    # DEBUG: Log incoming request
+    logger.info(f"🔥 Memory endpoint called for session {session_id} with {len(getattr(request, 'messages', []))} messages")
+    
     # Auto-create session if it doesn't exist (for compatibility with zep-server)
     if session_id not in sessions_store:
         logger.info(f"🔄 Auto-creating session {session_id} for memory request")

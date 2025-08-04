@@ -87,6 +87,32 @@ class SearchCache:
         self.cache[cache_key] = (result, current_time)
         logger.debug(f"💾 Cached result for session {session_id[:8]}: {query[:50]}...")
     
+    def get_by_key(self, cache_key: str) -> Optional[Any]:
+        """Get cached result by cache key directly"""
+        self._cleanup_expired()
+        
+        if cache_key in self.cache:
+            result, timestamp = self.cache[cache_key]
+            
+            # Check if result is still fresh
+            if time.time() - timestamp < self.ttl:
+                self.hits += 1
+                logger.debug(f"🎯 Cache HIT for key {cache_key[:16]}...")
+                return result
+            else:
+                # Remove expired entry
+                del self.cache[cache_key]
+        
+        self.misses += 1
+        logger.debug(f"❌ Cache MISS for key {cache_key[:16]}...")
+        return None
+    
+    def put_by_key(self, cache_key: str, result: Any):
+        """Cache result with cache key directly"""
+        current_time = time.time()
+        self.cache[cache_key] = (result, current_time)
+        logger.debug(f"💾 Cached result for key {cache_key[:16]}...")
+    
     def get_stats(self) -> Dict[str, Any]:
         """Get cache statistics"""
         total_requests = self.hits + self.misses

@@ -46,8 +46,11 @@ async def search_graph(
 ):
     """
     Search the knowledge graph using hybrid search (semantic + BM25 + RRF)
-    Compatible with official Zep graph search API
+    Compatible with official Zep graph search API with performance optimizations
     """
+    import time
+    start_time = time.time()
+    
     # Extract user context for proper database isolation (Zep v2 compatible)
     if request.user_id:
         # User-specific search: use user database with provided group_ids or search all data
@@ -69,13 +72,36 @@ async def search_graph(
         # FIXED: Use None to search all data in user database (official Zep behavior)
         search_group_ids = None
     
+    # Check cache first for fast responses (import search_cache)
+    from graph_service.search_cache import search_cache
+    cache_key = f"graph_{user_id}_{request.query}_{request.max_results}_{request.search_type}"
+    cached_result = search_cache.get_by_key(cache_key)
+    if cached_result:
+        logger.info(f"⚡ Cache HIT for graph search: {request.query[:50]}...")
+        cached_result.search_metadata["cache_hit"] = True
+        cached_result.search_metadata["execution_time_ms"] = 0
+        return cached_result
+    
     try:
-        # Use Graphiti's advanced search with proper isolation
-        search_results = await graphiti.search_(
-            query=request.query,
-            group_ids=search_group_ids,
-            # Use default config which includes comprehensive search
-        )
+        # Use fast mode for interactive queries (similar to session search optimization)
+        max_results = request.max_results or 10
+        if max_results <= 10 and len(request.query) <= 200:
+            logger.info(f"🚀 Using fast search mode for graph search: {request.query[:50]}...")
+            
+            # Use simplified search that bypasses complex hybrid algorithms
+            search_results = await graphiti.search_(
+                query=request.query,
+                group_ids=search_group_ids,
+                num_results=max_results
+            )
+        else:
+            # Use comprehensive search for complex queries
+            logger.info(f"🐌 Using comprehensive search mode for graph search")
+            search_results = await graphiti.search_(
+                query=request.query,
+                group_ids=search_group_ids,
+                # Use default config which includes comprehensive search
+            )
         
         # SearchResults already contains separated collections - convert to our DTO format
         edges = []
@@ -150,12 +176,15 @@ async def search_graph(
                 logger.warning(f"Failed to process node result: {e}")
                 continue
         
-        return GraphSearchResponse(
+        # Calculate execution time
+        execution_time_ms = (time.time() - start_time) * 1000
+        
+        response = GraphSearchResponse(
             edges=edges,
             episodes=episodes,
             nodes=nodes,
             search_metadata={
-                "execution_time_ms": 0,  # TODO: Add timing
+                "execution_time_ms": round(execution_time_ms, 2),
                 "user_id": user_id,
                 "group_ids": search_group_ids,
                 "query_processed": request.query,
@@ -164,9 +193,17 @@ async def search_graph(
                 "scope": request.scope,
                 "total_edges": len(edges),
                 "total_episodes": len(episodes),
-                "total_nodes": len(nodes)
+                "total_nodes": len(nodes),
+                "cache_hit": False,
+                "fast_mode": max_results <= 10 and len(request.query) <= 200
             }
         )
+        
+        # Cache the response for future requests
+        search_cache.put_by_key(cache_key, response)
+        logger.info(f"⚡ Graph search completed in {execution_time_ms:.2f}ms, cached for future requests")
+        
+        return response
         
     except Exception as e:
         logger.error(f"Graph search failed: {e}")
@@ -772,6 +809,8 @@ async def get_user_episodes_via_graph(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get user episodes: {str(e)}"
         )
+
+
 
 
 @router.get("/episodes/session/{session_id}", response_model=List[EpisodeResponse])

@@ -214,6 +214,50 @@ async def healthcheck():
     return JSONResponse(content={'status': 'healthy', 'service': 'zep-graphiti', 'version': '2.0.0'}, status_code=200)
 
 
+# Add root-level search endpoint for zep-server compatibility
+@app.post('/search')
+async def root_search(request: Request):
+    """
+    Root-level search endpoint for zep-server compatibility
+    Proxy to the graph search API with proper request handling
+    """
+    import json
+    from graph_service.config import get_settings
+    from graph_service.routers.graph import search_graph
+    from graph_service.dto.graph import GraphSearchRequest
+    
+    logger.info("🔗 Root-level /search called, proxying to graph search API")
+    
+    try:
+        # Parse request body
+        body = await request.body()
+        request_data = json.loads(body) if body else {}
+        
+        # Convert to GraphSearchRequest
+        graph_request = GraphSearchRequest(
+            query=request_data.get('query', ''),
+            user_id=request_data.get('user_id'),
+            group_ids=request_data.get('group_ids', []),
+            max_results=request_data.get('max_results', 10),
+            search_type=request_data.get('search_type', 'similarity'),
+            reranker=request_data.get('reranker', 'RRF'),
+            scope=request_data.get('scope', 'edges')
+        )
+        
+        # Get settings and proxy to graph search
+        settings = get_settings()
+        result = await search_graph(graph_request, settings, request)
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Root search proxy failed: {e}")
+        return JSONResponse(
+            content={'error': f'Search failed: {str(e)}'},
+            status_code=500
+        )
+
+
 @app.get('/debug/config')
 async def debug_config():
     """Debug endpoint to check configuration"""
