@@ -1073,6 +1073,7 @@ class ZepGraphiti(Graphiti):
                             
                     except json.JSONDecodeError as json_error:
                         logger.warning(f"ZEP EXTRACTION: Standard JSON parsing failed: {json_error}")
+                        logger.debug(f"ZEP EXTRACTION: Raw response text that failed parsing: {response_text}")
                         
                         # Try parsing as Python literal (handles single quotes)
                         try:
@@ -1100,7 +1101,33 @@ class ZepGraphiti(Graphiti):
                         except (ValueError, SyntaxError) as ast_error:
                             logger.error(f"ZEP EXTRACTION: Failed to parse as Python literal: {ast_error}")
                             logger.error(f"Response text: {response_text[:500]}")
-                            return []
+                            
+                            # Last resort: try to extract entities using regex patterns
+                            import re
+                            logger.warning("ZEP EXTRACTION: Attempting regex-based entity extraction as fallback")
+                            
+                            # Look for entity-like patterns in the text
+                            entity_patterns = [
+                                r'"name":\s*"([^"]+)".*?"type":\s*"([^"]+)"',
+                                r"'name':\s*'([^']+)'.*?'type':\s*'([^']+)'",
+                                r"name:\s*([^,\n]+).*?type:\s*([^,\n]+)"
+                            ]
+                            
+                            entities = []
+                            for pattern in entity_patterns:
+                                matches = re.findall(pattern, response_text, re.DOTALL)
+                                for name, entity_type in matches:
+                                    entities.append({
+                                        "name": name.strip().strip('"\''),
+                                        "type": entity_type.strip().strip('"\''),
+                                        "source": "regex_fallback"
+                                    })
+                            
+                            if entities:
+                                logger.info(f"ZEP EXTRACTION: Regex fallback extracted {len(entities)} entities")
+                            else:
+                                logger.error("ZEP EXTRACTION: All parsing methods failed, returning empty list")
+                                return []
                 
                 # Process and save entities using Zep patterns
                 saved_entities = []
