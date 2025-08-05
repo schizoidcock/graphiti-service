@@ -74,6 +74,38 @@ async def extract_entities_async(graphiti, content: str, group_id: str, session_
         processing_time = time.time() - start_time
         logger.error(f"❌ PROCESSING FAILED: Entity extraction failed for session {session_id} after {processing_time:.2f}s: {e}")
 
+# Async helper function for coordinated summary generation after episodes complete
+async def generate_summary_after_episodes(graphiti, group_id: str, session_id: str, session_data: dict, episode_tasks: list):
+    """Generate session summary after episode addition tasks complete"""
+    import time
+    start_time = time.time()
+    
+    # Log processing started
+    logger.info(f"🚀 PROCESSING STARTED: Summary generation for session {session_id} (waiting for {len(episode_tasks)} episodes)")
+    
+    try:
+        # Wait for all episode addition tasks to complete
+        if episode_tasks:
+            await asyncio.gather(*episode_tasks)
+            logger.info(f"⏱️  EPISODES COMPLETE: All {len(episode_tasks)} episodes added for session {session_id}")
+        
+        context_summary = await graphiti.get_contextual_summary(group_id, max_episodes=5)  # Reduced from 10
+        processing_time = time.time() - start_time
+        
+        # Update session data with summary (in background)
+        session_data["summary"] = context_summary.get("summary", "")
+        session_data["metadata"].update({
+            "key_entities": context_summary.get("key_entities", [])[:10],  # Limit entities
+            "topics": context_summary.get("topics", [])[:5],  # Limit topics
+        })
+        
+        logger.info(f"✅ PROCESSING COMPLETED: Generated session summary for {session_id} in {processing_time:.2f}s")
+        logger.info(f"   📄 Summary: {context_summary.get('summary', '')[:100]}...")
+        
+    except Exception as e:
+        processing_time = time.time() - start_time
+        logger.error(f"❌ PROCESSING FAILED: Summary generation failed for session {session_id} after {processing_time:.2f}s: {e}")
+
 # Async helper function for non-blocking summary generation  
 async def generate_summary_async(graphiti, group_id: str, session_id: str, session_data: dict):
     """Generate session summary asynchronously without blocking the main response"""
@@ -315,6 +347,7 @@ async def add_memory_to_session(
     
     # Process and store messages
     processed_messages = []
+    episode_tasks = []  # Track episode addition tasks
     
     # Batch process messages for better performance
     logger.info(f"Processing {len(request.messages)} messages for session {session_id}")
@@ -338,8 +371,8 @@ async def add_memory_to_session(
         
         # Add to Graphiti knowledge graph asynchronously (non-blocking)
         try:
-            # Use async task for episode creation to not block response
-            asyncio.create_task(add_episode_async(
+            # Create async task for episode creation and track it
+            episode_task = asyncio.create_task(add_episode_async(
                 graphiti=graphiti,
                 message_uuid=message_uuid,
                 group_id=group_id,
@@ -347,6 +380,7 @@ async def add_memory_to_session(
                 current_time=current_time,
                 session_id=session_id
             ))
+            episode_tasks.append(episode_task)
             
             # Optimized entity extraction - only for substantial user messages and with limits
             if (session_message.role == 'user' and 
@@ -370,10 +404,10 @@ async def add_memory_to_session(
         "last_updated": session_data["updated_at"].isoformat()
     }
     
-    # Generate summary asynchronously for messages >= 3 to avoid blocking response
+    # Generate summary asynchronously AFTER episode addition tasks complete
     if message_count >= 3:  # Increased threshold for better context
-        asyncio.create_task(generate_summary_async(graphiti, group_id, session_id, session_data))
-        logger.info(f"Session {session_id} updated with {message_count} messages (summary generating async)")
+        asyncio.create_task(generate_summary_after_episodes(graphiti, group_id, session_id, session_data, episode_tasks))
+        logger.info(f"Session {session_id} updated with {message_count} messages (summary will generate after episodes complete)")
     else:
         logger.info(f"Session {session_id} updated with {message_count} messages (waiting for more messages to generate summary)")
     
