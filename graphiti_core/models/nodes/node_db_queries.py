@@ -56,7 +56,7 @@ def get_entity_node_save_query(provider: GraphProvider, labels: str) -> str:
             SET n = $entity_data
             WITH n
             WHERE $entity_data.name_embedding IS NOT NULL
-            SET n.name_embedding = vecf32($entity_data.name_embedding)
+            CALL db.create.setNodeVectorProperty(n, "name_embedding", $entity_data.name_embedding)
             RETURN n.uuid AS uuid
         """
 
