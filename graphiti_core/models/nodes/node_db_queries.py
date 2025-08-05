@@ -48,17 +48,7 @@ EPISODIC_NODE_RETURN = """
 
 
 def get_entity_node_save_query(provider: GraphProvider, labels: str) -> str:
-    if provider == GraphProvider.FALKORDB:
-        return f"""
-            MERGE (n:Entity {{uuid: $entity_data.uuid}})
-            SET n:{labels}
-            SET n = $entity_data
-            WITH n 
-            WHERE $entity_data.name_embedding IS NOT NULL
-            CALL db.create.setNodeVectorProperty(n, "name_embedding", $entity_data.name_embedding)
-            RETURN n.uuid AS uuid
-        """
-
+    # Use vector procedures for both FalkorDB and Neo4j (now that extension is loaded)
     return f"""
         MERGE (n:Entity {{uuid: $entity_data.uuid}})
         SET n:{labels}

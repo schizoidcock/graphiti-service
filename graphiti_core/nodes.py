@@ -314,11 +314,12 @@ class EntityNode(Node):
         entity_data: dict[str, Any] = {
             'uuid': self.uuid,
             'name': self.name,
-            'name_embedding': self.name_embedding,
             'group_id': self.group_id,
             'summary': self.summary,
             'created_at': self.created_at,
+            'name_embedding': self.name_embedding,
         }
+            
         entity_data.update(self.attributes or {})
 
         labels = ':'.join(self.labels + ['Entity'])
