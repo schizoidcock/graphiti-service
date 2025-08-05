@@ -796,7 +796,11 @@ async def get_user_episodes_via_graph(
         )
         
         episodes = []
-        for record in result:
+        # Handle FalkorDB result format: (data_list, fields_list, metadata)
+        actual_records = result[0] if isinstance(result, tuple) and len(result) > 0 else result
+        logger.info(f"🔍 DEBUG: Processing {len(actual_records) if hasattr(actual_records, '__len__') else 'unknown'} records from query result")
+        
+        for record in actual_records:
             if record is None:
                 continue
             
@@ -882,7 +886,11 @@ async def get_session_episodes_via_graph(
         )
         
         episodes = []
-        for record in result:
+        # Handle FalkorDB result format: (data_list, fields_list, metadata)
+        actual_records = result[0] if isinstance(result, tuple) and len(result) > 0 else result
+        logger.info(f"🔍 DEBUG: Processing {len(actual_records) if hasattr(actual_records, '__len__') else 'unknown'} records from session query result")
+        
+        for record in actual_records:
             if record is None:
                 continue
             
