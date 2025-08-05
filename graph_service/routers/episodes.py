@@ -456,10 +456,10 @@ async def get_episode_mentions(
                     summary=record_data.get('summary', ''),
                     entity_type='Entity',  # Default type
                     labels=record_data.get('labels', []),
-                    attributes=record_data.get('attributes', {}),
+                    attributes=record_data.get('attributes') or {},
                     created_at=record_data.get('created_at'),
                     updated_at=record_data.get('updated_at'),
-                    metadata=record_data.get('attributes', {}),
+                    metadata=record_data.get('attributes') or {},
                     group_ids=[]
                 )
                 nodes.append(node)
@@ -495,14 +495,14 @@ async def get_episode_mentions(
                     fact=record_data.get('fact', ''),
                     predicate=record_data.get('name', 'relates_to'),
                     edge_type='relates_to',
-                    attributes=record_data.get('attributes', {}),
+                    attributes=record_data.get('attributes') or {},
                     episodes=record_data.get('episodes', []),
                     created_at=record_data.get('created_at'),
                     updated_at=record_data.get('updated_at'),
                     valid_at=record_data.get('valid_at'),
                     expires_at=record_data.get('expired_at'),
                     invalid_at=record_data.get('invalid_at'),
-                    metadata=record_data.get('attributes', {}),
+                    metadata=record_data.get('attributes') or {},
                     group_ids=[],
                     fact_rating=1.0
                 )
