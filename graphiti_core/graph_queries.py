@@ -91,8 +91,8 @@ def get_vector_cosine_func_query(vec1, vec2, provider: GraphProvider) -> str:
     if provider == GraphProvider.FALKORDB:
         # FalkorDB uses a different syntax for regular cosine similarity and Neo4j uses normalized cosine similarity
         # FalkorDB cosineDistance expects Vectorf32 format
-        # Both vec1 (stored) and vec2 (search vector) should be used directly without vecf32() conversion
-        return f'(2 - vec.cosineDistance({vec1}, {vec2}))/2'
+        # vec1 (stored embedding) is already Vectorf32, vec2 (search vector) needs vecf32() conversion
+        return f'(2 - vec.cosineDistance({vec1}, vecf32({vec2})))/2'
 
     return f'vector.similarity.cosine({vec1}, {vec2})'
 
