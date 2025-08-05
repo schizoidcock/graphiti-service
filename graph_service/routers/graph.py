@@ -748,10 +748,35 @@ async def get_user_episodes_via_graph(
         
         logger.info(f"🔍 Fetching episodes for user: {user_id} (via graph endpoint)")
         
-        # Query for Episodic nodes where group_id starts with user_id
+        # First, let's debug what group_ids exist for Episodic nodes
+        debug_query = """
+        MATCH (e:Episodic) 
+        RETURN DISTINCT e.group_id as group_id
+        ORDER BY e.group_id
+        LIMIT 50
+        """
+        
+        debug_result = await graphiti.driver.execute_query(debug_query)
+        logger.info(f"🔍 DEBUG: All Episodic group_ids in database: {debug_result}")
+        
+        # Also check for group_ids that contain the user_id anywhere
+        user_search_query = """
+        MATCH (e:Episodic) 
+        WHERE e.group_id CONTAINS $user_id
+        RETURN e.group_id as group_id, e.uuid as uuid
+        ORDER BY e.created_at DESC
+        LIMIT 10
+        """
+        
+        user_search_result = await graphiti.driver.execute_query(user_search_query, user_id=user_id)
+        logger.info(f"🔍 DEBUG: Episodes containing user_id '{user_id}': {user_search_result}")
+        
+        # Query for Episodic nodes where group_id starts with user_id OR contains user_id OR equals user_id
         query = """
         MATCH (e:Episodic) 
-        WHERE e.group_id STARTS WITH $user_prefix
+        WHERE e.group_id STARTS WITH $user_prefix 
+           OR e.group_id CONTAINS $user_id 
+           OR e.group_id = $user_id
         RETURN e.uuid as uuid, e.name as name, e.content as content, 
                e.source as source, e.source_description as source_description,
                e.created_at as created_at, e.updated_at as updated_at,
@@ -761,9 +786,12 @@ async def get_user_episodes_via_graph(
         """
         
         user_prefix = f"{user_id}_"
+        logger.info(f"🔍 DEBUG: Searching with user_prefix='{user_prefix}', user_id='{user_id}'")
+        
         result = await graphiti.driver.execute_query(
             query, 
             user_prefix=user_prefix, 
+            user_id=user_id,
             limit=limit
         )
         
