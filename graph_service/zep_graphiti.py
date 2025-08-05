@@ -1047,11 +1047,24 @@ class ZepGraphiti(Graphiti):
                 if entities is None:
                     logger.debug(f"ZEP EXTRACTION: Parsing response text: {response_text[:200]}...")
                     
+                    # Clean the response text to improve JSON parsing success
+                    cleaned_response = response_text.strip()
+                    
+                    # Try to extract JSON from text that might have additional content
+                    import re
+                    json_pattern = r'(\[.*?\]|\{.*?\})'
+                    json_matches = re.findall(json_pattern, cleaned_response, re.DOTALL)
+                    
+                    if json_matches:
+                        # Try the first JSON-like pattern found
+                        cleaned_response = json_matches[0].strip()
+                        logger.debug(f"ZEP EXTRACTION: Extracted JSON pattern: {cleaned_response[:100]}...")
+                    
                     import json
                     import ast
                     try:
                         # First try standard JSON parsing
-                        parsed_response = json.loads(response_text)
+                        parsed_response = json.loads(cleaned_response)
                         
                         # Handle different response formats following Zep patterns
                         if isinstance(parsed_response, list):
@@ -1077,7 +1090,7 @@ class ZepGraphiti(Graphiti):
                         
                         # Try parsing as Python literal (handles single quotes)
                         try:
-                            parsed_response = ast.literal_eval(response_text)
+                            parsed_response = ast.literal_eval(cleaned_response)
                             logger.debug(f"ZEP EXTRACTION: Successfully parsed using ast.literal_eval")
                             
                             # Handle different response formats
