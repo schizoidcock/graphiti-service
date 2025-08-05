@@ -48,60 +48,56 @@ EPISODIC_NODE_RETURN = """
 
 
 def get_entity_node_save_query(provider: GraphProvider, labels: str) -> str:
-    if provider == GraphProvider.FALKORDB:
-        # FalkorDB native vector support - store embedding as vecf32() vector
-        return f"""
-            MERGE (n:Entity {{uuid: $entity_data.uuid}})
-            SET n:{labels}
-            SET n = $entity_data
-            WITH n
-            WHERE $entity_data.name_embedding IS NOT NULL
-            SET n.name_embedding = vecf32($entity_data.name_embedding)
-            RETURN n.uuid AS uuid
-        """
-
-    # Neo4j with vector extension
+    # FalkorDB-only implementation - handle vector embedding separately to avoid type conflicts
+    # Don't use bulk assignment for entity_data since it includes name_embedding as raw list
     return f"""
         MERGE (n:Entity {{uuid: $entity_data.uuid}})
         SET n:{labels}
-        SET n = $entity_data
-        WITH n 
+        SET n.uuid = $entity_data.uuid,
+            n.name = $entity_data.name,
+            n.group_id = $entity_data.group_id,
+            n.labels = $entity_data.labels,
+            n.created_at = $entity_data.created_at,
+            n.valid_at = $entity_data.valid_at,
+            n.invalid_at = $entity_data.invalid_at,
+            n.summary = $entity_data.summary,
+            n.attributes = $entity_data.attributes
+        WITH n
         WHERE $entity_data.name_embedding IS NOT NULL
-        CALL db.create.setNodeVectorProperty(n, "name_embedding", $entity_data.name_embedding)
+        SET n.name_embedding = vecf32($entity_data.name_embedding)
         RETURN n.uuid AS uuid
     """
 
 
 def get_entity_node_save_bulk_query(provider: GraphProvider, nodes: list[dict]) -> str | Any:
-    if provider == GraphProvider.FALKORDB:
-        queries = []
-        for node in nodes:
-            for label in node['labels']:
-                queries.append(
-                    (
-                        f"""
-                        UNWIND $nodes AS node
-                        MERGE (n:Entity {{uuid: node.uuid}})
-                        SET n:{label}
-                        SET n = node
-                        WITH n, node
-                        WHERE node.name_embedding IS NOT NULL
-                        SET n.name_embedding = node.name_embedding
-                        RETURN n.uuid AS uuid
-                        """,
-                        {'nodes': [node]},
-                    )
+    # FalkorDB-only implementation - handle vector embedding separately to avoid type conflicts
+    queries = []
+    for node in nodes:
+        for label in node['labels']:
+            queries.append(
+                (
+                    f"""
+                    UNWIND $nodes AS node
+                    MERGE (n:Entity {{uuid: node.uuid}})
+                    SET n:{label}
+                    SET n.uuid = node.uuid,
+                        n.name = node.name,
+                        n.group_id = node.group_id,
+                        n.labels = node.labels,
+                        n.created_at = node.created_at,
+                        n.valid_at = node.valid_at,
+                        n.invalid_at = node.invalid_at,
+                        n.summary = node.summary,
+                        n.attributes = node.attributes
+                    WITH n, node
+                    WHERE node.name_embedding IS NOT NULL
+                    SET n.name_embedding = vecf32(node.name_embedding)
+                    RETURN n.uuid AS uuid
+                    """,
+                    {'nodes': [node]},
                 )
-        return queries
-
-    return """
-        UNWIND $nodes AS node
-        MERGE (n:Entity {uuid: node.uuid})
-        SET n:$(node.labels)
-        SET n = node
-        WITH n, node CALL db.create.setNodeVectorProperty(n, "name_embedding", node.name_embedding)
-        RETURN n.uuid AS uuid
-    """
+            )
+    return queries
 
 
 ENTITY_NODE_RETURN = """
