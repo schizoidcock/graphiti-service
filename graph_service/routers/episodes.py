@@ -458,7 +458,7 @@ async def get_episode_mentions(
                     labels=record_data.get('labels', []),
                     attributes=record_data.get('attributes') or {},
                     created_at=record_data.get('created_at'),
-                    updated_at=record_data.get('updated_at'),
+                    updated_at=record_data.get('updated_at') or record_data.get('created_at'),
                     metadata=record_data.get('attributes') or {},
                     group_ids=[]
                 )
@@ -498,7 +498,7 @@ async def get_episode_mentions(
                     attributes=record_data.get('attributes') or {},
                     episodes=record_data.get('episodes', []),
                     created_at=record_data.get('created_at'),
-                    updated_at=record_data.get('updated_at'),
+                    updated_at=record_data.get('updated_at') or record_data.get('created_at'),
                     valid_at=record_data.get('valid_at'),
                     expires_at=record_data.get('expired_at'),
                     invalid_at=record_data.get('invalid_at'),
