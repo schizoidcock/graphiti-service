@@ -78,12 +78,18 @@ async def extract_entities_async(graphiti, content: str, group_id: str, session_
 async def generate_summary_async(graphiti, group_id: str, session_id: str, session_data: dict):
     """Generate session summary asynchronously without blocking the main response"""
     import time
+    import asyncio
     start_time = time.time()
     
     # Log processing started
     logger.info(f"🚀 PROCESSING STARTED: Summary generation for session {session_id}")
     
     try:
+        # Wait a bit for episode addition to complete before generating summary
+        # This prevents race condition where summary runs before episodes are committed
+        await asyncio.sleep(2)  # 2 second delay to allow episode addition to complete
+        logger.info(f"⏱️  SUMMARY DELAY: Waited 2s for episode addition to complete for session {session_id}")
+        
         context_summary = await graphiti.get_contextual_summary(group_id, max_episodes=5)  # Reduced from 10
         processing_time = time.time() - start_time
         
