@@ -19,6 +19,34 @@ from graph_service.dto.session import (
 from graph_service.zep_graphiti import ZepGraphitiDep, ZepGraphitiForUserDep, get_or_create_pooled_client, current_user_context, ZepEnvDep
 from graph_service.search_cache import search_cache
 
+# Async helper function for non-blocking episode addition
+async def add_episode_async(graphiti, message_uuid: str, group_id: str, session_message, current_time, session_id: str):
+    """Add episode asynchronously without blocking the main response"""
+    import time
+    start_time = time.time()
+    
+    # Log processing started
+    logger.info(f"🚀 PROCESSING STARTED: Episode addition for session {session_id} - message: {message_uuid}")
+    
+    try:
+        # Use optimized episode creation with selective NLP processing
+        result = await graphiti.enhanced_add_episode(
+            uuid=message_uuid,
+            group_id=group_id,
+            name=f"{session_message.role.title()} Message",
+            episode_body=session_message.content,
+            reference_time=current_time,
+            source=EpisodeType.message,
+            source_description=f"{session_message.role} message in session {session_id}"
+        )
+        
+        processing_time = time.time() - start_time
+        logger.info(f"✅ PROCESSING COMPLETED: Episode added for session {session_id} in {processing_time:.2f}s")
+        
+    except Exception as e:
+        processing_time = time.time() - start_time
+        logger.error(f"❌ PROCESSING FAILED: Episode addition failed for session {session_id} after {processing_time:.2f}s: {e}")
+
 # Async helper function for non-blocking entity extraction
 async def extract_entities_async(graphiti, content: str, group_id: str, session_id: str):
     """Extract entities asynchronously without blocking the main response"""
@@ -302,18 +330,17 @@ async def add_memory_to_session(
         
         processed_messages.append(session_message)
         
-        # Add to Graphiti knowledge graph with optimized processing
+        # Add to Graphiti knowledge graph asynchronously (non-blocking)
         try:
-            # Use optimized episode creation with selective NLP processing
-            await graphiti.enhanced_add_episode(
-                uuid=message_uuid,
+            # Use async task for episode creation to not block response
+            asyncio.create_task(add_episode_async(
+                graphiti=graphiti,
+                message_uuid=message_uuid,
                 group_id=group_id,
-                name=f"{session_message.role.title()} Message",
-                episode_body=session_message.content,
-                reference_time=current_time,
-                source=EpisodeType.message,
-                source_description=f"{session_message.role} message in session {session_id}"
-            )
+                session_message=session_message,
+                current_time=current_time,
+                session_id=session_id
+            ))
             
             # Optimized entity extraction - only for substantial user messages and with limits
             if (session_message.role == 'user' and 
