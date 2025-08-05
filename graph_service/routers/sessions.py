@@ -22,18 +22,42 @@ from graph_service.search_cache import search_cache
 # Async helper function for non-blocking entity extraction
 async def extract_entities_async(graphiti, content: str, group_id: str, session_id: str):
     """Extract entities asynchronously without blocking the main response"""
+    import time
+    start_time = time.time()
+    
+    # Log processing started
+    logger.info(f"🚀 PROCESSING STARTED: Entity extraction for session {session_id} - content length: {len(content)}")
+    
     try:
         entities = await graphiti.extract_entities_from_text(content, group_id)
+        processing_time = time.time() - start_time
+        
         if entities:
-            logger.info(f"🔍 Extracted {len(entities)} entities from session {session_id} (async)")
+            logger.info(f"✅ PROCESSING COMPLETED: Extracted {len(entities)} entities from session {session_id} in {processing_time:.2f}s")
+            # Log entity details for debugging
+            for entity in entities[:3]:  # Log first 3 entities
+                entity_name = entity.get('name', 'Unknown')
+                entity_type = entity.get('type', 'Unknown')
+                logger.info(f"   📍 Entity: {entity_name} ({entity_type})")
+        else:
+            logger.info(f"⚠️ PROCESSING COMPLETED: No entities extracted from session {session_id} in {processing_time:.2f}s")
+            
     except Exception as e:
-        logger.warning(f"⚠️ Async entity extraction failed for session {session_id}: {e}")
+        processing_time = time.time() - start_time
+        logger.error(f"❌ PROCESSING FAILED: Entity extraction failed for session {session_id} after {processing_time:.2f}s: {e}")
 
 # Async helper function for non-blocking summary generation  
 async def generate_summary_async(graphiti, group_id: str, session_id: str, session_data: dict):
     """Generate session summary asynchronously without blocking the main response"""
+    import time
+    start_time = time.time()
+    
+    # Log processing started
+    logger.info(f"🚀 PROCESSING STARTED: Summary generation for session {session_id}")
+    
     try:
         context_summary = await graphiti.get_contextual_summary(group_id, max_episodes=5)  # Reduced from 10
+        processing_time = time.time() - start_time
         
         # Update session data with summary (in background)
         session_data["summary"] = context_summary.get("summary", "")
@@ -41,9 +65,13 @@ async def generate_summary_async(graphiti, group_id: str, session_id: str, sessi
             "key_entities": context_summary.get("key_entities", [])[:10],  # Limit entities
             "topics": context_summary.get("topics", [])[:5],  # Limit topics
         })
-        logger.info(f"📝 Generated session summary for {session_id} (async): {context_summary.get('summary', '')[:100]}...")
+        
+        logger.info(f"✅ PROCESSING COMPLETED: Generated session summary for {session_id} in {processing_time:.2f}s")
+        logger.info(f"   📄 Summary: {context_summary.get('summary', '')[:100]}...")
+        
     except Exception as e:
-        logger.warning(f"⚠️ Async summary generation failed for session {session_id}: {e}")
+        processing_time = time.time() - start_time
+        logger.error(f"❌ PROCESSING FAILED: Summary generation failed for session {session_id} after {processing_time:.2f}s: {e}")
 
 router = APIRouter(prefix="/api/v2", tags=["sessions"])
 
