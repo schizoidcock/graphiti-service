@@ -384,11 +384,21 @@ async def get_episode_mentions(
         
         episode_result = await graphiti.driver.execute_query(episode_query, episode_uuid=episode_uuid)
         
-        if not episode_result:
+        # Handle FalkorDB result format: (data_list, fields_list, metadata)
+        actual_episode_records = episode_result[0] if isinstance(episode_result, tuple) and len(episode_result) > 0 else episode_result
+        
+        if not actual_episode_records:
             logger.warning(f"Episode {episode_uuid} not found")
             return EpisodeMentionsResponse(nodes=[], edges=[])
         
-        group_id = episode_result[0].get('group_id')
+        # Handle both dict and list format for FalkorDB
+        first_record = actual_episode_records[0]
+        if isinstance(first_record, dict):
+            group_id = first_record.get('group_id')
+        elif isinstance(first_record, list):
+            group_id = first_record[0] if len(first_record) > 0 else None
+        else:
+            group_id = None
         if not group_id:
             logger.warning(f"Episode {episode_uuid} has no group_id")
             return EpisodeMentionsResponse(nodes=[], edges=[])
@@ -422,18 +432,34 @@ async def get_episode_mentions(
         
         # Process nodes
         nodes = []
-        for record in nodes_result:
+        # Handle FalkorDB result format: (data_list, fields_list, metadata)
+        actual_nodes_records = nodes_result[0] if isinstance(nodes_result, tuple) and len(nodes_result) > 0 else nodes_result
+        
+        for record in actual_nodes_records:
             try:
+                # Handle both dictionary and list formats from FalkorDB
+                if isinstance(record, dict):
+                    record_data = record
+                elif isinstance(record, list):
+                    # Map list to field names for nodes query
+                    field_names = ['uuid', 'name', 'summary', 'labels', 'attributes', 'created_at', 'updated_at']
+                    if len(record) == len(field_names):
+                        record_data = dict(zip(field_names, record))
+                    else:
+                        continue
+                else:
+                    continue
+                
                 node = EntityNode(
-                    uuid=record.get('uuid', ''),
-                    name=record.get('name', ''),
-                    summary=record.get('summary', ''),
+                    uuid=record_data.get('uuid', ''),
+                    name=record_data.get('name', ''),
+                    summary=record_data.get('summary', ''),
                     entity_type='Entity',  # Default type
-                    labels=record.get('labels', []),
-                    attributes=record.get('attributes', {}),
-                    created_at=record.get('created_at'),
-                    updated_at=record.get('updated_at'),
-                    metadata=record.get('attributes', {}),
+                    labels=record_data.get('labels', []),
+                    attributes=record_data.get('attributes', {}),
+                    created_at=record_data.get('created_at'),
+                    updated_at=record_data.get('updated_at'),
+                    metadata=record_data.get('attributes', {}),
                     group_ids=[]
                 )
                 nodes.append(node)
@@ -443,24 +469,40 @@ async def get_episode_mentions(
         
         # Process edges
         edges = []
-        for record in edges_result:
+        # Handle FalkorDB result format: (data_list, fields_list, metadata)
+        actual_edges_records = edges_result[0] if isinstance(edges_result, tuple) and len(edges_result) > 0 else edges_result
+        
+        for record in actual_edges_records:
             try:
+                # Handle both dictionary and list formats from FalkorDB
+                if isinstance(record, dict):
+                    record_data = record
+                elif isinstance(record, list):
+                    # Map list to field names for edges query
+                    field_names = ['uuid', 'source_node_uuid', 'target_node_uuid', 'fact', 'name', 'episodes', 'created_at', 'updated_at', 'valid_at', 'expired_at', 'invalid_at', 'attributes']
+                    if len(record) == len(field_names):
+                        record_data = dict(zip(field_names, record))
+                    else:
+                        continue
+                else:
+                    continue
+                
                 edge = EntityEdge(
-                    uuid=record.get('uuid', ''),
-                    source_node_uuid=record.get('source_node_uuid', ''),
-                    target_node_uuid=record.get('target_node_uuid', ''),
-                    name=record.get('name', 'relates_to'),
-                    fact=record.get('fact', ''),
-                    predicate=record.get('name', 'relates_to'),
+                    uuid=record_data.get('uuid', ''),
+                    source_node_uuid=record_data.get('source_node_uuid', ''),
+                    target_node_uuid=record_data.get('target_node_uuid', ''),
+                    name=record_data.get('name', 'relates_to'),
+                    fact=record_data.get('fact', ''),
+                    predicate=record_data.get('name', 'relates_to'),
                     edge_type='relates_to',
-                    attributes=record.get('attributes', {}),
-                    episodes=record.get('episodes', []),
-                    created_at=record.get('created_at'),
-                    updated_at=record.get('updated_at'),
-                    valid_at=record.get('valid_at'),
-                    expires_at=record.get('expired_at'),
-                    invalid_at=record.get('invalid_at'),
-                    metadata=record.get('attributes', {}),
+                    attributes=record_data.get('attributes', {}),
+                    episodes=record_data.get('episodes', []),
+                    created_at=record_data.get('created_at'),
+                    updated_at=record_data.get('updated_at'),
+                    valid_at=record_data.get('valid_at'),
+                    expires_at=record_data.get('expired_at'),
+                    invalid_at=record_data.get('invalid_at'),
+                    metadata=record_data.get('attributes', {}),
                     group_ids=[],
                     fact_rating=1.0
                 )
