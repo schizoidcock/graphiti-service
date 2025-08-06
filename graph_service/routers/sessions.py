@@ -382,13 +382,8 @@ async def add_memory_to_session(
             ))
             episode_tasks.append(episode_task)
             
-            # Optimized entity extraction - only for substantial user messages and with limits
-            if (session_message.role == 'user' and 
-                len(session_message.content) > 50 and  # Increased threshold
-                len(session_message.content) < 1000):  # Skip very long messages for speed
-                
-                # Use async task for entity extraction to not block response
-                asyncio.create_task(extract_entities_async(graphiti, session_message.content, group_id, session_id))
+            # NOTE: Entity extraction is already handled by enhanced_add_episode() above
+            # Removed duplicate extract_entities_async() call to prevent excessive API usage
                     
         except Exception as e:
             print(f"Warning: Failed to process message {message_uuid} in Graphiti: {e}")
