@@ -46,8 +46,8 @@ def get_entity_edge_save_query(provider: GraphProvider) -> str:
     # FalkorDB-only implementation - handle vector embedding separately to avoid type conflicts
     # Don't use bulk assignment for edge_data since it includes fact_embedding as raw list
     return """
-        MATCH (source:Entity {uuid: $edge_data.source_node_uuid})
-        MATCH (target:Entity {uuid: $edge_data.target_node_uuid})
+        MATCH (source:Entity {uuid: $edge_data.source_uuid})
+        MATCH (target:Entity {uuid: $edge_data.target_uuid})
         MERGE (source)-[e:RELATES_TO {uuid: $edge_data.uuid}]->(target)
         SET e.uuid = $edge_data.uuid,
             e.name = $edge_data.name,
