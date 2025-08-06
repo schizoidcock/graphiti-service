@@ -680,14 +680,15 @@ class ZepGraphiti(Graphiti):
 
     async def enhanced_add_episode(self, uuid: str, group_id: str, name: str, episode_body: str, 
                                  reference_time, source, source_description: str):
-        """Enhanced episode creation with proper node-edge sequencing and error handling"""
+        """Enhanced episode creation with FIXED UUID handling and proper error recovery"""
         try:
             logger.info(f"🚀 ENHANCED_ADD_EPISODE: Starting episode processing for group {group_id}")
             
-            # CRITICAL FIX: Re-enable edge extraction with proper error handling
-            # The "node not found" error occurs because edges try to reference nodes before they're committed
-            # Solution: Use transaction-like behavior and proper sequencing
+            # CRITICAL FIX: The root cause was UUID handling in the base graphiti library
+            # When we pass uuid=uuid, it tries to FETCH an existing episode, not CREATE a new one
+            # Solution: Don't pass the UUID parameter, let graphiti create the episode, then manually set the UUID
             try:
+                # Call add_episode WITHOUT the uuid parameter to create a new episode
                 result = await self.add_episode(
                     name=name,
                     episode_body=episode_body,
@@ -695,11 +696,17 @@ class ZepGraphiti(Graphiti):
                     source_description=source_description,
                     reference_time=reference_time,
                     group_id=group_id,
-                    uuid=uuid,
+                    # DO NOT PASS uuid=uuid - this causes "node not found" error
                     # Re-enable edge extraction with default types
                     edge_types=None,  # Use built-in default relationship types
                     edge_type_map=None  # Use default entity->entity mapping
                 )
+                
+                # MANUAL UUID ASSIGNMENT: Set the desired UUID after creation
+                if hasattr(result, 'episode') and result.episode:
+                    original_uuid = result.episode.uuid
+                    result.episode.uuid = uuid  # Set our desired UUID
+                    logger.info(f"🔧 ENHANCED_ADD_EPISODE: Manually set episode UUID from {original_uuid} to {uuid}")
                 
                 # Log successful extraction results
                 node_count = len(result.nodes) if hasattr(result, 'nodes') else 0
@@ -721,32 +728,42 @@ class ZepGraphiti(Graphiti):
                 
                 return result
                 
-            except Exception as edge_error:
-                # If edge extraction fails due to node reference issues, fall back to entity-only extraction
-                logger.warning(f"⚠️ ENHANCED_ADD_EPISODE: Edge extraction failed ({edge_error}), falling back to entity-only mode")
+            except Exception as primary_error:
+                # If the primary approach fails, fall back to entity-only extraction
+                logger.warning(f"⚠️ ENHANCED_ADD_EPISODE: Primary approach failed ({primary_error}), falling back to entity-only mode")
                 
                 # Retry with edge extraction disabled as fallback
-                result = await self.add_episode(
-                    name=name,
-                    episode_body=episode_body,
-                    source=source,
-                    source_description=source_description,
-                    reference_time=reference_time,
-                    group_id=group_id,
-                    uuid=uuid
-                    # No edge extraction parameters = entity-only mode
-                )
-                
-                node_count = len(result.nodes) if hasattr(result, 'nodes') else 0
-                logger.info(f"✅ ENHANCED_ADD_EPISODE: Fallback mode extracted {node_count} nodes (edges disabled due to sequencing issue)")
-                
-                # Log fallback node details (first 3)
-                if hasattr(result, 'nodes'):
-                    for i, node in enumerate(result.nodes[:3]):
-                        node_name = getattr(node, 'name', 'Unknown')
-                        logger.info(f"   📍 Node {i+1}: {node_name}")
-                
-                return result
+                try:
+                    result = await self.add_episode(
+                        name=name,
+                        episode_body=episode_body,
+                        source=source,
+                        source_description=source_description,
+                        reference_time=reference_time,
+                        group_id=group_id
+                        # No UUID parameter AND no edge extraction parameters = basic entity-only mode
+                    )
+                    
+                    # Manual UUID assignment for fallback mode too
+                    if hasattr(result, 'episode') and result.episode:
+                        original_uuid = result.episode.uuid
+                        result.episode.uuid = uuid
+                        logger.info(f"🔧 ENHANCED_ADD_EPISODE: Fallback mode - manually set UUID from {original_uuid} to {uuid}")
+                    
+                    node_count = len(result.nodes) if hasattr(result, 'nodes') else 0
+                    logger.info(f"✅ ENHANCED_ADD_EPISODE: Fallback mode extracted {node_count} nodes (edges disabled)")
+                    
+                    # Log fallback node details (first 3)
+                    if hasattr(result, 'nodes'):
+                        for i, node in enumerate(result.nodes[:3]):
+                            node_name = getattr(node, 'name', 'Unknown')
+                            logger.info(f"   📍 Node {i+1}: {node_name}")
+                    
+                    return result
+                    
+                except Exception as fallback_error:
+                    logger.error(f"❌ ENHANCED_ADD_EPISODE: Both primary and fallback approaches failed. Primary: {primary_error}, Fallback: {fallback_error}")
+                    raise fallback_error
             
         except Exception as e:
             logger.error(f"❌ ENHANCED_ADD_EPISODE: Episode creation failed for group {group_id}: {e}")
