@@ -680,22 +680,47 @@ class ZepGraphiti(Graphiti):
 
     async def enhanced_add_episode(self, uuid: str, group_id: str, name: str, episode_body: str, 
                                  reference_time, source, source_description: str):
-        """Fast episode creation - optimized for performance"""
+        """Enhanced episode creation with complete entity and edge extraction"""
         try:
-            # Direct episode creation without extra processing
+            logger.info(f"🚀 ENHANCED_ADD_EPISODE: Starting complete episode processing for group {group_id}")
+            
+            # Complete episode creation with entity AND edge extraction
+            # The base add_episode method includes edge extraction when edge_types is None (uses defaults)
             result = await self.add_episode(
                 name=name,
                 episode_body=episode_body,
                 source=source,
                 source_description=source_description,
                 reference_time=reference_time,
-                group_id=group_id
+                group_id=group_id,
+                uuid=uuid,
+                # Enable edge extraction with default relationship types
+                edge_types=None,  # Uses built-in defaults: CREATED_BY, DEVELOPED_BY, etc.
+                edge_type_map=None  # Uses default mapping for Entity->Entity relationships
             )
+            
+            # Log extraction results for debugging
+            if hasattr(result, 'nodes') and hasattr(result, 'edges'):
+                logger.info(f"✅ ENHANCED_ADD_EPISODE: Extracted {len(result.nodes)} nodes and {len(result.edges)} edges")
+                
+                # Log node details (first 3)
+                for i, node in enumerate(result.nodes[:3]):
+                    node_name = getattr(node, 'name', 'Unknown')
+                    logger.info(f"   📍 Node {i+1}: {node_name}")
+                    
+                # Log edge details (first 3)
+                for i, edge in enumerate(result.edges[:3]):
+                    edge_name = getattr(edge, 'name', 'Unknown')
+                    source_name = getattr(edge, 'source_uuid', 'Unknown')[:8]
+                    target_name = getattr(edge, 'target_uuid', 'Unknown')[:8]
+                    logger.info(f"   🔗 Edge {i+1}: {source_name} -> {edge_name} -> {target_name}")
+            else:
+                logger.warning(f"⚠️ ENHANCED_ADD_EPISODE: Result object missing nodes/edges attributes")
+            
             return result
             
         except Exception as e:
-            # Simple fallback without verbose logging
-            logger.warning(f"Episode creation failed for group {group_id}: {e}")
+            logger.error(f"❌ ENHANCED_ADD_EPISODE: Episode creation failed for group {group_id}: {e}")
             raise
 
     async def get_contextual_summary(self, group_id: str, max_episodes: int = 10):
