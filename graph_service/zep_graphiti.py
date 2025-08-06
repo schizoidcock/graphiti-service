@@ -680,12 +680,12 @@ class ZepGraphiti(Graphiti):
 
     async def enhanced_add_episode(self, uuid: str, group_id: str, name: str, episode_body: str, 
                                  reference_time, source, source_description: str):
-        """Enhanced episode creation with complete entity and edge extraction"""
+        """Enhanced episode creation with entity extraction only (temporary fix)"""
         try:
-            logger.info(f"🚀 ENHANCED_ADD_EPISODE: Starting complete episode processing for group {group_id}")
+            logger.info(f"🚀 ENHANCED_ADD_EPISODE: Starting episode processing for group {group_id}")
             
-            # Complete episode creation with entity AND edge extraction
-            # The base add_episode method includes edge extraction when edge_types is None (uses defaults)
+            # Temporarily disable edge extraction to avoid node reference errors
+            # TODO: Fix edge extraction node reference issue
             result = await self.add_episode(
                 name=name,
                 episode_body=episode_body,
@@ -693,29 +693,20 @@ class ZepGraphiti(Graphiti):
                 source_description=source_description,
                 reference_time=reference_time,
                 group_id=group_id,
-                uuid=uuid,
-                # Enable edge extraction with default relationship types
-                edge_types=None,  # Uses built-in defaults: CREATED_BY, DEVELOPED_BY, etc.
-                edge_type_map=None  # Uses default mapping for Entity->Entity relationships
+                uuid=uuid
+                # Edge extraction disabled temporarily due to node reference errors
             )
             
             # Log extraction results for debugging
-            if hasattr(result, 'nodes') and hasattr(result, 'edges'):
-                logger.info(f"✅ ENHANCED_ADD_EPISODE: Extracted {len(result.nodes)} nodes and {len(result.edges)} edges")
+            if hasattr(result, 'nodes'):
+                logger.info(f"✅ ENHANCED_ADD_EPISODE: Extracted {len(result.nodes)} nodes (edges disabled temporarily)")
                 
                 # Log node details (first 3)
                 for i, node in enumerate(result.nodes[:3]):
                     node_name = getattr(node, 'name', 'Unknown')
                     logger.info(f"   📍 Node {i+1}: {node_name}")
-                    
-                # Log edge details (first 3)
-                for i, edge in enumerate(result.edges[:3]):
-                    edge_name = getattr(edge, 'name', 'Unknown')
-                    source_name = getattr(edge, 'source_uuid', 'Unknown')[:8]
-                    target_name = getattr(edge, 'target_uuid', 'Unknown')[:8]
-                    logger.info(f"   🔗 Edge {i+1}: {source_name} -> {edge_name} -> {target_name}")
             else:
-                logger.warning(f"⚠️ ENHANCED_ADD_EPISODE: Result object missing nodes/edges attributes")
+                logger.warning(f"⚠️ ENHANCED_ADD_EPISODE: Result object missing nodes attribute")
             
             return result
             
