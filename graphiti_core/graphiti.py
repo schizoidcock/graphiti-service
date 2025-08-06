@@ -457,12 +457,17 @@ class Graphiti:
                 )
             )
 
-            # Create default edge type map
-            edge_type_map_default = (
-                {('Entity', 'Entity'): list(edge_types.keys())}
-                if edge_types is not None
-                else {('Entity', 'Entity'): []}
-            )
+            # Create default edge type map with basic relationship types
+            if edge_types is not None:
+                edge_type_map_default = {('Entity', 'Entity'): list(edge_types.keys())}
+            else:
+                # Provide default relationship types when none specified
+                default_edge_types = [
+                    'CREATED_BY', 'DEVELOPED_BY', 'FOUNDED_BY', 'BUILT_BY',
+                    'COMPETES_WITH', 'RELATED_TO', 'USED_FOR', 'PART_OF',
+                    'WORKS_WITH', 'ASSOCIATED_WITH', 'OWNS', 'MANAGES'
+                ]
+                edge_type_map_default = {('Entity', 'Entity'): default_edge_types}
 
             # Extract entities as nodes
 
@@ -604,12 +609,17 @@ class Graphiti:
             group_id = group_id or get_default_group_id(self.driver.provider)
             validate_group_id(group_id)
 
-            # Create default edge type map
-            edge_type_map_default = (
-                {('Entity', 'Entity'): list(edge_types.keys())}
-                if edge_types is not None
-                else {('Entity', 'Entity'): []}
-            )
+            # Create default edge type map with basic relationship types
+            if edge_types is not None:
+                edge_type_map_default = {('Entity', 'Entity'): list(edge_types.keys())}
+            else:
+                # Provide default relationship types when none specified
+                default_edge_types = [
+                    'CREATED_BY', 'DEVELOPED_BY', 'FOUNDED_BY', 'BUILT_BY',
+                    'COMPETES_WITH', 'RELATED_TO', 'USED_FOR', 'PART_OF',
+                    'WORKS_WITH', 'ASSOCIATED_WITH', 'OWNS', 'MANAGES'
+                ]
+                edge_type_map_default = {('Entity', 'Entity'): default_edge_types}
 
             episodes = [
                 await EpisodicNode.get_by_uuid(self.driver, episode.uuid)
