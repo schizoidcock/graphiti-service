@@ -414,15 +414,16 @@ async def get_episode_mentions(
         """
         
         # Get edges that were extracted from this episode's group
+        # Fixed: Edges are stored as RELATES_TO relationships, not EntityEdge nodes
         edges_query = """
-        MATCH (edge:EntityEdge)
-        WHERE edge.group_id = $group_id
-        RETURN edge.uuid as uuid, edge.source_node_uuid as source_node_uuid,
-               edge.target_node_uuid as target_node_uuid, edge.fact as fact,
-               edge.name as name, edge.episodes as episodes,
-               edge.created_at as created_at, edge.updated_at as updated_at,
-               edge.valid_at as valid_at, edge.expired_at as expired_at,
-               edge.invalid_at as invalid_at, edge.attributes as attributes
+        MATCH (source:Entity)-[e:RELATES_TO]->(target:Entity)
+        WHERE e.group_id = $group_id
+        RETURN e.uuid as uuid, source.uuid as source_node_uuid,
+               target.uuid as target_node_uuid, e.fact as fact,
+               e.name as name, e.episodes as episodes,
+               e.created_at as created_at, e.created_at as updated_at,
+               e.valid_at as valid_at, e.expired_at as expired_at,
+               e.invalid_at as invalid_at, {} as attributes
         LIMIT 100
         """
         
