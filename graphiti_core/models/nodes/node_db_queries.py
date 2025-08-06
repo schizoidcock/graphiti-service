@@ -112,17 +112,17 @@ ENTITY_NODE_RETURN = """
 
 
 def get_community_node_save_query(provider: GraphProvider) -> str:
-    if provider == GraphProvider.FALKORDB:
-        return """
-            MERGE (n:Community {uuid: $uuid})
-            SET n = {uuid: $uuid, name: $name, group_id: $group_id, summary: $summary, created_at: $created_at, name_embedding: $name_embedding}
-            RETURN n.uuid AS uuid
-        """
-
+    # FalkorDB-only implementation - handle vector embedding separately to avoid type conflicts
     return """
         MERGE (n:Community {uuid: $uuid})
-        SET n = {uuid: $uuid, name: $name, group_id: $group_id, summary: $summary, created_at: $created_at}
-        WITH n CALL db.create.setNodeVectorProperty(n, "name_embedding", $name_embedding)
+        SET n.uuid = $uuid,
+            n.name = $name,
+            n.group_id = $group_id,
+            n.summary = $summary,
+            n.created_at = $created_at
+        WITH n
+        WHERE $name_embedding IS NOT NULL
+        SET n.name_embedding = vecf32($name_embedding)
         RETURN n.uuid AS uuid
     """
 
