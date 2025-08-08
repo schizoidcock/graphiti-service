@@ -403,13 +403,15 @@ async def get_episode_mentions(
             logger.warning(f"Episode {episode_uuid} has no group_id")
             return EpisodeMentionsResponse(nodes=[], edges=[])
         
-        # Get nodes that were mentioned in this specific episode
-        # Filter by episode UUID in the episodes list (episode-specific filtering)
+        # Get nodes that are connected to edges mentioned in this specific episode
+        # Query for nodes that are source or target of episode-specific edges
         nodes_query = """
-        MATCH (node:Entity)
-        WHERE node.group_id = $group_id 
-        AND $episode_uuid IN node.episodes
-        RETURN node.uuid as uuid, node.name as name, node.summary as summary,
+        MATCH (source:Entity)-[e:RELATES_TO]->(target:Entity)
+        WHERE e.group_id = $group_id
+        AND $episode_uuid IN e.episodes
+        WITH source, target
+        UNWIND [source, target] AS node
+        RETURN DISTINCT node.uuid as uuid, node.name as name, node.summary as summary,
                node.labels as labels, node.attributes as attributes,
                node.created_at as created_at, node.updated_at as updated_at
         LIMIT 100
