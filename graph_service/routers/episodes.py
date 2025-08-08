@@ -403,21 +403,24 @@ async def get_episode_mentions(
             logger.warning(f"Episode {episode_uuid} has no group_id")
             return EpisodeMentionsResponse(nodes=[], edges=[])
         
-        # Get nodes that were extracted from this episode's group
+        # Get nodes that were mentioned in this specific episode
+        # Filter by episode UUID in the episodes list (episode-specific filtering)
         nodes_query = """
         MATCH (node:Entity)
-        WHERE node.group_id = $group_id
+        WHERE node.group_id = $group_id 
+        AND $episode_uuid IN node.episodes
         RETURN node.uuid as uuid, node.name as name, node.summary as summary,
                node.labels as labels, node.attributes as attributes,
                node.created_at as created_at, node.updated_at as updated_at
         LIMIT 100
         """
         
-        # Get edges that were extracted from this episode's group
-        # Fixed: Edges are stored as RELATES_TO relationships, not EntityEdge nodes
+        # Get edges that were mentioned in this specific episode
+        # Filter by episode UUID in the episodes list (episode-specific filtering)
         edges_query = """
         MATCH (source:Entity)-[e:RELATES_TO]->(target:Entity)
         WHERE e.group_id = $group_id
+        AND $episode_uuid IN e.episodes
         RETURN e.uuid as uuid, source.uuid as source_node_uuid,
                target.uuid as target_node_uuid, e.fact as fact,
                e.name as name, e.episodes as episodes,
@@ -427,9 +430,9 @@ async def get_episode_mentions(
         LIMIT 100
         """
         
-        # Execute both queries
-        nodes_result = await graphiti.driver.execute_query(nodes_query, group_id=group_id)
-        edges_result = await graphiti.driver.execute_query(edges_query, group_id=group_id)
+        # Execute both queries with episode-specific filtering
+        nodes_result = await graphiti.driver.execute_query(nodes_query, group_id=group_id, episode_uuid=episode_uuid)
+        edges_result = await graphiti.driver.execute_query(edges_query, group_id=group_id, episode_uuid=episode_uuid)
         
         # Process nodes
         nodes = []
