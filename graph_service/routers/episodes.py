@@ -372,8 +372,7 @@ async def get_episode_mentions(
     try:
         logger.info(f"🔍 Fetching mentions for episode: {episode_uuid}")
         
-        # FIXED: Query for nodes and edges that reference this SPECIFIC episode
-        # Previously returned ALL nodes/edges in the group, now filtering by episode UUID
+        # Query for nodes and edges that reference this episode
         # In Graphiti, episodes are connected to nodes and edges through group_id relationships
         
         # First, get the episode to check its group_id
@@ -404,24 +403,21 @@ async def get_episode_mentions(
             logger.warning(f"Episode {episode_uuid} has no group_id")
             return EpisodeMentionsResponse(nodes=[], edges=[])
         
-        # Get nodes that were extracted from this SPECIFIC episode
-        # Filter by episode UUID in the entities/edges that reference this episode
+        # Get nodes that were extracted from this episode's group
         nodes_query = """
         MATCH (node:Entity)
-        WHERE node.group_id = $group_id 
-        AND ($episode_uuid IN node.episodes OR node.created_from_episode = $episode_uuid)
+        WHERE node.group_id = $group_id
         RETURN node.uuid as uuid, node.name as name, node.summary as summary,
                node.labels as labels, node.attributes as attributes,
                node.created_at as created_at, node.updated_at as updated_at
         LIMIT 100
         """
         
-        # Get edges that were extracted from this SPECIFIC episode
-        # Filter edges to only those that reference this specific episode
+        # Get edges that were extracted from this episode's group
+        # Fixed: Edges are stored as RELATES_TO relationships, not EntityEdge nodes
         edges_query = """
         MATCH (source:Entity)-[e:RELATES_TO]->(target:Entity)
-        WHERE e.group_id = $group_id 
-        AND ($episode_uuid IN e.episodes OR e.created_from_episode = $episode_uuid)
+        WHERE e.group_id = $group_id
         RETURN e.uuid as uuid, source.uuid as source_node_uuid,
                target.uuid as target_node_uuid, e.fact as fact,
                e.name as name, e.episodes as episodes,
@@ -431,9 +427,9 @@ async def get_episode_mentions(
         LIMIT 100
         """
         
-        # Execute both queries with episode_uuid parameter
-        nodes_result = await graphiti.driver.execute_query(nodes_query, group_id=group_id, episode_uuid=episode_uuid)
-        edges_result = await graphiti.driver.execute_query(edges_query, group_id=group_id, episode_uuid=episode_uuid)
+        # Execute both queries
+        nodes_result = await graphiti.driver.execute_query(nodes_query, group_id=group_id)
+        edges_result = await graphiti.driver.execute_query(edges_query, group_id=group_id)
         
         # Process nodes
         nodes = []
