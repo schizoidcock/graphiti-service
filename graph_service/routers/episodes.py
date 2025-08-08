@@ -404,14 +404,12 @@ async def get_episode_mentions(
             logger.warning(f"Episode {episode_uuid} has no group_id")
             return EpisodeMentionsResponse(nodes=[], edges=[])
         
-        # Get nodes that are referenced by edges from this episode
-        # First get the edges for this episode, then find the nodes they reference
+        # Get ALL nodes for this group (nodes don't have episode references, only edges do)
+        # We need all nodes so we can build complete triplets when edges reference them
         nodes_query = """
-        MATCH (source:Entity)-[e:RELATES_TO]->(target:Entity)
-        WHERE e.group_id = $group_id AND ($episode_uuid IN e.episodes OR e.created_from_episode = $episode_uuid)
-        WITH COLLECT(DISTINCT source) + COLLECT(DISTINCT target) AS referencedNodes
-        UNWIND referencedNodes AS node
-        RETURN DISTINCT node.uuid as uuid, node.name as name, node.summary as summary,
+        MATCH (node:Entity)
+        WHERE node.group_id = $group_id
+        RETURN node.uuid as uuid, node.name as name, node.summary as summary,
                node.labels as labels, node.attributes as attributes,
                node.created_at as created_at, node.updated_at as updated_at
         LIMIT 100
@@ -432,8 +430,8 @@ async def get_episode_mentions(
         LIMIT 100
         """
         
-        # Execute both queries with group_id and episode_uuid parameters
-        nodes_result = await graphiti.driver.execute_query(nodes_query, group_id=group_id, episode_uuid=episode_uuid)
+        # Execute queries - nodes query only needs group_id, edges query needs both parameters
+        nodes_result = await graphiti.driver.execute_query(nodes_query, group_id=group_id)
         edges_result = await graphiti.driver.execute_query(edges_query, group_id=group_id, episode_uuid=episode_uuid)
         
         # Process nodes
