@@ -7,6 +7,7 @@ from contextvars import ContextVar
 from functools import lru_cache
 
 from fastapi import Depends, HTTPException, Request
+from pydantic import BaseModel, Field
 from graphiti_core import Graphiti  # type: ignore
 from graphiti_core.driver.falkordb_driver import FalkorDriver  # type: ignore
 from graphiti_core.edges import EntityEdge  # type: ignore
@@ -19,6 +20,58 @@ from graph_service.dto import FactResult
 from graph_service.response_cache import response_cache
 
 logger = logging.getLogger(__name__)
+
+# Official Zep Entity Types (based on Zep documentation)
+class User(BaseModel):
+    """A human that is part of the current chat thread"""
+    pass
+
+class Assistant(BaseModel):
+    """The AI assistant in the conversation"""
+    pass
+
+class Preference(BaseModel):
+    """A user's expressed like, dislike, or preference for something"""
+    pass
+
+class Location(BaseModel):
+    """A physical or virtual place where activities occur or entities exist"""
+    pass
+
+class Event(BaseModel):
+    """A time-bound activity, occurrence, or experience"""
+    pass
+
+class Object(BaseModel):
+    """A physical item, tool, device, or possession"""
+    pass
+
+class Topic(BaseModel):
+    """A subject of conversation, interest, or knowledge domain"""
+    pass
+
+class Organization(BaseModel):
+    """A company, institution, group, or formal entity"""
+    pass
+
+class Document(BaseModel):
+    """Information content in various forms"""
+    pass
+
+# Function to get the official Zep entity types
+def get_zep_entity_types() -> dict[str, type[BaseModel]]:
+    """Returns the official Zep entity types for proper entity classification"""
+    return {
+        "User": User,
+        "Assistant": Assistant, 
+        "Preference": Preference,
+        "Location": Location,
+        "Event": Event,
+        "Object": Object,
+        "Topic": Topic,
+        "Organization": Organization,
+        "Document": Document,
+    }
 
 # Context variable to store current user_id for request-scoped database isolation
 current_user_context: ContextVar[str | None] = ContextVar('current_user_context', default=None)
@@ -697,6 +750,8 @@ class ZepGraphiti(Graphiti):
                     reference_time=reference_time,
                     group_id=group_id,
                     # DO NOT PASS uuid=uuid - this causes "node not found" error
+                    # ADD PROPER ENTITY TYPES for correct classification
+                    entity_types=get_zep_entity_types(),  # Use official Zep entity types
                     # Re-enable edge extraction with default types
                     edge_types=None,  # Use built-in default relationship types
                     edge_type_map=None  # Use default entity->entity mapping
@@ -740,7 +795,9 @@ class ZepGraphiti(Graphiti):
                         source=source,
                         source_description=source_description,
                         reference_time=reference_time,
-                        group_id=group_id
+                        group_id=group_id,
+                        # ADD PROPER ENTITY TYPES for correct classification (even in fallback mode)
+                        entity_types=get_zep_entity_types()  # Use official Zep entity types
                         # No UUID parameter AND no edge extraction parameters = basic entity-only mode
                     )
                     

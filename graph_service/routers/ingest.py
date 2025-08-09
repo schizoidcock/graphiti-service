@@ -128,6 +128,9 @@ async def add_messages(
             from graphiti_core.nodes import EpisodeType
             
             try:
+                # Import the entity types function
+                from graph_service.zep_graphiti import get_zep_entity_types
+                
                 # Let Graphiti handle the complete workflow: episode creation, entity extraction, and relationship building
                 result = await graphiti.add_episode(
                     name=episode_name,
@@ -135,7 +138,9 @@ async def add_messages(
                     source=EpisodeType.message,
                     source_description=f"{message.role} message from {request.group_id}",
                     reference_time=message.timestamp or utc_now(),
-                    group_id=request.group_id
+                    group_id=request.group_id,
+                    # ADD PROPER ENTITY TYPES for correct classification
+                    entity_types=get_zep_entity_types()  # Use official Zep entity types
                 )
                 
                 logger.info(f"Successfully processed episode {result.episode.uuid} with {len(result.nodes)} entities and {len(result.edges)} relationships")

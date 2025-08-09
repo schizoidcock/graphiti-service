@@ -251,13 +251,18 @@ async def add_graph_data(
         from graphiti_core.nodes import EpisodeType
         source_type = EpisodeType.from_str(request.data_type)
         
+        # Import the entity types function
+        from graph_service.zep_graphiti import get_zep_entity_types
+        
         episode_result = await graphiti.add_episode(
             name=f"Episode_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
             episode_body=request.data,
             source=source_type,
             source_description=request.source_description or f"Added via graph API - {request.data_type}",
             group_id=group_id,
-            reference_time=datetime.now(timezone.utc)
+            reference_time=datetime.now(timezone.utc),
+            # ADD PROPER ENTITY TYPES for correct classification
+            entity_types=get_zep_entity_types()  # Use official Zep entity types
         )
         
         processing_time = (datetime.now() - start_time).total_seconds() * 1000
