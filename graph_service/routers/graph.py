@@ -579,98 +579,178 @@ async def get_user_graph_triplets(
     limit: int = Query(100, description="Maximum number of triplets to return")
 ):
     """
-    Get graph triplets for a user using Zep's episode-based architecture.
-    Episodes serve as the relationships connecting nodes.
+    Get graph triplets for a user using actual EntityEdges with complete data.
+    Returns proper triplets with sourceNode, edge (with episodes, valid_at), targetNode.
     
-    This endpoint matches the expected structure for zep-web-interface
-    graph visualization where episodes are the connecting relationships.
+    This matches the official Zep API structure for graph triplets.
     """
     
     try:
         # Extract user context for proper database isolation
         graphiti = get_or_create_pooled_client(user_id, settings)
         
-        logger.info(f"🔍 Building graph triplets for user: {user_id}")
+        logger.info(f"🔍 Getting actual graph triplets for user: {user_id}")
         
-        # Step 1: Get all episodes for this user 
-        # In Graphiti, episodes represent the temporal context of knowledge extraction
-        from graphiti_core.nodes import EpisodicNode
-        episodes = await EpisodicNode.get_by_group_ids(graphiti.driver, [f"{user_id}_*"])
+        # Step 1: Query for EntityEdges using direct database query (like episodes endpoint)
+        # Try different group_id patterns for user data
+        user_patterns = [f"{user_id}_*", user_id, f"*{user_id}*"]
         
-        logger.info(f"📊 Found {len(episodes)} episodes for user {user_id}")
+        all_edges_data = []
+        all_nodes_data = []
         
-        triplets = []
-        node_cache = {}  # Cache nodes to avoid duplicates
-        
-        # Step 2: For each episode, get the nodes and edges that were extracted from it
-        for episode in episodes[:limit]:  # Limit episodes processed
+        for pattern in user_patterns:
             try:
-                # Get entities and relationships extracted from this episode
-                # In Graphiti, these are stored with the same group_id as the episode
-                group_id = getattr(episode, 'group_id', f"{user_id}_session")
+                # Query for edges with this group_id pattern
+                edge_query = """
+                MATCH (e:Entity) 
+                WHERE e.group_id STARTS WITH $pattern 
+                   OR e.group_id CONTAINS $user_id 
+                   OR e.group_id = $user_id
+                RETURN e.uuid as uuid, e.source_node_uuid as source_node_uuid, 
+                       e.target_node_uuid as target_node_uuid, e.name as name, 
+                       e.fact as fact, e.created_at as created_at, e.updated_at as updated_at,
+                       e.valid_at as valid_at, e.expires_at as expires_at, 
+                       e.invalid_at as invalid_at, e.episodes as episodes
+                ORDER BY e.created_at DESC
+                LIMIT $limit
+                """
                 
-                # Get nodes that were extracted from this episode's group
-                from graphiti_core.nodes import EntityNode
-                nodes = await EntityNode.get_by_group_ids(graphiti.driver, [group_id])
+                edge_result = await graphiti.driver.execute_query(
+                    edge_query, 
+                    pattern=pattern, 
+                    user_id=user_id,
+                    limit=limit
+                )
                 
-                # Get edges that were extracted from this episode's group  
-                from graphiti_core.edges import EntityEdge
-                edges = await EntityEdge.get_by_group_ids(graphiti.driver, [group_id])
+                # Handle FalkorDB result format
+                actual_records = edge_result[0] if isinstance(edge_result, tuple) and len(edge_result) > 0 else edge_result
+                logger.info(f"📊 Pattern '{pattern}' found {len(actual_records) if hasattr(actual_records, '__len__') else 'unknown'} edge records")
                 
-                # Cache nodes for reference
-                for node in nodes:
-                    node_cache[node.uuid] = {
-                        "uuid": node.uuid,
-                        "name": getattr(node, 'name', ''),
-                        "summary": getattr(node, 'summary', ''),
-                        "labels": getattr(node, 'labels', []),
-                        "attributes": getattr(node, 'attributes', {}),
-                        "created_at": getattr(node, 'created_at', '').isoformat() if hasattr(getattr(node, 'created_at', ''), 'isoformat') else str(getattr(node, 'created_at', '')),
-                        "updated_at": getattr(node, 'updated_at', '').isoformat() if hasattr(getattr(node, 'updated_at', ''), 'isoformat') else str(getattr(node, 'updated_at', ''))
-                    }
-                
-                # Step 3: Build triplets where the episode serves as the relationship
-                # For each pair of nodes that appear in the same episode, create a triplet
-                # with the episode as the connecting relationship
-                for i, source_node in enumerate(nodes):
-                    for target_node in nodes[i+1:]:  # Avoid duplicate pairs
-                        
-                        # Create triplet with episode as the relationship
-                        triplet = {
-                            "sourceNode": node_cache[source_node.uuid],
-                            "episode": {
-                                "uuid": episode.uuid,
-                                "source_node_uuid": source_node.uuid,
-                                "target_node_uuid": target_node.uuid, 
-                                "type": "episode_relationship",
-                                "name": getattr(episode, 'name', f"Episode_{episode.uuid[:8]}"),
-                                "fact": f"Entities mentioned together in {getattr(episode, 'name', 'episode')}",
-                                "content": getattr(episode, 'episode_body', getattr(episode, 'content', '')),
-                                "summary": getattr(episode, 'summary', ''),
-                                "created_at": getattr(episode, 'created_at', '').isoformat() if hasattr(getattr(episode, 'created_at', ''), 'isoformat') else str(getattr(episode, 'created_at', '')),
-                                "updated_at": getattr(episode, 'updated_at', '').isoformat() if hasattr(getattr(episode, 'updated_at', ''), 'isoformat') else str(getattr(episode, 'updated_at', '')),
-                                "valid_at": None,
-                                "expired_at": None,  
-                                "invalid_at": None
-                            },
-                            "targetNode": node_cache[target_node.uuid]
-                        }
-                        
-                        triplets.append(triplet)
-                        
-                        # Limit triplets to avoid overwhelming the UI
-                        if len(triplets) >= limit:
-                            break
+                for record in actual_records:
+                    if record is None:
+                        continue
                     
-                    if len(triplets) >= limit:
-                        break
-                        
+                    # Handle both dictionary and list formats
+                    if isinstance(record, dict):
+                        record_data = record
+                    elif isinstance(record, list):
+                        # Map list to field names
+                        field_names = ['uuid', 'source_node_uuid', 'target_node_uuid', 'name', 'fact', 'created_at', 'updated_at', 'valid_at', 'expires_at', 'invalid_at', 'episodes']
+                        if len(record) == len(field_names):
+                            record_data = dict(zip(field_names, record))
+                        else:
+                            continue
+                    else:
+                        continue
+                    
+                    all_edges_data.append(record_data)
+                    
             except Exception as e:
-                logger.warning(f"Failed to process episode {episode.uuid}: {e}")
+                logger.warning(f"Edge query for pattern '{pattern}' failed: {e}")
+        
+        logger.info(f"📊 Found {len(all_edges_data)} total edge records for user {user_id}")
+        
+        if not all_edges_data:
+            logger.info(f"No edges found for user {user_id}")
+            return []
+        
+        # Step 2: Get all nodes referenced by the edges
+        node_uuids = set()
+        for edge_data in all_edges_data:
+            if edge_data.get('source_node_uuid'):
+                node_uuids.add(edge_data['source_node_uuid'])
+            if edge_data.get('target_node_uuid'):
+                node_uuids.add(edge_data['target_node_uuid'])
+        
+        # Query for nodes by UUIDs
+        if node_uuids:
+            node_query = """
+            MATCH (n:Entity) 
+            WHERE n.uuid IN $node_uuids
+            RETURN n.uuid as uuid, n.name as name, n.summary as summary, 
+                   n.labels as labels, n.attributes as attributes,
+                   n.created_at as created_at, n.updated_at as updated_at
+            """
+            
+            node_result = await graphiti.driver.execute_query(node_query, node_uuids=list(node_uuids))
+            actual_node_records = node_result[0] if isinstance(node_result, tuple) and len(node_result) > 0 else node_result
+            
+            for record in actual_node_records:
+                if record is None:
+                    continue
+                
+                # Handle both dictionary and list formats
+                if isinstance(record, dict):
+                    record_data = record
+                elif isinstance(record, list):
+                    field_names = ['uuid', 'name', 'summary', 'labels', 'attributes', 'created_at', 'updated_at']
+                    if len(record) == len(field_names):
+                        record_data = dict(zip(field_names, record))
+                    else:
+                        continue
+                else:
+                    continue
+                
+                all_nodes_data.append(record_data)
+        
+        # Create node lookup map
+        node_map = {node['uuid']: node for node in all_nodes_data}
+        logger.info(f"📊 Found {len(all_nodes_data)} nodes for edges")
+        
+        # Step 3: Build actual triplets with complete edge data
+        triplets = []
+        for edge_data in all_edges_data:
+            try:
+                source_node = node_map.get(edge_data.get('source_node_uuid'))
+                target_node = node_map.get(edge_data.get('target_node_uuid'))
+                
+                if not source_node or not target_node:
+                    logger.warning(f"Missing nodes for edge {edge_data.get('uuid')}")
+                    continue
+                
+                # Build triplet with actual edge data (including episodes, valid_at)
+                triplet = {
+                    "sourceNode": {
+                        "uuid": source_node.get('uuid', ''),
+                        "name": source_node.get('name', ''),
+                        "summary": source_node.get('summary', ''),
+                        "labels": source_node.get('labels', []),
+                        "attributes": source_node.get('attributes', {}),
+                        "created_at": source_node.get('created_at', ''),
+                        "updated_at": source_node.get('updated_at', '')
+                    },
+                    "edge": {
+                        "uuid": edge_data.get('uuid', ''),
+                        "source_node_uuid": edge_data.get('source_node_uuid', ''),
+                        "target_node_uuid": edge_data.get('target_node_uuid', ''),
+                        "name": edge_data.get('name', ''),
+                        "fact": edge_data.get('fact', ''),
+                        "created_at": edge_data.get('created_at', ''),
+                        "updated_at": edge_data.get('updated_at', ''),
+                        "valid_at": edge_data.get('valid_at'),
+                        "expires_at": edge_data.get('expires_at'),
+                        "invalid_at": edge_data.get('invalid_at'),
+                        "episodes": edge_data.get('episodes', [])
+                    },
+                    "targetNode": {
+                        "uuid": target_node.get('uuid', ''),
+                        "name": target_node.get('name', ''),
+                        "summary": target_node.get('summary', ''),
+                        "labels": target_node.get('labels', []),
+                        "attributes": target_node.get('attributes', {}),
+                        "created_at": target_node.get('created_at', ''),
+                        "updated_at": target_node.get('updated_at', '')
+                    }
+                }
+                
+                triplets.append(triplet)
+                
+            except Exception as e:
+                logger.warning(f"Failed to build triplet for edge {edge_data.get('uuid')}: {e}")
                 continue
         
-        logger.info(f"✅ Built {len(triplets)} graph triplets for user {user_id}")
-        return triplets
+        logger.info(f"✅ Built {len(triplets)} actual graph triplets for user {user_id}")
+        return triplets  # Return array directly to match expected format
         
     except Exception as e:
         logger.error(f"❌ Failed to get graph triplets for user {user_id}: {e}")
