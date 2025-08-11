@@ -681,62 +681,56 @@ async def get_user_graph_triplets(
         user_group_debug_result = await graphiti.driver.execute_query(user_group_debug_query, user_id=user_id)
         logger.info(f"🔍 DEBUG - User-related group_ids: {user_group_debug_result}")
         
-        # Step 1: Query for EntityEdges using direct database query (like episodes endpoint)
-        # Try different group_id patterns for user data
-        user_patterns = [f"{user_id}_*", user_id, f"*{user_id}*"]
+        # Step 1: Query for EntityEdges using the exact pattern that works
+        edge_query = """
+        MATCH (n:Entity)-[e:RELATES_TO]->(m:Entity)
+        WHERE e.group_id STARTS WITH $user_id_pattern
+        RETURN e.uuid as uuid, e.source_node_uuid as source_node_uuid, 
+               e.target_node_uuid as target_node_uuid, e.name as name, 
+               e.fact as fact, e.created_at as created_at, e.updated_at as updated_at,
+               e.valid_at as valid_at, e.expires_at as expires_at, 
+               e.invalid_at as invalid_at, e.episodes as episodes
+        ORDER BY e.created_at DESC
+        LIMIT $limit
+        """
         
-        all_edges_data = []
-        all_nodes_data = []
+        # Use the exact pattern that worked in testing
+        user_id_pattern = f"{user_id}_"
         
-        for pattern in user_patterns:
-            try:
-                # Query for edges using official Graphiti pattern
-                edge_query = """
-                MATCH (n:Entity)-[e:RELATES_TO]->(m:Entity)
-                WHERE e.group_id STARTS WITH $pattern 
-                   OR e.group_id CONTAINS $user_id 
-                   OR e.group_id = $user_id
-                RETURN e.uuid as uuid, e.source_node_uuid as source_node_uuid, 
-                       e.target_node_uuid as target_node_uuid, e.name as name, 
-                       e.fact as fact, e.created_at as created_at, e.updated_at as updated_at,
-                       e.valid_at as valid_at, e.expires_at as expires_at, 
-                       e.invalid_at as invalid_at, e.episodes as episodes
-                ORDER BY e.created_at DESC
-                LIMIT $limit
-                """
+        try:
+            edge_result = await graphiti.driver.execute_query(
+                edge_query, 
+                user_id_pattern=user_id_pattern,
+                limit=limit
+            )
+            
+            # Handle FalkorDB result format
+            actual_records = edge_result[0] if isinstance(edge_result, tuple) and len(edge_result) > 0 else edge_result
+            logger.info(f"📊 Found {len(actual_records) if hasattr(actual_records, '__len__') else 'unknown'} edge records for user {user_id}")
+            
+            all_edges_data = []
+            for record in actual_records:
+                if record is None:
+                    continue
                 
-                edge_result = await graphiti.driver.execute_query(
-                    edge_query, 
-                    pattern=pattern, 
-                    user_id=user_id,
-                    limit=limit
-                )
-                
-                # Handle FalkorDB result format
-                actual_records = edge_result[0] if isinstance(edge_result, tuple) and len(edge_result) > 0 else edge_result
-                logger.info(f"📊 Pattern '{pattern}' found {len(actual_records) if hasattr(actual_records, '__len__') else 'unknown'} edge records")
-                
-                for record in actual_records:
-                    if record is None:
-                        continue
-                    
-                    # Handle both dictionary and list formats
-                    if isinstance(record, dict):
-                        record_data = record
-                    elif isinstance(record, list):
-                        # Map list to field names
-                        field_names = ['uuid', 'source_node_uuid', 'target_node_uuid', 'name', 'fact', 'created_at', 'updated_at', 'valid_at', 'expires_at', 'invalid_at', 'episodes']
-                        if len(record) == len(field_names):
-                            record_data = dict(zip(field_names, record))
-                        else:
-                            continue
+                # Handle both dictionary and list formats
+                if isinstance(record, dict):
+                    record_data = record
+                elif isinstance(record, list):
+                    # Map list to field names
+                    field_names = ['uuid', 'source_node_uuid', 'target_node_uuid', 'name', 'fact', 'created_at', 'updated_at', 'valid_at', 'expires_at', 'invalid_at', 'episodes']
+                    if len(record) == len(field_names):
+                        record_data = dict(zip(field_names, record))
                     else:
                         continue
-                    
-                    all_edges_data.append(record_data)
-                    
-            except Exception as e:
-                logger.warning(f"Edge query for pattern '{pattern}' failed: {e}")
+                else:
+                    continue
+                
+                all_edges_data.append(record_data)
+                
+        except Exception as e:
+            logger.error(f"Edge query failed: {e}")
+            all_edges_data = []
         
         logger.info(f"📊 Found {len(all_edges_data)} total edge records for user {user_id}")
         
@@ -752,6 +746,7 @@ async def get_user_graph_triplets(
             if edge_data.get('target_node_uuid'):
                 node_uuids.add(edge_data['target_node_uuid'])
         
+        all_nodes_data = []
         # Query for nodes by UUIDs using official Graphiti pattern
         if node_uuids:
             node_query = """
@@ -762,26 +757,29 @@ async def get_user_graph_triplets(
                    n.created_at as created_at, n.updated_at as updated_at
             """
             
-            node_result = await graphiti.driver.execute_query(node_query, node_uuids=list(node_uuids))
-            actual_node_records = node_result[0] if isinstance(node_result, tuple) and len(node_result) > 0 else node_result
-            
-            for record in actual_node_records:
-                if record is None:
-                    continue
+            try:
+                node_result = await graphiti.driver.execute_query(node_query, node_uuids=list(node_uuids))
+                actual_node_records = node_result[0] if isinstance(node_result, tuple) and len(node_result) > 0 else node_result
                 
-                # Handle both dictionary and list formats
-                if isinstance(record, dict):
-                    record_data = record
-                elif isinstance(record, list):
-                    field_names = ['uuid', 'name', 'summary', 'labels', 'attributes', 'created_at', 'updated_at']
-                    if len(record) == len(field_names):
-                        record_data = dict(zip(field_names, record))
+                for record in actual_node_records:
+                    if record is None:
+                        continue
+                    
+                    # Handle both dictionary and list formats
+                    if isinstance(record, dict):
+                        record_data = record
+                    elif isinstance(record, list):
+                        field_names = ['uuid', 'name', 'summary', 'labels', 'attributes', 'created_at', 'updated_at']
+                        if len(record) == len(field_names):
+                            record_data = dict(zip(field_names, record))
+                        else:
+                            continue
                     else:
                         continue
-                else:
-                    continue
-                
-                all_nodes_data.append(record_data)
+                    
+                    all_nodes_data.append(record_data)
+            except Exception as e:
+                logger.error(f"Node query failed: {e}")
         
         # Create node lookup map
         node_map = {node['uuid']: node for node in all_nodes_data}
