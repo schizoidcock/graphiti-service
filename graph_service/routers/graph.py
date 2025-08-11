@@ -600,9 +600,9 @@ async def get_user_graph_triplets(
         
         for pattern in user_patterns:
             try:
-                # Query for edges with this group_id pattern
+                # Query for edges using official Graphiti pattern
                 edge_query = """
-                MATCH (e:Entity) 
+                MATCH (n:Entity)-[e:RELATES_TO]->(m:Entity)
                 WHERE e.group_id STARTS WITH $pattern 
                    OR e.group_id CONTAINS $user_id 
                    OR e.group_id = $user_id
@@ -662,10 +662,10 @@ async def get_user_graph_triplets(
             if edge_data.get('target_node_uuid'):
                 node_uuids.add(edge_data['target_node_uuid'])
         
-        # Query for nodes by UUIDs
+        # Query for nodes by UUIDs using official Graphiti pattern
         if node_uuids:
             node_query = """
-            MATCH (n:Entity) 
+            MATCH (n:Entity)
             WHERE n.uuid IN $node_uuids
             RETURN n.uuid as uuid, n.name as name, n.summary as summary, 
                    n.labels as labels, n.attributes as attributes,
