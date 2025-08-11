@@ -591,6 +591,42 @@ async def get_user_graph_triplets(
         
         logger.info(f"🔍 Getting actual graph triplets for user: {user_id}")
         
+        # DEBUG: First check what data exists in the database
+        debug_query = """
+        MATCH (n)
+        RETURN DISTINCT labels(n) as node_labels, count(n) as count
+        """
+        debug_result = await graphiti.driver.execute_query(debug_query)
+        logger.info(f"🔍 DEBUG - Database node labels: {debug_result}")
+        
+        # DEBUG: Check what relationships exist
+        rel_debug_query = """
+        MATCH ()-[r]->()
+        RETURN DISTINCT type(r) as rel_type, count(r) as count
+        """
+        rel_debug_result = await graphiti.driver.execute_query(rel_debug_query)
+        logger.info(f"🔍 DEBUG - Database relationship types: {rel_debug_result}")
+        
+        # DEBUG: Check what group_ids exist for this user
+        group_debug_query = """
+        MATCH (n)
+        WHERE n.group_id IS NOT NULL
+        RETURN DISTINCT n.group_id as group_id
+        ORDER BY n.group_id
+        LIMIT 20
+        """
+        group_debug_result = await graphiti.driver.execute_query(group_debug_query)
+        logger.info(f"🔍 DEBUG - Available group_ids: {group_debug_result}")
+        
+        # DEBUG: Check specifically for user-related group_ids
+        user_group_debug_query = """
+        MATCH (n)
+        WHERE n.group_id CONTAINS $user_id
+        RETURN DISTINCT n.group_id as group_id
+        """
+        user_group_debug_result = await graphiti.driver.execute_query(user_group_debug_query, user_id=user_id)
+        logger.info(f"🔍 DEBUG - User-related group_ids: {user_group_debug_result}")
+        
         # Step 1: Query for EntityEdges using direct database query (like episodes endpoint)
         # Try different group_id patterns for user data
         user_patterns = [f"{user_id}_*", user_id, f"*{user_id}*"]
