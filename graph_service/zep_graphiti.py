@@ -420,7 +420,7 @@ class ZepGraphiti(Graphiti):
             password=password if password and password.strip() else None,
             database=database_name
         )
-        super().__init__(graph_driver=falkor_driver, llm_client=llm_client)
+        super().__init__(graph_driver=falkor_driver, llm_client=llm_client, ensure_ascii=False)
         self._skip_init = skip_init
         self._user_id = user_id
         self._database_name = database_name

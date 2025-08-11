@@ -112,6 +112,7 @@ class Graphiti:
         store_raw_episode_content: bool = True,
         graph_driver: GraphDriver | None = None,
         max_coroutines: int | None = None,
+        ensure_ascii: bool = True,
     ):
         """
         Initialize a Graphiti instance.
@@ -144,6 +145,10 @@ class Graphiti:
         max_coroutines : int | None, optional
             The maximum number of concurrent operations allowed. Overrides SEMAPHORE_LIMIT set in the environment.
             If not set, the Graphiti default is used.
+        ensure_ascii : bool, optional
+            Whether to escape non-ASCII characters in JSON serialization for prompts. Defaults to True.
+            Set to False to preserve non-ASCII characters (e.g., Korean, Japanese, Chinese) in their
+            original form, making them readable in LLM logs and improving model understanding.
 
         Returns
         -------
@@ -173,6 +178,7 @@ class Graphiti:
 
         self.store_raw_episode_content = store_raw_episode_content
         self.max_coroutines = max_coroutines
+        self.ensure_ascii = ensure_ascii
         if llm_client:
             self.llm_client = llm_client
         else:
@@ -191,6 +197,7 @@ class Graphiti:
             llm_client=self.llm_client,
             embedder=self.embedder,
             cross_encoder=self.cross_encoder,
+            ensure_ascii=self.ensure_ascii,
         )
 
         # Capture telemetry event
@@ -535,7 +542,9 @@ class Graphiti:
             if update_communities:
                 communities, community_edges = await semaphore_gather(
                     *[
-                        update_community(self.driver, self.llm_client, self.embedder, node)
+                        update_community(
+                            self.driver, self.llm_client, self.embedder, node, self.ensure_ascii
+                        )
                         for node in nodes
                     ],
                     max_coroutines=self.max_coroutines,
