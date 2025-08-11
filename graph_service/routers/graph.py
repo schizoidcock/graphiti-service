@@ -681,15 +681,20 @@ async def get_user_graph_triplets(
         user_group_debug_result = await graphiti.driver.execute_query(user_group_debug_query, user_id=user_id)
         logger.info(f"🔍 DEBUG - User-related group_ids: {user_group_debug_result}")
         
-        # Step 1: Query for EntityEdges using the exact pattern that works
+        # Step 1: Query for EntityEdges AND nodes in one go (since source/target_node_uuid are null)
         edge_query = """
         MATCH (n:Entity)-[e:RELATES_TO]->(m:Entity)
         WHERE e.group_id STARTS WITH $user_id_pattern
-        RETURN e.uuid as uuid, e.source_node_uuid as source_node_uuid, 
-               e.target_node_uuid as target_node_uuid, e.name as name, 
-               e.fact as fact, e.created_at as created_at, e.updated_at as updated_at,
-               e.valid_at as valid_at, e.expires_at as expires_at, 
-               e.invalid_at as invalid_at, e.episodes as episodes
+        RETURN e.uuid as edge_uuid, e.name as edge_name, 
+               e.fact as edge_fact, e.created_at as edge_created_at, e.updated_at as edge_updated_at,
+               e.valid_at as edge_valid_at, e.expires_at as edge_expires_at, 
+               e.invalid_at as edge_invalid_at, e.episodes as edge_episodes,
+               n.uuid as source_uuid, n.name as source_name, n.summary as source_summary,
+               n.labels as source_labels, n.attributes as source_attributes, 
+               n.created_at as source_created_at, n.updated_at as source_updated_at,
+               m.uuid as target_uuid, m.name as target_name, m.summary as target_summary,
+               m.labels as target_labels, m.attributes as target_attributes,
+               m.created_at as target_created_at, m.updated_at as target_updated_at
         ORDER BY e.created_at DESC
         LIMIT $limit
         """
@@ -706,9 +711,9 @@ async def get_user_graph_triplets(
             
             # Handle FalkorDB result format
             actual_records = edge_result[0] if isinstance(edge_result, tuple) and len(edge_result) > 0 else edge_result
-            logger.info(f"📊 Found {len(actual_records) if hasattr(actual_records, '__len__') else 'unknown'} edge records for user {user_id}")
+            logger.info(f"📊 Found {len(actual_records) if hasattr(actual_records, '__len__') else 'unknown'} triplet records for user {user_id}")
             
-            all_edges_data = []
+            triplets = []
             for record in actual_records:
                 if record is None:
                     continue
@@ -717,128 +722,71 @@ async def get_user_graph_triplets(
                 if isinstance(record, dict):
                     record_data = record
                 elif isinstance(record, list):
-                    # Map list to field names
-                    field_names = ['uuid', 'source_node_uuid', 'target_node_uuid', 'name', 'fact', 'created_at', 'updated_at', 'valid_at', 'expires_at', 'invalid_at', 'episodes']
+                    # Map list to field names for the combined query
+                    field_names = [
+                        'edge_uuid', 'edge_name', 'edge_fact', 'edge_created_at', 'edge_updated_at',
+                        'edge_valid_at', 'edge_expires_at', 'edge_invalid_at', 'edge_episodes',
+                        'source_uuid', 'source_name', 'source_summary', 'source_labels', 'source_attributes',
+                        'source_created_at', 'source_updated_at',
+                        'target_uuid', 'target_name', 'target_summary', 'target_labels', 'target_attributes',
+                        'target_created_at', 'target_updated_at'
+                    ]
                     if len(record) == len(field_names):
                         record_data = dict(zip(field_names, record))
                     else:
+                        logger.warning(f"Record length {len(record)} doesn't match expected {len(field_names)} fields")
                         continue
                 else:
                     continue
                 
-                all_edges_data.append(record_data)
-                
-        except Exception as e:
-            logger.error(f"Edge query failed: {e}")
-            all_edges_data = []
-        
-        logger.info(f"📊 Found {len(all_edges_data)} total edge records for user {user_id}")
-        
-        if not all_edges_data:
-            logger.info(f"No edges found for user {user_id}")
-            return []
-        
-        # Step 2: Get all nodes referenced by the edges
-        node_uuids = set()
-        for edge_data in all_edges_data:
-            if edge_data.get('source_node_uuid'):
-                node_uuids.add(edge_data['source_node_uuid'])
-            if edge_data.get('target_node_uuid'):
-                node_uuids.add(edge_data['target_node_uuid'])
-        
-        all_nodes_data = []
-        # Query for nodes by UUIDs using official Graphiti pattern
-        if node_uuids:
-            node_query = """
-            MATCH (n:Entity)
-            WHERE n.uuid IN $node_uuids
-            RETURN n.uuid as uuid, n.name as name, n.summary as summary, 
-                   n.labels as labels, n.attributes as attributes,
-                   n.created_at as created_at, n.updated_at as updated_at
-            """
-            
-            try:
-                node_result = await graphiti.driver.execute_query(node_query, node_uuids=list(node_uuids))
-                actual_node_records = node_result[0] if isinstance(node_result, tuple) and len(node_result) > 0 else node_result
-                
-                for record in actual_node_records:
-                    if record is None:
-                        continue
+                # Build triplet directly from combined result
+                try:
+                    triplet = {
+                        "sourceNode": {
+                            "uuid": record_data.get('source_uuid', ''),
+                            "name": record_data.get('source_name', ''),
+                            "summary": record_data.get('source_summary', ''),
+                            "labels": record_data.get('source_labels', []),
+                            "attributes": record_data.get('source_attributes', {}),
+                            "created_at": record_data.get('source_created_at', ''),
+                            "updated_at": record_data.get('source_updated_at', '')
+                        },
+                        "edge": {
+                            "uuid": record_data.get('edge_uuid', ''),
+                            "source_node_uuid": record_data.get('source_uuid', ''),
+                            "target_node_uuid": record_data.get('target_uuid', ''),
+                            "name": record_data.get('edge_name', ''),
+                            "fact": record_data.get('edge_fact', ''),
+                            "created_at": record_data.get('edge_created_at', ''),
+                            "updated_at": record_data.get('edge_updated_at', ''),
+                            "valid_at": record_data.get('edge_valid_at'),
+                            "expires_at": record_data.get('edge_expires_at'),
+                            "invalid_at": record_data.get('edge_invalid_at'),
+                            "episodes": record_data.get('edge_episodes', [])
+                        },
+                        "targetNode": {
+                            "uuid": record_data.get('target_uuid', ''),
+                            "name": record_data.get('target_name', ''),
+                            "summary": record_data.get('target_summary', ''),
+                            "labels": record_data.get('target_labels', []),
+                            "attributes": record_data.get('target_attributes', {}),
+                            "created_at": record_data.get('target_created_at', ''),
+                            "updated_at": record_data.get('target_updated_at', '')
+                        }
+                    }
                     
-                    # Handle both dictionary and list formats
-                    if isinstance(record, dict):
-                        record_data = record
-                    elif isinstance(record, list):
-                        field_names = ['uuid', 'name', 'summary', 'labels', 'attributes', 'created_at', 'updated_at']
-                        if len(record) == len(field_names):
-                            record_data = dict(zip(field_names, record))
-                        else:
-                            continue
-                    else:
-                        continue
+                    triplets.append(triplet)
                     
-                    all_nodes_data.append(record_data)
-            except Exception as e:
-                logger.error(f"Node query failed: {e}")
-        
-        # Create node lookup map
-        node_map = {node['uuid']: node for node in all_nodes_data}
-        logger.info(f"📊 Found {len(all_nodes_data)} nodes for edges")
-        
-        # Step 3: Build actual triplets with complete edge data
-        triplets = []
-        for edge_data in all_edges_data:
-            try:
-                source_node = node_map.get(edge_data.get('source_node_uuid'))
-                target_node = node_map.get(edge_data.get('target_node_uuid'))
-                
-                if not source_node or not target_node:
-                    logger.warning(f"Missing nodes for edge {edge_data.get('uuid')}")
+                except Exception as e:
+                    logger.warning(f"Failed to build triplet from record: {e}")
                     continue
                 
-                # Build triplet with actual edge data (including episodes, valid_at)
-                triplet = {
-                    "sourceNode": {
-                        "uuid": source_node.get('uuid', ''),
-                        "name": source_node.get('name', ''),
-                        "summary": source_node.get('summary', ''),
-                        "labels": source_node.get('labels', []),
-                        "attributes": source_node.get('attributes', {}),
-                        "created_at": source_node.get('created_at', ''),
-                        "updated_at": source_node.get('updated_at', '')
-                    },
-                    "edge": {
-                        "uuid": edge_data.get('uuid', ''),
-                        "source_node_uuid": edge_data.get('source_node_uuid', ''),
-                        "target_node_uuid": edge_data.get('target_node_uuid', ''),
-                        "name": edge_data.get('name', ''),
-                        "fact": edge_data.get('fact', ''),
-                        "created_at": edge_data.get('created_at', ''),
-                        "updated_at": edge_data.get('updated_at', ''),
-                        "valid_at": edge_data.get('valid_at'),
-                        "expires_at": edge_data.get('expires_at'),
-                        "invalid_at": edge_data.get('invalid_at'),
-                        "episodes": edge_data.get('episodes', [])
-                    },
-                    "targetNode": {
-                        "uuid": target_node.get('uuid', ''),
-                        "name": target_node.get('name', ''),
-                        "summary": target_node.get('summary', ''),
-                        "labels": target_node.get('labels', []),
-                        "attributes": target_node.get('attributes', {}),
-                        "created_at": target_node.get('created_at', ''),
-                        "updated_at": target_node.get('updated_at', '')
-                    }
-                }
-                
-                triplets.append(triplet)
-                
-            except Exception as e:
-                logger.warning(f"Failed to build triplet for edge {edge_data.get('uuid')}: {e}")
-                continue
+        except Exception as e:
+            logger.error(f"Combined edge+node query failed: {e}")
+            triplets = []
         
         logger.info(f"✅ Built {len(triplets)} actual graph triplets for user {user_id}")
-        return triplets  # Return array directly to match expected format
+        return triplets
         
     except Exception as e:
         logger.error(f"❌ Failed to get graph triplets for user {user_id}: {e}")
