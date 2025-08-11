@@ -592,20 +592,74 @@ async def get_user_graph_triplets(
         logger.info(f"🔍 Getting actual graph triplets for user: {user_id}")
         
         # DEBUG: First check what data exists in the database
-        debug_query = """
-        MATCH (n)
-        RETURN DISTINCT labels(n) as node_labels, count(n) as count
-        """
-        debug_result = await graphiti.driver.execute_query(debug_query)
-        logger.info(f"🔍 DEBUG - Database node labels: {debug_result}")
+        try:
+            debug_query = """
+            MATCH (n)
+            RETURN DISTINCT labels(n) as node_labels, count(n) as count
+            """
+            debug_result = await graphiti.driver.execute_query(debug_query)
+            logger.info(f"🔍 DEBUG - Database node labels: {debug_result}")
+        except Exception as e:
+            logger.error(f"❌ DEBUG - Node labels query failed: {e}")
         
         # DEBUG: Check what relationships exist
-        rel_debug_query = """
-        MATCH ()-[r]->()
-        RETURN DISTINCT type(r) as rel_type, count(r) as count
-        """
-        rel_debug_result = await graphiti.driver.execute_query(rel_debug_query)
-        logger.info(f"🔍 DEBUG - Database relationship types: {rel_debug_result}")
+        try:
+            rel_debug_query = """
+            MATCH ()-[r]->()
+            RETURN DISTINCT type(r) as rel_type, count(r) as count
+            """
+            rel_debug_result = await graphiti.driver.execute_query(rel_debug_query)
+            logger.info(f"🔍 DEBUG - Database relationship types: {rel_debug_result}")
+        except Exception as e:
+            logger.error(f"❌ DEBUG - Relationship types query failed: {e}")
+            
+        # DEBUG: Check total node count
+        try:
+            count_query = """
+            MATCH (n)
+            RETURN count(n) as total_nodes
+            """
+            count_result = await graphiti.driver.execute_query(count_query)
+            logger.info(f"🔍 DEBUG - Total nodes in database: {count_result}")
+        except Exception as e:
+            logger.error(f"❌ DEBUG - Node count query failed: {e}")
+            
+        # DEBUG: Test simple queries to verify they work
+        try:
+            # Try to get ANY edges, regardless of user/group
+            test_edge_query = """
+            MATCH ()-[r]->()
+            RETURN type(r) as rel_type, count(r) as count
+            LIMIT 5
+            """
+            test_edge_result = await graphiti.driver.execute_query(test_edge_query)
+            logger.info(f"🔍 DEBUG - Any edges in database: {test_edge_result}")
+        except Exception as e:
+            logger.error(f"❌ DEBUG - Simple edge query failed: {e}")
+            
+        # DEBUG: Try to get ANY Entity nodes  
+        try:
+            test_entity_query = """
+            MATCH (n:Entity)
+            RETURN count(n) as entity_count
+            LIMIT 1
+            """
+            test_entity_result = await graphiti.driver.execute_query(test_entity_query)
+            logger.info(f"🔍 DEBUG - Entity nodes count: {test_entity_result}")
+        except Exception as e:
+            logger.error(f"❌ DEBUG - Entity query failed: {e}")
+            
+        # DEBUG: Try alternative relationship patterns
+        try:
+            alt_query = """
+            MATCH (n)-[r:MENTIONS]->(m)
+            RETURN type(r) as rel_type, count(r) as count
+            LIMIT 5
+            """
+            alt_result = await graphiti.driver.execute_query(alt_query)
+            logger.info(f"🔍 DEBUG - MENTIONS relationships: {alt_result}")
+        except Exception as e:
+            logger.error(f"❌ DEBUG - MENTIONS query failed: {e}")
         
         # DEBUG: Check what group_ids exist for this user
         group_debug_query = """
