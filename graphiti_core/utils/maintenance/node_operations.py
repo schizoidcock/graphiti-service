@@ -360,6 +360,7 @@ async def extract_attributes_from_node(
                 prompt_library.extract_nodes.extract_attributes(attributes_context),
                 response_model=entity_type,
                 model_size=ModelSize.small,
+                max_tokens=2000,  # Limit token output for conciseness
             )
         )
         if entity_type is not None
@@ -370,6 +371,7 @@ async def extract_attributes_from_node(
         prompt_library.extract_nodes.extract_summary(summary_context),
         response_model=EntitySummary,
         model_size=ModelSize.small,
+        max_tokens=1500,  # Limit summary generation tokens
     )
 
     if entity_type is not None:

@@ -313,7 +313,7 @@ def extract_attributes(context: dict[str, Any]) -> list[Message]:
     return [
         Message(
             role='system',
-            content='You are a culturally-aware assistant that extracts and updates entity properties with enhanced linguistic and cultural context preservation.',
+            content='You are a concise assistant that extracts entity properties. Be brief and factual. Limit all responses to essential information only.',
         ),
         Message(
             role='user',
@@ -334,12 +334,10 @@ def extract_attributes(context: dict[str, Any]) -> list[Message]:
         Guidelines:
         1. **Evidence-Based Updates**: Do not hallucinate entity property values if they cannot be found in the current context.
         2. **Source Fidelity**: Only use the provided MESSAGES and ENTITY to set attribute values.
-        3. **Enhanced Summary**: The summary attribute should include:
-           - Cultural and linguistic context
-           - Temporal information using REFERENCE TIME
-           - Communication patterns and relationship dynamics
-           - Language use and formality levels
-           - Summaries must be no longer than 250 words but maximize information density.
+        3. **Concise Summary**: The summary must be:
+           - Maximum 100 words or 500 characters, whichever is shorter
+           - Only essential facts and context
+           - No elaborate descriptions or cultural analysis
         4. **Language Attributes**: Update language field if language patterns are evident in the messages.
         5. **Cultural Context**: Update cultural_context field with communication style, formality, cultural markers.
         6. **Disambiguation**: Update disambiguation field with relationship context and distinguishing information.
@@ -354,8 +352,8 @@ def extract_attributes(context: dict[str, Any]) -> list[Message]:
 
 
 def extract_summary(context: dict[str, Any]) -> list[Message]:
-    sys_prompt = """You are an AI assistant that generates culturally-aware, temporally-contextualized entity summaries. 
-    Your task is to create or update comprehensive summaries that preserve cultural, linguistic, and temporal context."""
+    sys_prompt = """You are an AI assistant that generates concise entity summaries. 
+    Create brief, factual summaries using maximum 100 words. Be direct and avoid elaborate descriptions."""
 
     user_prompt = f"""
 <ENTITY INFORMATION>
