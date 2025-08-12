@@ -145,23 +145,26 @@ You are given a conversation context and a CURRENT MESSAGE. Your task is to extr
 Pronoun references such as he/she/they or this/that/those should be disambiguated to the names of the 
 reference entities.
 
-1. **Role-Based Entity Classification** (CRITICAL):
-   - If the CURRENT MESSAGE has "Role: Human user input" or "Role: user", entities representing the speaker should be classified as "User" type
-   - If the CURRENT MESSAGE has "Role: AI assistant response" or "Role: assistant", entities representing the speaker should be classified as "Assistant" type
-   - This role information takes PRIORITY over content-based classification
+1. **Entity Identification**: Extract all significant entities, concepts, or actors that are **explicitly or implicitly** mentioned in the CURRENT MESSAGE.
+   - **Include** entities mentioned in content, names, references, and implied speakers
+   - **Exclude** entities mentioned only in the PREVIOUS MESSAGES (they are for context only)
 
-2. **Speaker Extraction**: Always extract the speaker as the primary entity node.
-   - Use the Role field from the CURRENT MESSAGE to determine the correct entity type
-   - If the speaker is mentioned again in the message, treat both mentions as a **single entity**.
+2. **Role-Based Entity Classification** (IMPORTANT):
+   - If the CURRENT MESSAGE has "Role: Human user input", prioritize classifying human speakers/users as "User" type
+   - If the CURRENT MESSAGE has "Role: AI assistant response", prioritize classifying the assistant speaker as "Assistant" type
+   - **However, still extract all other entities mentioned in the content** regardless of role
+   - This role information provides guidance but should not prevent normal entity extraction
 
-3. **Entity Identification**:
-   - Extract all significant entities, concepts, or actors that are **explicitly or implicitly** mentioned in the CURRENT MESSAGE.
-   - **Exclude** entities mentioned only in the PREVIOUS MESSAGES (they are for context only).
+3. **Speaker Extraction**: Always extract the speaker and any other entities mentioned.
+   - Extract the primary speaker/author of the message
+   - Extract any other people, places, things mentioned in the content
+   - If the speaker is mentioned again in the message, treat both mentions as a **single entity**
 
 4. **Entity Classification**:
-   - FIRST check the Role field to determine speaker entity type (User vs Assistant)
-   - Then use the descriptions in ENTITY TYPES to classify each extracted entity.
-   - Assign the appropriate `entity_type_id` for each one.
+   - Use role information as a guide for speaker classification when available
+   - Use the descriptions in ENTITY TYPES to classify all extracted entities
+   - Assign the appropriate `entity_type_id` for each one
+   - When in doubt, prefer more specific types over generic "Entity" type
 
 5. **Language and Cultural Analysis**:
    - **Language Detection**: If the entity uses or is associated with a specific language, set the `language` field (ISO 639-1 codes: "en", "es", "fr", "de", etc.)
@@ -245,11 +248,11 @@ Indicate the classified entity type by providing its entity_type_id.
 {context['custom_prompt']}
 
 Guidelines:
-1. **Role-Based Entity Classification** (CRITICAL):
-   - If the TEXT contains "Role: Human user input" or "Role: user", entities representing the speaker should be classified as "User" type
-   - If the TEXT contains "Role: AI assistant response" or "Role: assistant", entities representing the speaker should be classified as "Assistant" type
-   - This role information takes PRIORITY over content-based classification
-2. **Entity Extraction**: Extract significant entities, concepts, or actors mentioned in the text.
+1. **Entity Extraction**: Extract significant entities, concepts, or actors mentioned in the text.
+2. **Role-Based Classification Guidance** (HELPFUL):
+   - If the TEXT contains "Role: Human user input", consider classifying human speakers as "User" type
+   - If the TEXT contains "Role: AI assistant response", consider classifying assistant entities as "Assistant" type
+   - Use this role information as helpful guidance while still extracting all relevant entities
 3. **Cultural Awareness**: Identify language use, cultural markers, formality levels, and regional context.
 4. **Language Detection**: Set language field for entities when language patterns are evident.
 5. **Disambiguation**: Provide context to distinguish entities from similar ones.
@@ -310,13 +313,15 @@ def classify_nodes(context: dict[str, Any]) -> list[Message]:
     Given the above conversation, extracted entities, and provided entity types and their descriptions, classify the extracted entities.
     
     Guidelines:
-    1. **Role-Based Classification Priority** (CRITICAL):
-       - If the CURRENT MESSAGE has "Role: Human user input" or "Role: user", the speaker entity should be classified as "User" type
-       - If the CURRENT MESSAGE has "Role: AI assistant response" or "Role: assistant", the speaker entity should be classified as "Assistant" type
-       - This role information takes PRIORITY over content-based classification
+    1. **Role-Based Classification Guidance** (IMPORTANT):
+       - If the CURRENT MESSAGE has "Role: Human user input", consider classifying human speakers as "User" type
+       - If the CURRENT MESSAGE has "Role: AI assistant response", consider classifying assistant entities as "Assistant" type
+       - Use this role information as helpful guidance, but also consider content and context
+       - Still classify all other entities based on their actual nature and the provided ENTITY TYPES
     2. Each entity must have exactly one type
     3. Only use the provided ENTITY TYPES as types, do not use additional types to classify entities.
     4. If none of the provided entity types accurately classify an extracted node, the type should be set to None
+    5. When in doubt, prefer more specific types (User, Assistant, etc.) over generic "Entity" type
 """
     return [
         Message(role='system', content=sys_prompt),
