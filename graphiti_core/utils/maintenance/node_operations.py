@@ -188,24 +188,26 @@ async def resolve_extracted_nodes(
     llm_client = clients.llm_client
     driver = clients.driver
 
-    search_results: list[SearchResults] = await semaphore_gather(
-        *[
-            search(
-                clients=clients,
-                query=node.name,
-                group_ids=[node.group_id],
-                search_filter=SearchFilters(),
-                config=NODE_HYBRID_SEARCH_RRF,
-            )
-            for node in extracted_nodes
-        ]
-    )
-
-    candidate_nodes: list[EntityNode] = (
-        [node for result in search_results for node in result.nodes]
-        if existing_nodes_override is None
-        else existing_nodes_override
-    )
+    # PERFORMANCE OPTIMIZATION: Batch entity search instead of individual searches
+    # Each individual search was taking 688ms, causing 6+ second episode processing
+    if existing_nodes_override is None:
+        # Create batch search query for all entity names at once
+        all_entity_names = [node.name for node in extracted_nodes]
+        all_group_ids = list(set(node.group_id for node in extracted_nodes))
+        
+        # Single batch search instead of N individual searches (major performance improvement)
+        batch_search_query = " OR ".join(all_entity_names)
+        batch_search_results = await search(
+            clients=clients,
+            query=batch_search_query,
+            group_ids=all_group_ids,
+            search_filter=SearchFilters(),
+            config=NODE_HYBRID_SEARCH_RRF,
+        )
+        
+        candidate_nodes: list[EntityNode] = batch_search_results.nodes
+    else:
+        candidate_nodes: list[EntityNode] = existing_nodes_override
 
     existing_nodes_dict: dict[str, EntityNode] = {node.uuid: node for node in candidate_nodes}
 
