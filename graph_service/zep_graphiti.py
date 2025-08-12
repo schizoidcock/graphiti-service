@@ -24,39 +24,48 @@ logger = logging.getLogger(__name__)
 # Official Zep Entity Types (based on Zep documentation)
 class User(BaseModel):
     """A human that is part of the current chat thread"""
-    pass
+    name: str = Field(..., description="Name or identifier of the user")
+    summary: str = Field(default="", description="Summary of the user")
 
 class Assistant(BaseModel):
     """The AI assistant in the conversation"""
-    pass
+    name: str = Field(..., description="Name or identifier of the assistant")
+    summary: str = Field(default="", description="Summary of the assistant")
 
 class Preference(BaseModel):
     """A user's expressed like, dislike, or preference for something"""
-    pass
+    name: str = Field(..., description="Name or description of the preference")
+    summary: str = Field(default="", description="Summary of the preference")
 
 class Location(BaseModel):
     """A physical or virtual place where activities occur or entities exist"""
-    pass
+    name: str = Field(..., description="Name of the location")
+    summary: str = Field(default="", description="Summary of the location")
 
 class Event(BaseModel):
     """A time-bound activity, occurrence, or experience"""
-    pass
+    name: str = Field(..., description="Name or description of the event")
+    summary: str = Field(default="", description="Summary of the event")
 
 class Object(BaseModel):
     """A physical item, tool, device, or possession"""
-    pass
+    name: str = Field(..., description="Name or description of the object")
+    summary: str = Field(default="", description="Summary of the object")
 
 class Topic(BaseModel):
     """A subject of conversation, interest, or knowledge domain"""
-    pass
-
+    name: str = Field(..., description="Name of the topic or subject")
+    summary: str = Field(default="", description="Summary of the topic content")
+    
 class Organization(BaseModel):
     """A company, institution, group, or formal entity"""
-    pass
-
+    name: str = Field(..., description="Name of the organization")
+    summary: str = Field(default="", description="Summary of the organization")
+    
 class Document(BaseModel):
     """Information content in various forms"""
-    pass
+    name: str = Field(..., description="Name or title of the document")
+    summary: str = Field(default="", description="Summary of the document content")
 
 # Function to get the official Zep entity types
 def get_zep_entity_types() -> dict[str, type[BaseModel]]:
