@@ -295,9 +295,15 @@ async def get_or_create_pooled_client_async(user_id: str, settings) -> "ZepGraph
     # Periodic cleanup
     await cleanup_connection_pool()
     
-    # Fast path: return existing client
+    # Fast path: return existing client (but verify it has clients attribute)
     if pool_key in _graphiti_pool:
-        return _graphiti_pool[pool_key]
+        existing_client = _graphiti_pool[pool_key]
+        if hasattr(existing_client, 'clients'):
+            logger.debug(f"✅ Returning existing async pooled client for {user_id}")
+            return existing_client
+        else:
+            logger.warning(f"⚠️ Existing async pooled client for {user_id} missing clients attribute, recreating...")
+            del _graphiti_pool[pool_key]
     
     # Use per-key locks to prevent race conditions
     if pool_key not in _pool_locks:
@@ -360,9 +366,15 @@ def get_or_create_pooled_client(user_id: str, settings) -> "ZepGraphiti":
     """Get or create a pooled ZepGraphiti client for the given user - optimized"""
     pool_key = f"{user_id}_{settings.falkordb_host}_{settings.falkordb_port}"
     
-    # Fast path: return existing client
+    # Fast path: return existing client (but verify it has clients attribute)
     if pool_key in _graphiti_pool:
-        return _graphiti_pool[pool_key]
+        existing_client = _graphiti_pool[pool_key]
+        if hasattr(existing_client, 'clients'):
+            logger.debug(f"✅ Returning existing pooled client for {user_id}")
+            return existing_client
+        else:
+            logger.warning(f"⚠️ Existing pooled client for {user_id} missing clients attribute, recreating...")
+            del _graphiti_pool[pool_key]
     
     # Create LLM client with proper configuration first (only if API key is available)
     llm_client = None
@@ -782,6 +794,15 @@ class ZepGraphiti(Graphiti):
         """Enhanced episode creation with FIXED UUID handling and proper error recovery"""
         try:
             logger.info(f"🚀 ENHANCED_ADD_EPISODE: Starting episode processing for group {group_id}")
+            
+            # DEBUG: Check if clients attribute exists
+            if not hasattr(self, 'clients'):
+                logger.error(f"❌ CRITICAL: self.clients attribute is missing! Instance type: {type(self)}")
+                logger.error(f"❌ Available attributes: {[attr for attr in dir(self) if not attr.startswith('_')]}")
+                raise AttributeError("self.clients attribute not found - Graphiti initialization may have failed")
+            
+            logger.debug(f"✅ self.clients attribute found: {type(self.clients)}")
+            logger.debug(f"✅ Database: {getattr(self, '_database_name', 'unknown')}")
             
             # CRITICAL FIX: The root cause was UUID handling in the base graphiti library
             # When we pass uuid=uuid, it tries to FETCH an existing episode, not CREATE a new one
