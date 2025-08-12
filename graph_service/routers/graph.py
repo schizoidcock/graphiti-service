@@ -74,7 +74,17 @@ async def search_graph(
     
     # Check cache first for fast responses (import search_cache)
     from graph_service.search_cache import search_cache
-    cache_key = f"graph_{user_id}_{request.query}_{request.max_results}_{request.search_type}"
+    import hashlib
+    
+    # CACHE OPTIMIZATION: Generate normalized cache key to improve hit rate
+    # Normalize query to improve cache hits (trim whitespace, lowercase)
+    normalized_query = request.query.strip().lower()
+    search_group_ids_str = "|".join(sorted(search_group_ids)) if search_group_ids else "all"
+    
+    # Use structured cache key with hashing to avoid collisions and improve hits
+    cache_data = f"graph_{user_id}_{normalized_query}_{request.max_results}_{request.search_type}_{search_group_ids_str}"
+    cache_key = hashlib.md5(cache_data.encode()).hexdigest()
+    
     cached_result = search_cache.get_by_key(cache_key)
     if cached_result:
         logger.info(f"⚡ Cache HIT for graph search: {request.query[:50]}...")
