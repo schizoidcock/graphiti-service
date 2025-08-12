@@ -308,16 +308,23 @@ async def get_or_create_pooled_client_async(user_id: str, settings) -> "ZepGraph
         if pool_key in _graphiti_pool:
             return _graphiti_pool[pool_key]
         
-        # Create LLM client with proper configuration first
-        from graphiti_core.llm_client import OpenAIClient, LLMConfig
-        
-        llm_config = LLMConfig(
-            api_key=settings.openai_api_key,
-            base_url=settings.openai_base_url,
-            model=settings.model_name or "gpt-4o-mini",
-            temperature=settings.temperature
-        )
-        llm_client = OpenAIClient(config=llm_config) if settings.openai_api_key else None
+        # Create LLM client with proper configuration first (only if API key is available)
+        llm_client = None
+        if settings.openai_api_key:
+            try:
+                from graphiti_core.llm_client import OpenAIClient, LLMConfig
+                
+                llm_config = LLMConfig(
+                    api_key=settings.openai_api_key,
+                    base_url=settings.openai_base_url,
+                    model=settings.model_name or "gpt-4o-mini",
+                    temperature=settings.temperature
+                )
+                llm_client = OpenAIClient(config=llm_config)
+                logger.debug(f"✅ Created LLM client with API key for user {user_id}")
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to create LLM client for user {user_id}: {e}")
+                llm_client = None
         
         # Create new client with pre-configured LLM client
         client = ZepGraphiti(
@@ -357,16 +364,23 @@ def get_or_create_pooled_client(user_id: str, settings) -> "ZepGraphiti":
     if pool_key in _graphiti_pool:
         return _graphiti_pool[pool_key]
     
-    # Create LLM client with proper configuration first
-    from graphiti_core.llm_client import OpenAIClient, LLMConfig
-    
-    llm_config = LLMConfig(
-        api_key=settings.openai_api_key,
-        base_url=settings.openai_base_url,
-        model=settings.model_name or "gpt-4o-mini",
-        temperature=settings.temperature
-    )
-    llm_client = OpenAIClient(config=llm_config) if settings.openai_api_key else None
+    # Create LLM client with proper configuration first (only if API key is available)
+    llm_client = None
+    if settings.openai_api_key:
+        try:
+            from graphiti_core.llm_client import OpenAIClient, LLMConfig
+            
+            llm_config = LLMConfig(
+                api_key=settings.openai_api_key,
+                base_url=settings.openai_base_url,
+                model=settings.model_name or "gpt-4o-mini",
+                temperature=settings.temperature
+            )
+            llm_client = OpenAIClient(config=llm_config)
+            logger.debug(f"✅ Created LLM client with API key for user {user_id}")
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to create LLM client for user {user_id}: {e}")
+            llm_client = None
     
     # Create new client with pre-configured LLM client
     client = ZepGraphiti(
@@ -437,7 +451,22 @@ class ZepGraphiti(Graphiti):
             password=password if password and password.strip() else None,
             database=database_name
         )
-        super().__init__(graph_driver=falkor_driver, llm_client=llm_client, ensure_ascii=False)
+        
+        try:
+            super().__init__(graph_driver=falkor_driver, llm_client=llm_client, ensure_ascii=False)
+            logger.debug(f"✅ Successfully initialized Graphiti parent class for database {database_name}")
+            
+            # Verify clients attribute was created
+            if not hasattr(self, 'clients'):
+                logger.error(f"❌ clients attribute not created during initialization for database {database_name}")
+                raise RuntimeError("Graphiti initialization failed: clients attribute missing")
+            else:
+                logger.debug(f"✅ clients attribute verified for database {database_name}")
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to initialize Graphiti parent class for database {database_name}: {e}")
+            raise
+            
         self._skip_init = skip_init
         self._user_id = user_id
         self._database_name = database_name
@@ -1653,16 +1682,23 @@ async def initialize_graphiti(settings: ZepEnvDep):
     try:
         logger.debug(f"Initializing Graphiti with FalkorDB at {settings.falkordb_host}:{settings.falkordb_port}")
         
-        # Create LLM client with proper configuration for initialization
-        from graphiti_core.llm_client import OpenAIClient, LLMConfig
-        
-        llm_config = LLMConfig(
-            api_key=settings.openai_api_key,
-            base_url=settings.openai_base_url,
-            model=settings.model_name or "gpt-4o-mini",
-            temperature=settings.temperature
-        )
-        llm_client = OpenAIClient(config=llm_config) if settings.openai_api_key else None
+        # Create LLM client with proper configuration for initialization (only if API key is available)
+        llm_client = None
+        if settings.openai_api_key:
+            try:
+                from graphiti_core.llm_client import OpenAIClient, LLMConfig
+                
+                llm_config = LLMConfig(
+                    api_key=settings.openai_api_key,
+                    base_url=settings.openai_base_url,
+                    model=settings.model_name or "gpt-4o-mini",
+                    temperature=settings.temperature
+                )
+                llm_client = OpenAIClient(config=llm_config)
+                logger.debug("✅ Created LLM client for initialization")
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to create LLM client for initialization: {e}")
+                llm_client = None
         
         client = ZepGraphiti(
             host=settings.falkordb_host,
