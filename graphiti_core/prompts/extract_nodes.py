@@ -145,32 +145,39 @@ You are given a conversation context and a CURRENT MESSAGE. Your task is to extr
 Pronoun references such as he/she/they or this/that/those should be disambiguated to the names of the 
 reference entities.
 
-1. **Speaker Extraction**: Always extract the speaker (the part before the colon `:` in each dialogue line) as the first entity node.
+1. **Role-Based Entity Classification** (CRITICAL):
+   - If the CURRENT MESSAGE has "Role: Human user input" or "Role: user", entities representing the speaker should be classified as "User" type
+   - If the CURRENT MESSAGE has "Role: AI assistant response" or "Role: assistant", entities representing the speaker should be classified as "Assistant" type
+   - This role information takes PRIORITY over content-based classification
+
+2. **Speaker Extraction**: Always extract the speaker as the primary entity node.
+   - Use the Role field from the CURRENT MESSAGE to determine the correct entity type
    - If the speaker is mentioned again in the message, treat both mentions as a **single entity**.
 
-2. **Entity Identification**:
+3. **Entity Identification**:
    - Extract all significant entities, concepts, or actors that are **explicitly or implicitly** mentioned in the CURRENT MESSAGE.
    - **Exclude** entities mentioned only in the PREVIOUS MESSAGES (they are for context only).
 
-3. **Entity Classification**:
-   - Use the descriptions in ENTITY TYPES to classify each extracted entity.
+4. **Entity Classification**:
+   - FIRST check the Role field to determine speaker entity type (User vs Assistant)
+   - Then use the descriptions in ENTITY TYPES to classify each extracted entity.
    - Assign the appropriate `entity_type_id` for each one.
 
-4. **Language and Cultural Analysis**:
+5. **Language and Cultural Analysis**:
    - **Language Detection**: If the entity uses or is associated with a specific language, set the `language` field (ISO 639-1 codes: "en", "es", "fr", "de", etc.)
    - **Cultural Context**: Identify cultural markers such as formality level, regional context, professional setting, or communication style
    - **Disambiguation**: Provide context to distinguish entities (e.g., "Fernando from conversation", "user's conversation partner")
 
-5. **Enhanced Context Preservation**:
+6. **Enhanced Context Preservation**:
    - Consider the conversational register (formal/informal)
    - Note any cultural or linguistic patterns in entity behavior
    - Preserve relationship context for disambiguation
 
-6. **Exclusions**:
+7. **Exclusions**:
    - Do NOT extract entities representing relationships or actions.
    - Do NOT extract dates, times, or other temporal information—these will be handled separately.
 
-7. **Formatting**:
+8. **Formatting**:
    - Be **explicit and unambiguous** in naming entities (e.g., use full names when available).
    - Include language and cultural context when evident from the conversation.
 
@@ -238,14 +245,18 @@ Indicate the classified entity type by providing its entity_type_id.
 {context['custom_prompt']}
 
 Guidelines:
-1. **Entity Extraction**: Extract significant entities, concepts, or actors mentioned in the text.
-2. **Cultural Awareness**: Identify language use, cultural markers, formality levels, and regional context.
-3. **Language Detection**: Set language field for entities when language patterns are evident.
-4. **Disambiguation**: Provide context to distinguish entities from similar ones.
-5. **Relationship Exclusions**: Avoid creating nodes for relationships or actions.
-6. **Temporal Exclusions**: Avoid creating nodes for temporal information like dates, times or years (these will be added to edges later).
-7. **Explicit Naming**: Be as explicit as possible in node names, using full names and avoiding abbreviations.
-8. **Context Preservation**: Include enough cultural and linguistic context for proper entity understanding.
+1. **Role-Based Entity Classification** (CRITICAL):
+   - If the TEXT contains "Role: Human user input" or "Role: user", entities representing the speaker should be classified as "User" type
+   - If the TEXT contains "Role: AI assistant response" or "Role: assistant", entities representing the speaker should be classified as "Assistant" type
+   - This role information takes PRIORITY over content-based classification
+2. **Entity Extraction**: Extract significant entities, concepts, or actors mentioned in the text.
+3. **Cultural Awareness**: Identify language use, cultural markers, formality levels, and regional context.
+4. **Language Detection**: Set language field for entities when language patterns are evident.
+5. **Disambiguation**: Provide context to distinguish entities from similar ones.
+6. **Relationship Exclusions**: Avoid creating nodes for relationships or actions.
+7. **Temporal Exclusions**: Avoid creating nodes for temporal information like dates, times or years (these will be added to edges later).
+8. **Explicit Naming**: Be as explicit as possible in node names, using full names and avoiding abbreviations.
+9. **Context Preservation**: Include enough cultural and linguistic context for proper entity understanding.
 """
     return [
         Message(role='system', content=sys_prompt),
@@ -299,9 +310,13 @@ def classify_nodes(context: dict[str, Any]) -> list[Message]:
     Given the above conversation, extracted entities, and provided entity types and their descriptions, classify the extracted entities.
     
     Guidelines:
-    1. Each entity must have exactly one type
-    2. Only use the provided ENTITY TYPES as types, do not use additional types to classify entities.
-    3. If none of the provided entity types accurately classify an extracted node, the type should be set to None
+    1. **Role-Based Classification Priority** (CRITICAL):
+       - If the CURRENT MESSAGE has "Role: Human user input" or "Role: user", the speaker entity should be classified as "User" type
+       - If the CURRENT MESSAGE has "Role: AI assistant response" or "Role: assistant", the speaker entity should be classified as "Assistant" type
+       - This role information takes PRIORITY over content-based classification
+    2. Each entity must have exactly one type
+    3. Only use the provided ENTITY TYPES as types, do not use additional types to classify entities.
+    4. If none of the provided entity types accurately classify an extracted node, the type should be set to None
 """
     return [
         Message(role='system', content=sys_prompt),
