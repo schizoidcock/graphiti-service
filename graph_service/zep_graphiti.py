@@ -308,22 +308,26 @@ async def get_or_create_pooled_client_async(user_id: str, settings) -> "ZepGraph
         if pool_key in _graphiti_pool:
             return _graphiti_pool[pool_key]
         
-        # Create new client
+        # Create LLM client with proper configuration first
+        from graphiti_core.llm_client import OpenAIClient, LLMConfig
+        
+        llm_config = LLMConfig(
+            api_key=settings.openai_api_key,
+            base_url=settings.openai_base_url,
+            model=settings.model_name or "gpt-4o-mini",
+            temperature=settings.temperature
+        )
+        llm_client = OpenAIClient(config=llm_config) if settings.openai_api_key else None
+        
+        # Create new client with pre-configured LLM client
         client = ZepGraphiti(
             host=settings.falkordb_host,
             port=settings.falkordb_port,
             username=settings.falkordb_username,
             password=settings.falkordb_password,
-            user_id=user_id
+            user_id=user_id,
+            llm_client=llm_client
         )
-        
-        # Fast LLM configuration
-        if settings.openai_api_key and client.llm_client:
-            if settings.openai_base_url:
-                client.llm_client.config.base_url = settings.openai_base_url
-            client.llm_client.config.api_key = settings.openai_api_key
-            client.llm_client.model = settings.model_name or "gpt-4o-mini"
-            client.llm_client.config.temperature = settings.temperature
         
         # Fast embedder configuration
         if settings.openai_api_key and hasattr(client, 'embedder') and client.embedder and hasattr(client.embedder, 'config'):
@@ -353,22 +357,26 @@ def get_or_create_pooled_client(user_id: str, settings) -> "ZepGraphiti":
     if pool_key in _graphiti_pool:
         return _graphiti_pool[pool_key]
     
-    # Create new client (only when needed)
+    # Create LLM client with proper configuration first
+    from graphiti_core.llm_client import OpenAIClient, LLMConfig
+    
+    llm_config = LLMConfig(
+        api_key=settings.openai_api_key,
+        base_url=settings.openai_base_url,
+        model=settings.model_name or "gpt-4o-mini",
+        temperature=settings.temperature
+    )
+    llm_client = OpenAIClient(config=llm_config) if settings.openai_api_key else None
+    
+    # Create new client with pre-configured LLM client
     client = ZepGraphiti(
         host=settings.falkordb_host,
         port=settings.falkordb_port,
         username=settings.falkordb_username,
         password=settings.falkordb_password,
-        user_id=user_id
+        user_id=user_id,
+        llm_client=llm_client
     )
-    
-    # Fast LLM configuration
-    if settings.openai_api_key and client.llm_client:
-        if settings.openai_base_url:
-            client.llm_client.config.base_url = settings.openai_base_url
-        client.llm_client.config.api_key = settings.openai_api_key
-        client.llm_client.model = settings.model_name or "gpt-4o-mini"
-        client.llm_client.config.temperature = settings.temperature
     
     # Fast embedder configuration
     if settings.openai_api_key and hasattr(client, 'embedder') and client.embedder and hasattr(client.embedder, 'config'):
@@ -1644,11 +1652,24 @@ async def initialize_graphiti(settings: ZepEnvDep):
         
     try:
         logger.debug(f"Initializing Graphiti with FalkorDB at {settings.falkordb_host}:{settings.falkordb_port}")
+        
+        # Create LLM client with proper configuration for initialization
+        from graphiti_core.llm_client import OpenAIClient, LLMConfig
+        
+        llm_config = LLMConfig(
+            api_key=settings.openai_api_key,
+            base_url=settings.openai_base_url,
+            model=settings.model_name or "gpt-4o-mini",
+            temperature=settings.temperature
+        )
+        llm_client = OpenAIClient(config=llm_config) if settings.openai_api_key else None
+        
         client = ZepGraphiti(
             host=settings.falkordb_host,
             port=settings.falkordb_port,
             username=settings.falkordb_username,
             password=settings.falkordb_password,
+            llm_client=llm_client
         )
         
         # Only call build_indices_and_constraints once during app startup
