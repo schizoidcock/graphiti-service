@@ -372,8 +372,8 @@ def extract_attributes(context: dict[str, Any]) -> list[Message]:
 
 
 def extract_summary(context: dict[str, Any]) -> list[Message]:
-    sys_prompt = """You are an AI assistant that generates concise entity summaries. 
-    Create brief, factual summaries using maximum 100 words. Be direct and avoid elaborate descriptions."""
+    sys_prompt = """You are an AI assistant that generates concise entity summaries in English only. 
+    Create brief, factual summaries using maximum 100 CHARACTERS. Be direct and avoid elaborate descriptions."""
 
     user_prompt = f"""
 <ENTITY INFORMATION>
@@ -396,16 +396,17 @@ Current Attributes: {context['node']['attributes']}
 </REFERENCE TIME>
 
 Instructions:
-1. **Comprehensive Summary**: Create or update a comprehensive summary for this entity based on all available information
-2. **Temporal Context**: Include timing and sequence of interactions, using REFERENCE TIME for temporal anchoring
-3. **Cultural Preservation**: Preserve cultural markers, language preferences, communication styles, and cultural context
-4. **Linguistic Awareness**: Note language use patterns, formality levels, and communication preferences
-5. **Relationship Context**: Include relationship dynamics and interaction patterns with other entities
-6. **Progressive Enhancement**: If current summary exists, enhance with new information while preserving existing context
-7. **Conciseness**: Keep summary under 250 words while maximizing information density
-8. **Disambiguation**: Include enough context to distinguish this entity from similar ones
+1. **CRITICAL**: Summary must be maximum 100 CHARACTERS total length
+2. **Language**: English only, no Spanish or other languages  
+3. **Comprehensive Summary**: Create or update a comprehensive summary for this entity based on all available information
+4. **Temporal Context**: Include timing and sequence of interactions, using REFERENCE TIME for temporal anchoring
+5. **Cultural Preservation**: Preserve cultural markers, language preferences, communication styles, and cultural context
+6. **Linguistic Awareness**: Note language use patterns, formality levels, and communication preferences
+7. **Relationship Context**: Include relationship dynamics and interaction patterns with other entities
+8. **Progressive Enhancement**: If current summary exists, enhance with new information while preserving existing context
+9. **Disambiguation**: Include enough context to distinguish this entity from similar ones
 
-Generate a culturally-aware, temporally-contextualized summary that captures the complete essence of this entity including their cultural background, communication patterns, and relationship dynamics.
+Generate a culturally-aware, temporally-contextualized summary that captures the complete essence of this entity including their cultural background, communication patterns, and relationship dynamics. Keep it under 100 characters while maximizing information density.
     """
 
     return [

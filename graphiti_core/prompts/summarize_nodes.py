@@ -25,7 +25,7 @@ from .prompt_helpers import to_prompt_json
 class Summary(BaseModel):
     summary: str = Field(
         ...,
-        description='Culturally-aware, temporally-contextualized summary containing the important information about the entity. Under 250 words',
+        description='Concise entity summary in English only. Maximum 100 characters. Essential facts only.',
     )
     temporal_context: str | None = Field(
         default=None,
