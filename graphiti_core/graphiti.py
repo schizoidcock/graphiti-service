@@ -1029,6 +1029,8 @@ class Graphiti:
                 entity_edges=[],
                 group_id=edge.group_id,
             ),
+            None,
+            self.clients.ensure_ascii,
         )
 
         await add_nodes_and_edges_bulk(

@@ -312,6 +312,7 @@ async def resolve_extracted_edges(
                     existing_edges,
                     episode,
                     extracted_edge_types,
+                    clients.ensure_ascii,
                 )
                 for extracted_edge, related_edges, existing_edges, extracted_edge_types in zip(
                     extracted_edges,
@@ -383,6 +384,7 @@ async def resolve_extracted_edge(
     existing_edges: list[EntityEdge],
     episode: EpisodicNode,
     edge_types: dict[str, BaseModel] | None = None,
+    ensure_ascii: bool = True,
 ) -> tuple[EntityEdge, list[EntityEdge], list[EntityEdge]]:
     if len(related_edges) == 0 and len(existing_edges) == 0:
         return extracted_edge, [], []
@@ -416,7 +418,7 @@ async def resolve_extracted_edge(
         'new_edge': extracted_edge.fact,
         'edge_invalidation_candidates': invalidation_edge_candidates_context,
         'edge_types': edge_types_context,
-        'ensure_ascii': clients.ensure_ascii,
+        'ensure_ascii': ensure_ascii,
     }
 
     llm_response = await llm_client.generate_response(
