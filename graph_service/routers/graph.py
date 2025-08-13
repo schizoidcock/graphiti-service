@@ -799,14 +799,15 @@ async def get_user_graph_triplets(
         try:
             isolated_user_query = """
             MATCH (n:Entity)
-            WHERE n.group_id STARTS WITH $user_id_pattern 
+            WHERE (n.group_id STARTS WITH $user_id_pattern 
+               OR n.group_id CONTAINS $user_id)
                AND ('User' IN labels(n) OR n.entity_type = 'User')
                AND NOT (n)-[:RELATES_TO]-(:Entity)
                AND NOT (:Entity)-[:RELATES_TO]-(n)
             RETURN n.uuid as node_uuid, n.name as node_name, n.summary as node_summary,
                    n.labels as node_labels, n.attributes as node_attributes,
                    n.created_at as node_created_at, n.updated_at as node_updated_at,
-                   n.entity_type as entity_type
+                   n.entity_type as entity_type, n.group_id as group_id
             ORDER BY n.created_at DESC
             LIMIT $limit
             """
