@@ -841,22 +841,29 @@ async def get_user_graph_triplets(
             
             isolated_records = isolated_result[0] if isinstance(isolated_result, tuple) and len(isolated_result) > 0 else isolated_result
             logger.info(f"📊 Found {len(isolated_records) if hasattr(isolated_records, '__len__') else 'unknown'} isolated User nodes for user {user_id}")
+            logger.info(f"🔍 DEBUG - Isolated result format: {type(isolated_result)}, records: {isolated_records[:2] if hasattr(isolated_records, '__len__') and len(isolated_records) > 0 else isolated_records}")
             
             # Create isolated node triplets (like official Zep)
-            for record in isolated_records:
+            for i, record in enumerate(isolated_records):
                 if record is None:
+                    logger.warning(f"🔍 DEBUG - Record {i} is None, skipping")
                     continue
                 
                 # Handle both dictionary and list formats
+                logger.info(f"🔍 DEBUG - Record {i} type: {type(record)}, content: {record}")
                 if isinstance(record, dict):
                     node_data = record
                 elif isinstance(record, list):
                     field_names = ['node_uuid', 'node_name', 'node_summary', 'node_labels', 'node_attributes', 'node_created_at', 'node_updated_at', 'entity_type', 'group_id']
+                    logger.info(f"🔍 DEBUG - Converting list record (len={len(record)}) to dict with {len(field_names)} fields")
                     if len(record) == len(field_names):
                         node_data = dict(zip(field_names, record))
+                        logger.info(f"🔍 DEBUG - Successfully converted to: {node_data}")
                     else:
+                        logger.warning(f"🔍 DEBUG - Record length mismatch: {len(record)} != {len(field_names)}, skipping")
                         continue
                 else:
+                    logger.warning(f"🔍 DEBUG - Unknown record type {type(record)}, skipping")
                     continue
                 
                 try:
