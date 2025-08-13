@@ -691,7 +691,9 @@ async def get_user_graph_triplets(
         user_group_debug_result = await graphiti.driver.execute_query(user_group_debug_query, user_id=user_id)
         logger.info(f"🔍 DEBUG - User-related group_ids: {user_group_debug_result}")
         
-        # Step 1: Query for EntityEdges AND nodes in one go (since source/target_node_uuid are null)
+        # Step 1: Query for regular RELATES_TO relationships between different Entity nodes
+        triplets = []
+        
         edge_query = """
         MATCH (n:Entity)-[e:RELATES_TO]->(m:Entity)
         WHERE e.group_id STARTS WITH $user_id_pattern
@@ -709,7 +711,6 @@ async def get_user_graph_triplets(
         LIMIT $limit
         """
         
-        # Use the exact pattern that worked in testing
         user_id_pattern = f"{user_id}_"
         
         try:
@@ -721,9 +722,8 @@ async def get_user_graph_triplets(
             
             # Handle FalkorDB result format
             actual_records = edge_result[0] if isinstance(edge_result, tuple) and len(edge_result) > 0 else edge_result
-            logger.info(f"📊 Found {len(actual_records) if hasattr(actual_records, '__len__') else 'unknown'} triplet records for user {user_id}")
+            logger.info(f"📊 Found {len(actual_records) if hasattr(actual_records, '__len__') else 'unknown'} regular relationship records for user {user_id}")
             
-            triplets = []
             for record in actual_records:
                 if record is None:
                     continue
@@ -792,10 +792,101 @@ async def get_user_graph_triplets(
                     continue
                 
         except Exception as e:
-            logger.error(f"Combined edge+node query failed: {e}")
-            triplets = []
+            logger.error(f"Regular edge+node query failed: {e}")
         
-        logger.info(f"✅ Built {len(triplets)} actual graph triplets for user {user_id}")
+        # Step 2: Query for isolated User nodes (like official Zep behavior)
+        # Official Zep creates isolated_node relationships when User nodes exist without other relationships
+        try:
+            isolated_user_query = """
+            MATCH (n:Entity)
+            WHERE n.group_id STARTS WITH $user_id_pattern 
+               AND ('User' IN labels(n) OR n.entity_type = 'User')
+               AND NOT (n)-[:RELATES_TO]-(:Entity)
+               AND NOT (:Entity)-[:RELATES_TO]-(n)
+            RETURN n.uuid as node_uuid, n.name as node_name, n.summary as node_summary,
+                   n.labels as node_labels, n.attributes as node_attributes,
+                   n.created_at as node_created_at, n.updated_at as node_updated_at,
+                   n.entity_type as entity_type
+            ORDER BY n.created_at DESC
+            LIMIT $limit
+            """
+            
+            isolated_result = await graphiti.driver.execute_query(
+                isolated_user_query, 
+                user_id_pattern=user_id_pattern,
+                limit=limit - len(triplets)  # Leave room for isolated nodes
+            )
+            
+            isolated_records = isolated_result[0] if isinstance(isolated_result, tuple) and len(isolated_result) > 0 else isolated_result
+            logger.info(f"📊 Found {len(isolated_records) if hasattr(isolated_records, '__len__') else 'unknown'} isolated User nodes for user {user_id}")
+            
+            # Create isolated node triplets (like official Zep)
+            for record in isolated_records:
+                if record is None:
+                    continue
+                
+                # Handle both dictionary and list formats
+                if isinstance(record, dict):
+                    node_data = record
+                elif isinstance(record, list):
+                    field_names = ['node_uuid', 'node_name', 'node_summary', 'node_labels', 'node_attributes', 'node_created_at', 'node_updated_at', 'entity_type']
+                    if len(record) == len(field_names):
+                        node_data = dict(zip(field_names, record))
+                    else:
+                        continue
+                else:
+                    continue
+                
+                try:
+                    # Create isolated node triplet (both source and target are the same User node)
+                    node_uuid = node_data.get('node_uuid', '')
+                    
+                    # Create the user node structure
+                    user_node = {
+                        "uuid": node_uuid,
+                        "name": node_data.get('node_name', ''),
+                        "graph_id": node_uuid,  # Match official Zep structure
+                        "labels": ["Entity", "User"],  # Match official Zep structure
+                        "created_at": node_data.get('node_created_at', ''),
+                        "score": None,
+                        "summary": node_data.get('node_summary', f"user with the id of {user_id}"),
+                        "attributes": {
+                            "email": "",
+                            "first_name": "",
+                            "last_name": "",
+                            "role_type": "user",
+                            "user_id": user_id,
+                            **node_data.get('node_attributes', {})
+                        }
+                    }
+                    
+                    # Create isolated node edge (like official Zep)
+                    isolated_edge = {
+                        "uuid": f"isolated-node-{node_uuid}",
+                        "source_node_uuid": node_uuid,
+                        "target_node_uuid": node_uuid,  # Points to itself
+                        "type": "_isolated_node_",
+                        "name": "",
+                        "created_at": node_data.get('node_created_at', '')
+                    }
+                    
+                    # Build triplet with isolated node structure
+                    triplet = {
+                        "sourceNode": user_node,
+                        "edge": isolated_edge,
+                        "targetNode": user_node  # Same as source for isolated nodes
+                    }
+                    
+                    triplets.append(triplet)
+                    
+                except Exception as e:
+                    logger.warning(f"Failed to build isolated node triplet from record: {e}")
+                    continue
+        
+        except Exception as e:
+            logger.error(f"Isolated User nodes query failed: {e}")
+        
+        logger.info(f"✅ Built {len(triplets)} graph triplets for user {user_id} (including isolated nodes)")
         return triplets
         
     except Exception as e:
