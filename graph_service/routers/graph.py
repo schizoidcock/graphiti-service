@@ -796,6 +796,26 @@ async def get_user_graph_triplets(
         
         # Step 2: Query for isolated User nodes (like official Zep behavior)
         # Official Zep creates isolated_node relationships when User nodes exist without other relationships
+        
+        # Debug: Check what group_ids actually exist for this user
+        try:
+            debug_query = """
+            MATCH (n:Entity)
+            WHERE (n.group_id STARTS WITH $user_id_pattern 
+               OR n.group_id CONTAINS $user_id)
+            RETURN DISTINCT n.group_id as group_id, labels(n) as labels, n.entity_type as entity_type
+            LIMIT 10
+            """
+            debug_result = await graphiti.driver.execute_query(
+                debug_query, 
+                user_id_pattern=user_id_pattern,
+                user_id=user_id
+            )
+            debug_records = debug_result[0] if isinstance(debug_result, tuple) and len(debug_result) > 0 else debug_result
+            logger.info(f"🔍 DEBUG - Group IDs found for user {user_id}: {[record.get('group_id') if isinstance(record, dict) else record for record in debug_records[:5]]}")
+        except Exception as e:
+            logger.warning(f"Debug query failed: {e}")
+        
         try:
             isolated_user_query = """
             MATCH (n:Entity)
@@ -815,6 +835,7 @@ async def get_user_graph_triplets(
             isolated_result = await graphiti.driver.execute_query(
                 isolated_user_query, 
                 user_id_pattern=user_id_pattern,
+                user_id=user_id,
                 limit=limit - len(triplets)  # Leave room for isolated nodes
             )
             
@@ -830,7 +851,7 @@ async def get_user_graph_triplets(
                 if isinstance(record, dict):
                     node_data = record
                 elif isinstance(record, list):
-                    field_names = ['node_uuid', 'node_name', 'node_summary', 'node_labels', 'node_attributes', 'node_created_at', 'node_updated_at', 'entity_type']
+                    field_names = ['node_uuid', 'node_name', 'node_summary', 'node_labels', 'node_attributes', 'node_created_at', 'node_updated_at', 'entity_type', 'group_id']
                     if len(record) == len(field_names):
                         node_data = dict(zip(field_names, record))
                     else:
