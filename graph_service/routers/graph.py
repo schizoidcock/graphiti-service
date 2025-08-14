@@ -885,7 +885,7 @@ async def get_user_graph_triplets(
                             "last_name": "",
                             "role_type": "user",
                             "user_id": user_id,
-                            **node_data.get('node_attributes', {})
+                            **(node_data.get('node_attributes') or {})
                         }
                     }
                     
