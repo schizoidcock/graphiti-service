@@ -259,7 +259,7 @@ async def delete_entity_edge(uuid: str, settings: ZepEnvDep, request: Request):
 
 @router.delete('/group/{group_id}', status_code=status.HTTP_200_OK)
 async def delete_group(group_id: str, settings: ZepEnvDep):
-    """Delete a group by completely removing the user's database"""
+    """Delete nodes/edges/episodes with specific group_id (preserves other sessions for same user)"""
     import logging
     import time
     logger = logging.getLogger(__name__)
@@ -276,18 +276,23 @@ async def delete_group(group_id: str, settings: ZepEnvDep):
     _deletion_cache.add(cache_key)
     
     try:
-        logger.info(f"🗑️ Deleting group: {group_id}")
+        logger.info(f"🗑️ Deleting nodes with group_id: {group_id}")
         
         # Extract user context from group_id to get the right database
         user_id = update_user_context_from_group_id(group_id)
         logger.debug(f"👤 Resolved user context: {user_id} for group: {group_id}")
         
-        # Call the database deletion function directly - but DON'T double-process the user_id
-        result = await delete_database_direct(user_id, settings)
+        # Get the graphiti client for this user's database
+        graphiti = get_or_create_pooled_client(user_id, settings)
         
-        # Update the success message to reflect group deletion
+        # Use the proper group deletion that deletes only nodes with this group_id
+        # This preserves other sessions/groups for the same user
+        await graphiti.delete_group(group_id)
+        
+        logger.info(f"✅ Successfully deleted nodes with group_id: {group_id} (other sessions preserved)")
+        
         return Result(
-            message=f'Group {group_id} deleted successfully (entire database removed)', 
+            message=f'Group {group_id} deleted successfully (session-specific nodes only)', 
             success=True
         )
         
