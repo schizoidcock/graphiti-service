@@ -63,23 +63,17 @@ MAX_QUERY_LENGTH = 128
 
 
 def fulltext_query(query: str, group_ids: list[str] | None = None, fulltext_syntax: str = ''):
-    group_ids_filter_list = (
-        [fulltext_syntax + f'group_id:"{g}"' for g in group_ids] if group_ids is not None else []
-    )
-    group_ids_filter = ''
-    for f in group_ids_filter_list:
-        group_ids_filter += f if not group_ids_filter else f' OR {f}'
-
-    group_ids_filter += ' AND ' if group_ids_filter else ''
-
+    # For FalkorDB, we need to use simple search terms only
+    # Group filtering will be handled in the WHERE clause of the Cypher query
+    
     lucene_query = lucene_sanitize(query)
     # If the lucene query is too long return no query
     if len(lucene_query.split(' ')) + len(group_ids or '') >= MAX_QUERY_LENGTH:
         return ''
 
-    full_query = group_ids_filter + '(' + lucene_query + ')'
-
-    return full_query
+    # For FalkorDB, return just the sanitized query without RediSearch syntax
+    # Group filtering is handled separately in the WHERE clause
+    return lucene_query
 
 
 async def get_episodes_by_mentions(
