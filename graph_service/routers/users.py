@@ -244,12 +244,8 @@ async def get_user_sessions(user_id: str):
 async def get_user_node(user_id: str):
     """Get user node from FalkorDB graph database following official Zep API v2 specification"""
     
-    # Check if user exists in the user store first
-    if user_id not in users_store:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User Get Node Request Not Found Error"
-        )
+    # Note: User existence is validated by zep-server-railway before proxying here
+    # This endpoint only needs to query the graph database for the user's node
     
     try:
         # Import graphiti core for actual FalkorDB queries
