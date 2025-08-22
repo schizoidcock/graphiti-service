@@ -5,6 +5,7 @@ from typing import Dict, Any, Optional
 
 from fastapi import APIRouter, HTTPException, status, Query
 from pydantic import BaseModel, Field
+from graph_service.config import ZepEnvDep
 
 # Logger for user management
 logger = logging.getLogger(__name__)
@@ -241,7 +242,7 @@ async def get_user_sessions(user_id: str):
 
 
 @router.get('/users/{user_id}/node', status_code=status.HTTP_200_OK)
-async def get_user_node(user_id: str):
+async def get_user_node(user_id: str, settings: ZepEnvDep):
     """Get user node from FalkorDB graph database following official Zep API v2 specification"""
     
     # Note: User existence is validated by zep-server-railway before proxying here
@@ -249,11 +250,10 @@ async def get_user_node(user_id: str):
     
     try:
         # Import graphiti core for actual FalkorDB queries
-        from graphiti_core.graphiti import Graphiti
         from graph_service.zep_graphiti import get_graphiti_for_user
         
         # Get graphiti instance for the user
-        graphiti_instance = await get_graphiti_for_user(user_id)
+        graphiti_instance = await get_graphiti_for_user(user_id, settings)
         
         # Search for the user node in the graph database
         # Query FalkorDB for user entity nodes
