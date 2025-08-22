@@ -238,3 +238,38 @@ async def get_user_sessions(user_id: str):
         logger.warning("Sessions store not available")
     
     return user_sessions
+
+
+@router.get('/users/{user_id}/node', status_code=status.HTTP_200_OK)
+async def get_user_node(user_id: str):
+    """Get user node from graph database following official Zep API v2 specification"""
+    
+    if user_id not in users_store:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User Get Node Request Not Found Error"
+        )
+    
+    # For now, return a mock node structure that matches the official Zep v2 specification
+    # In production, this would query FalkorDB through graphiti-core
+    from datetime import datetime
+    import uuid
+    
+    mock_node = {
+        "node": {
+            "created_at": datetime.utcnow().isoformat() + "Z",
+            "name": f"user_{user_id}",
+            "summary": f"User node representing {user_id} with associated memories and relationships",
+            "uuid": str(uuid.uuid4()),
+            "attributes": {
+                "user_id": user_id,
+                "entity_type": "Person",
+                "node_type": "user"
+            },
+            "labels": ["User", "Person"],
+            "score": 1.0
+        }
+    }
+    
+    logger.info(f"Retrieved user node for: {user_id}")
+    return mock_node
