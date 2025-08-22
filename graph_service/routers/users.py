@@ -256,18 +256,21 @@ async def get_user_node(user_id: str, settings: ZepEnvDep):
         graphiti_instance = await get_graphiti_for_user(user_id, settings)
         
         # Search for the user node in the graph database
-        # Query FalkorDB for user entity nodes - search returns async generator
-        user_nodes_generator = graphiti_instance.search(
+        # Query FalkorDB for user entity nodes - search method returns async generator
+        search_results = []
+        async for search_result in graphiti_instance.search(
             query=f"user {user_id}",
             user_id=user_id,
             limit=1
-        )
+        ):
+            search_results.append(search_result)
+            break  # We only need the first result since limit=1
         
-        # Collect results from the async generator
+        # Extract user nodes from search results
         user_nodes = []
-        async for result in user_nodes_generator:
-            user_nodes.extend(result.nodes)
-            break  # We only need the first batch since limit=1
+        for result in search_results:
+            if hasattr(result, 'nodes') and result.nodes:
+                user_nodes.extend(result.nodes)
         
         if not user_nodes:
             raise HTTPException(
