@@ -23,7 +23,6 @@ from typing import Any
 
 import numpy as np
 from dotenv import load_dotenv
-from neo4j import time as neo4j_time
 from numpy._typing import NDArray
 from pydantic import BaseModel
 from typing_extensions import LiteralString
@@ -43,12 +42,11 @@ RUNTIME_QUERY: LiteralString = (
 )
 
 
-def parse_db_date(neo_date: neo4j_time.DateTime | str | None) -> datetime | None:
+def parse_db_date(date_value: str | None) -> datetime | None:
+    """Parse database date string into datetime object."""
     return (
-        neo_date.to_native()
-        if isinstance(neo_date, neo4j_time.DateTime)
-        else datetime.fromisoformat(neo_date)
-        if neo_date
+        datetime.fromisoformat(date_value)
+        if date_value
         else None
     )
 

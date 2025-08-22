@@ -256,7 +256,7 @@ class FalkorDriver(GraphDriver):
     def clone(self, database: str) -> 'GraphDriver':
         """
         Returns a shallow copy of this driver with a different default database.
-        Reuses the same connection (e.g. FalkorDB, Neo4j).
+        Reuses the same connection (e.g. FalkorDB).
         """
         cloned = FalkorDriver(falkor_db=self.client, database=database)
 

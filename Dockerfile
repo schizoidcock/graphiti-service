@@ -24,8 +24,7 @@ RUN pip install \
     pydantic-settings>=2.0.0 \
     python-multipart>=0.0.6 \
     redis>=5.0.0 \
-    falkordb>=1.1.2 \
-    neo4j>=5.26.0 \
+    falkordb>=1.2.0 \
     diskcache>=5.6.3 \
     openai>=1.0.0 \
     anthropic>=0.7.0 \

@@ -92,7 +92,7 @@ async def retrieve_episodes(
     Retrieve the last n episodic nodes from the graph.
 
     Args:
-        driver (Driver): The Neo4j driver instance.
+        driver (Driver): The FalkorDB driver instance.
         reference_time (datetime): The reference time to filter episodes. Only episodes with a valid_at timestamp
                                    less than or equal to this reference_time will be retrieved. This allows for
                                    querying the graph's state at a specific point in time.

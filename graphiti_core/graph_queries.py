@@ -1,7 +1,7 @@
 """
 Database query utilities for different graph database backends.
 
-This module provides database-agnostic query generation for Neo4j and FalkorDB,
+This module provides database-agnostic query generation for FalkorDB,
 supporting index creation, fulltext search, and bulk operations.
 """
 
@@ -9,8 +9,8 @@ from typing_extensions import LiteralString
 
 from graphiti_core.driver.driver import GraphProvider
 
-# Mapping from Neo4j fulltext index names to FalkorDB node labels
-NEO4J_TO_FALKORDB_MAPPING = {
+# Mapping of fulltext index names to FalkorDB node labels
+FULLTEXT_INDEX_MAPPING = {
     'node_name_and_summary': 'Entity',
     'community_name': 'Community',
     'episode_content': 'Episodic',
@@ -81,15 +81,16 @@ def get_fulltext_indices(provider: GraphProvider) -> list[LiteralString]:
 
 def get_nodes_query(provider: GraphProvider, name: str = '', query: str | None = None) -> str:
     if provider == GraphProvider.FALKORDB:
-        label = NEO4J_TO_FALKORDB_MAPPING[name]
-        return f"CALL db.idx.fulltext.queryNodes('{label}', {query})"
+        label = FULLTEXT_INDEX_MAPPING[name]
+        # FalkorDB RediSearch requires quoted queries - use $query parameter for proper escaping
+        return f"CALL db.idx.fulltext.queryNodes('{label}', $query)"
 
     return f'CALL db.index.fulltext.queryNodes("{name}", {query}, {{limit: $limit}})'
 
 
 def get_vector_cosine_func_query(vec1, vec2, provider: GraphProvider) -> str:
     if provider == GraphProvider.FALKORDB:
-        # FalkorDB uses a different syntax for regular cosine similarity and Neo4j uses normalized cosine similarity
+        # FalkorDB uses its own vector similarity syntax with vecf32() conversion
         # FalkorDB cosineDistance expects Vectorf32 format
         # vec1 (stored embedding) is already Vectorf32, vec2 (search vector) needs vecf32() conversion
         return f'(2 - vec.cosineDistance({vec1}, vecf32({vec2})))/2'
@@ -99,7 +100,8 @@ def get_vector_cosine_func_query(vec1, vec2, provider: GraphProvider) -> str:
 
 def get_relationships_query(name: str, provider: GraphProvider) -> str:
     if provider == GraphProvider.FALKORDB:
-        label = NEO4J_TO_FALKORDB_MAPPING[name]
+        label = FULLTEXT_INDEX_MAPPING[name]
+        # FalkorDB RediSearch requires quoted queries - use $query parameter for proper escaping
         return f"CALL db.idx.fulltext.queryRelationships('{label}', $query)"
 
     return f'CALL db.index.fulltext.queryRelationships("{name}", $query, {{limit: $limit}})'

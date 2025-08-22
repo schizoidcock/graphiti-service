@@ -315,7 +315,6 @@ async def node_fulltext_search(
         YIELD node AS n, score
         WHERE n:Entity AND n.group_id IN $group_ids
         WITH n, score
-        LIMIT $limit
         """
         + filter_query
         + """
@@ -324,6 +323,7 @@ async def node_fulltext_search(
         + ENTITY_NODE_RETURN
         + """
         ORDER BY score DESC
+        LIMIT $limit
         """
     )
 
@@ -586,7 +586,7 @@ async def hybrid_node_search(
     embeddings : list[list[float]]
         A list of embedding vectors corresponding to the queries. If empty only fulltext search is performed.
     driver : GraphDriver
-        The Neo4j driver instance for database operations.
+        The FalkorDB driver instance for database operations.
     group_ids : list[str] | None, optional
         The list of group ids to retrieve nodes from.
     limit : int | None, optional

@@ -25,7 +25,7 @@ from typing_extensions import LiteralString
 from graphiti_core.cross_encoder.client import CrossEncoderClient
 from graphiti_core.cross_encoder.openai_reranker_client import OpenAIRerankerClient
 from graphiti_core.driver.driver import GraphDriver
-from graphiti_core.driver.neo4j_driver import Neo4jDriver
+from graphiti_core.driver.falkordb_driver import FalkorDriver
 from graphiti_core.edges import CommunityEdge, EntityEdge, EpisodicEdge
 from graphiti_core.embedder import EmbedderClient, OpenAIEmbedder
 from graphiti_core.graphiti_types import GraphitiClients
@@ -122,11 +122,11 @@ class Graphiti:
         Parameters
         ----------
         uri : str
-            The URI of the Neo4j database.
+            The host for the FalkorDB database.
         user : str
-            The username for authenticating with the Neo4j database.
+            The username for authenticating with the FalkorDB database.
         password : str
-            The password for authenticating with the Neo4j database.
+            The password for authenticating with the FalkorDB database.
         llm_client : LLMClient | None, optional
             An instance of LLMClient for natural language processing tasks.
             If not provided, a default OpenAIClient will be initialized.
@@ -140,7 +140,7 @@ class Graphiti:
             Whether to store the raw content of episodes. Defaults to True.
         graph_driver : GraphDriver | None, optional
             An instance of GraphDriver for database operations.
-            If not provided, a default Neo4jDriver will be initialized.
+            If not provided, a default FalkorDriver will be initialized.
         max_coroutines : int | None, optional
             The maximum number of concurrent operations allowed. Overrides SEMAPHORE_LIMIT set in the environment.
             If not set, the Graphiti default is used.
@@ -151,7 +151,7 @@ class Graphiti:
 
         Notes
         -----
-        This method establishes a connection to a graph database (Neo4j by default) using the provided
+        This method establishes a connection to a graph database (FalkorDB by default) using the provided
         credentials. It also sets up the LLM client, either using the provided client
         or by creating a default OpenAIClient.
 
@@ -169,7 +169,7 @@ class Graphiti:
         else:
             if uri is None:
                 raise ValueError('uri must be provided when graph_driver is None')
-            self.driver = Neo4jDriver(uri, user, password)
+            self.driver = FalkorDriver(host=uri, username=user, password=password)
 
         self.store_raw_episode_content = store_raw_episode_content
         self.max_coroutines = max_coroutines
@@ -238,8 +238,6 @@ class Graphiti:
         elif 'groq' in class_name:
             return 'groq'
         # Database providers
-        elif 'neo4j' in class_name:
-            return 'neo4j'
         elif 'falkor' in class_name:
             return 'falkordb'
         # Embedder providers
@@ -250,9 +248,9 @@ class Graphiti:
 
     async def close(self):
         """
-        Close the connection to the Neo4j database.
+        Close the connection to the FalkorDB database.
 
-        This method safely closes the driver connection to the Neo4j database.
+        This method safely closes the driver connection to the FalkorDB database.
         It should be called when the Graphiti instance is no longer needed or
         when the application is shutting down.
 
@@ -282,9 +280,9 @@ class Graphiti:
 
     async def build_indices_and_constraints(self, delete_existing: bool = False):
         """
-        Build indices and constraints in the Neo4j database.
+        Build indices and constraints in the FalkorDB database.
 
-        This method sets up the necessary indices and constraints in the Neo4j database
+        This method sets up the necessary indices and constraints in the FalkorDB database
         to optimize query performance and ensure data integrity for the knowledge graph.
 
         Parameters
