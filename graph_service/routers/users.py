@@ -258,11 +258,12 @@ async def get_user_node(user_id: str, settings: ZepEnvDep):
         # Search for the user node in the graph database
         # Query FalkorDB for user entity nodes - search method returns async generator
         search_results = []
-        async for search_result in graphiti_instance.search(
+        search_generator = graphiti_instance.search(
             query=f"user {user_id}",
             user_id=user_id,
             limit=1
-        ):
+        )
+        async for search_result in search_generator:
             search_results.append(search_result)
             break  # We only need the first result since limit=1
         
