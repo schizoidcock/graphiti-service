@@ -249,42 +249,65 @@ async def get_user_node(user_id: str, settings: ZepEnvDep):
     # This endpoint only needs to query the graph database for the user's node
     
     try:
-        # For now, return a mock node structure that matches the official Zep v2 specification
-        # This avoids the async generator issues while testing the API compliance
-        import uuid
-        from datetime import datetime, timezone
+        # Import graphiti core for actual FalkorDB queries
+        from graph_service.zep_graphiti import get_graphiti_for_user
         
-        # Check if user exists in the users_store
-        if user_id not in users_store:
+        # Get graphiti instance for the user
+        graphiti_instance = await get_graphiti_for_user(user_id, settings)
+        
+        # Search for the user node in the graph database
+        # Properly collect results from async generator
+        search_results = []
+        async for result in graphiti_instance.search(
+            query=f"user {user_id}",
+            user_id=user_id,
+            limit=1
+        ):
+            search_results.append(result)
+            break  # We only need the first result since limit=1
+        
+        # Extract user nodes from search results
+        user_nodes = []
+        for result in search_results:
+            if hasattr(result, 'nodes') and result.nodes:
+                user_nodes.extend(result.nodes)
+        
+        if not user_nodes:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="User Get Node Request Not Found Error"
             )
         
-        mock_node = {
+        # Get the first user node
+        user_node = user_nodes[0]
+        
+        # Format response according to Zep v2 API specification
+        node_response = {
             "node": {
-                "created_at": datetime.now(timezone.utc).isoformat(),
-                "name": f"user_{user_id}",
-                "summary": f"User node representing {user_id} with associated memories and relationships",
-                "uuid": str(uuid.uuid4()),
-                "attributes": {
-                    "user_id": user_id,
-                    "entity_type": "Person",
-                    "node_type": "user"
-                },
-                "labels": ["User", "Person"],
-                "score": 1.0
+                "created_at": user_node.created_at.isoformat() if user_node.created_at else None,
+                "name": user_node.name,
+                "summary": user_node.summary or f"User node for {user_id}",
+                "uuid": user_node.uuid,
+                "attributes": user_node.attributes or {},
+                "labels": user_node.labels or ["User"],
+                "score": getattr(user_node, 'score', 1.0)
             }
         }
         
-        logger.info(f"Retrieved user node for: {user_id}")
-        return mock_node
+        logger.info(f"Retrieved user node from FalkorDB for: {user_id}")
+        return node_response
         
+    except ImportError:
+        logger.error("Graphiti core not available")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="User Get Node Request internal Server Error"
+        )
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error retrieving user node for {user_id}: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="User Get Node Request internal Server Error"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User Get Node Request Not Found Error"
         )
