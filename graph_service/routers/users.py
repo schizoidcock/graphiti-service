@@ -256,21 +256,27 @@ async def get_user_node(user_id: str, settings: ZepEnvDep):
         graphiti_instance = await get_graphiti_for_user(user_id, settings)
         
         # Search for the user node in the graph database
-        # Properly collect results from async generator
-        search_results = []
-        async for result in graphiti_instance.search(
+        # search method returns list[EntityEdge], not an async generator
+        search_results = await graphiti_instance.search(
             query=f"user {user_id}",
-            user_id=user_id,
-            limit=1
-        ):
-            search_results.append(result)
-            break  # We only need the first result since limit=1
+            num_results=1
+        )
         
-        # Extract user nodes from search results
+        # The search results are EntityEdges, not nodes directly
+        # Extract user information from the edges
         user_nodes = []
-        for result in search_results:
-            if hasattr(result, 'nodes') and result.nodes:
-                user_nodes.extend(result.nodes)
+        if search_results:
+            # Create a user node from the first edge result
+            first_edge = search_results[0]
+            user_nodes.append(type('UserNode', (), {
+                'created_at': first_edge.created_at,
+                'name': f"user_{user_id}",
+                'summary': first_edge.fact or f"User node for {user_id}",
+                'uuid': first_edge.source_node_uuid,
+                'attributes': {},
+                'labels': ["User"],
+                'score': 1.0
+            })())
         
         if not user_nodes:
             raise HTTPException(
