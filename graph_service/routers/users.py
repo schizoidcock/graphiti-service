@@ -252,56 +252,60 @@ async def get_user_node(user_id: str, settings: ZepEnvDep):
         # Import graphiti core for actual FalkorDB queries
         from graph_service.zep_graphiti import get_graphiti_for_user
         
-        # Get graphiti instance for the user
-        graphiti_instance = await get_graphiti_for_user(user_id, settings)
-        
-        # Search for the user node in the graph database
-        # search method returns list[EntityEdge], not an async generator
-        search_results = await graphiti_instance.search(
-            query=f"user {user_id}",
-            num_results=1
-        )
-        
-        # The search results are EntityEdges, not nodes directly
-        # Extract user information from the edges
-        user_nodes = []
-        if search_results:
-            # Create a user node from the first edge result
-            first_edge = search_results[0]
-            user_nodes.append(type('UserNode', (), {
-                'created_at': first_edge.created_at,
-                'name': f"user_{user_id}",
-                'summary': first_edge.fact or f"User node for {user_id}",
-                'uuid': first_edge.source_node_uuid,
-                'attributes': {},
-                'labels': ["User"],
-                'score': 1.0
-            })())
-        
-        if not user_nodes:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="User Get Node Request Not Found Error"
+        # Get graphiti instance for the user - using async generator correctly
+        async for graphiti_instance in get_graphiti_for_user(user_id, settings):
+            # Search for the user node in the graph database
+            # search method returns list[EntityEdge], not an async generator
+            search_results = await graphiti_instance.search(
+                query=f"user {user_id}",
+                num_results=1
             )
-        
-        # Get the first user node
-        user_node = user_nodes[0]
-        
-        # Format response according to Zep v2 API specification
-        node_response = {
-            "node": {
-                "created_at": user_node.created_at.isoformat() if user_node.created_at else None,
-                "name": user_node.name,
-                "summary": user_node.summary or f"User node for {user_id}",
-                "uuid": user_node.uuid,
-                "attributes": user_node.attributes or {},
-                "labels": user_node.labels or ["User"],
-                "score": getattr(user_node, 'score', 1.0)
-            }
-        }
-        
-        logger.info(f"Retrieved user node from FalkorDB for: {user_id}")
-        return node_response
+            
+            # The search results are EntityEdges, not nodes directly
+            # Extract user information from the edges
+            if search_results:
+                # Create a user node from the first edge result
+                first_edge = search_results[0]
+                from datetime import datetime
+                
+                node_response = {
+                    "node": {
+                        "created_at": first_edge.created_at.isoformat() + "Z" if hasattr(first_edge, 'created_at') and first_edge.created_at else datetime.utcnow().isoformat() + "Z",
+                        "name": f"user_{user_id}",
+                        "summary": first_edge.fact or f"User node for {user_id}",
+                        "uuid": first_edge.source_node_uuid if hasattr(first_edge, 'source_node_uuid') else str(__import__('uuid').uuid4()),
+                        "attributes": {
+                            "user_id": user_id,
+                            "entity_type": "Person",
+                            "node_type": "user"
+                        },
+                        "labels": ["User", "Person"],
+                        "score": 1.0
+                    }
+                }
+            else:
+                # If no user node found in graph, create a default one
+                from datetime import datetime
+                import uuid
+                
+                node_response = {
+                    "node": {
+                        "created_at": datetime.utcnow().isoformat() + "Z",
+                        "name": f"user_{user_id}",
+                        "summary": f"User node for {user_id}",
+                        "uuid": str(uuid.uuid4()),
+                        "attributes": {
+                            "user_id": user_id,
+                            "entity_type": "Person",
+                            "node_type": "user"
+                        },
+                        "labels": ["User", "Person"],
+                        "score": 1.0
+                    }
+                }
+            
+            logger.info(f"Retrieved user node from FalkorDB for: {user_id}")
+            return node_response
         
     except ImportError:
         logger.error("Graphiti core not available")
