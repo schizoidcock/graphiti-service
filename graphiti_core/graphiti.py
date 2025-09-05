@@ -26,7 +26,13 @@ from graphiti_core.cross_encoder.client import CrossEncoderClient
 from graphiti_core.cross_encoder.openai_reranker_client import OpenAIRerankerClient
 from graphiti_core.driver.driver import GraphDriver
 from graphiti_core.driver.falkordb_driver import FalkorDriver
-from graphiti_core.edges import CommunityEdge, EntityEdge, EpisodicEdge
+from graphiti_core.edges import (
+    CommunityEdge,
+    Edge,
+    EntityEdge,
+    EpisodicEdge,
+    create_entity_edge_embeddings,
+)
 from graphiti_core.embedder import EmbedderClient, OpenAIEmbedder
 from graphiti_core.graphiti_types import GraphitiClients
 from graphiti_core.helpers import (
@@ -36,7 +42,14 @@ from graphiti_core.helpers import (
     validate_group_id,
 )
 from graphiti_core.llm_client import LLMClient, OpenAIClient
-from graphiti_core.nodes import CommunityNode, EntityNode, EpisodeType, EpisodicNode
+from graphiti_core.nodes import (
+    CommunityNode,
+    EntityNode,
+    EpisodeType,
+    EpisodicNode,
+    Node,
+    create_entity_node_embeddings,
+)
 from graphiti_core.search.search import SearchConfig, search
 from graphiti_core.search.search_config import DEFAULT_SEARCH_LIMIT, SearchResults
 from graphiti_core.search.search_config_recipes import (
@@ -112,6 +125,7 @@ class Graphiti:
         store_raw_episode_content: bool = True,
         graph_driver: GraphDriver | None = None,
         max_coroutines: int | None = None,
+        ensure_ascii: bool = False,
     ):
         """
         Initialize a Graphiti instance.
@@ -144,6 +158,10 @@ class Graphiti:
         max_coroutines : int | None, optional
             The maximum number of concurrent operations allowed. Overrides SEMAPHORE_LIMIT set in the environment.
             If not set, the Graphiti default is used.
+        ensure_ascii : bool, optional
+            Whether to escape non-ASCII characters in JSON serialization for prompts. Defaults to False.
+            Set as False to preserve non-ASCII characters (e.g., Korean, Japanese, Chinese) in their
+            original form, making them readable in LLM logs and improving model understanding.
 
         Returns
         -------
@@ -173,6 +191,7 @@ class Graphiti:
 
         self.store_raw_episode_content = store_raw_episode_content
         self.max_coroutines = max_coroutines
+        self.ensure_ascii = ensure_ascii
         if llm_client:
             self.llm_client = llm_client
         else:
@@ -191,6 +210,7 @@ class Graphiti:
             llm_client=self.llm_client,
             embedder=self.embedder,
             cross_encoder=self.cross_encoder,
+            ensure_ascii=self.ensure_ascii,
         )
 
         # Capture telemetry event
@@ -357,10 +377,10 @@ class Graphiti:
         group_id: str | None = None,
         uuid: str | None = None,
         update_communities: bool = False,
-        entity_types: dict[str, BaseModel] | None = None,
+        entity_types: dict[str, type[BaseModel]] | None = None,
         excluded_entity_types: list[str] | None = None,
         previous_episode_uuids: list[str] | None = None,
-        edge_types: dict[str, BaseModel] | None = None,
+        edge_types: dict[str, type[BaseModel]] | None = None,
         edge_type_map: dict[tuple[str, str], list[str]] | None = None,
     ) -> AddEpisodeResults:
         """
@@ -533,7 +553,9 @@ class Graphiti:
             if update_communities:
                 communities, community_edges = await semaphore_gather(
                     *[
-                        update_community(self.driver, self.llm_client, self.embedder, node)
+                        update_community(
+                            self.driver, self.llm_client, self.embedder, node, self.ensure_ascii
+                        )
                         for node in nodes
                     ],
                     max_coroutines=self.max_coroutines,
@@ -558,9 +580,9 @@ class Graphiti:
         self,
         bulk_episodes: list[RawEpisode],
         group_id: str | None = None,
-        entity_types: dict[str, BaseModel] | None = None,
+        entity_types: dict[str, type[BaseModel]] | None = None,
         excluded_entity_types: list[str] | None = None,
-        edge_types: dict[str, BaseModel] | None = None,
+        edge_types: dict[str, type[BaseModel]] | None = None,
         edge_type_map: dict[tuple[str, str], list[str]] | None = None,
     ):
         """
@@ -992,7 +1014,8 @@ class Graphiti:
         if edge.fact_embedding is None:
             await edge.generate_embedding(self.embedder)
 
-        resolved_nodes, uuid_map, _ = await resolve_extracted_nodes(
+
+        nodes, uuid_map, _ = await resolve_extracted_nodes(
             self.clients,
             [source_node, target_node],
         )
@@ -1018,11 +1041,16 @@ class Graphiti:
                 entity_edges=[],
                 group_id=edge.group_id,
             ),
+            None,
+            self.ensure_ascii,
         )
 
-        await add_nodes_and_edges_bulk(
-            self.driver, [], [], resolved_nodes, [resolved_edge] + invalidated_edges, self.embedder
-        )
+        edges: list[EntityEdge] = [resolved_edge] + invalidated_edges
+
+        await create_entity_edge_embeddings(self.embedder, edges)
+        await create_entity_node_embeddings(self.embedder, nodes)
+
+        await add_nodes_and_edges_bulk(self.driver, [], [], nodes, edges, self.embedder)
 
     async def remove_episode(self, episode_uuid: str):
         # Find the episode to be deleted
@@ -1049,12 +1077,7 @@ class Graphiti:
                 if record['episode_count'] == 1:
                     nodes_to_delete.append(node)
 
-        await semaphore_gather(
-            *[node.delete(self.driver) for node in nodes_to_delete],
-            max_coroutines=self.max_coroutines,
-        )
-        await semaphore_gather(
-            *[edge.delete(self.driver) for edge in edges_to_delete],
-            max_coroutines=self.max_coroutines,
-        )
+        await Edge.delete_by_uuids(self.driver, [edge.uuid for edge in edges_to_delete])
+        await Node.delete_by_uuids(self.driver, [node.uuid for node in nodes_to_delete])
+
         await episode.delete(self.driver)

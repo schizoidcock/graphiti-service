@@ -20,18 +20,25 @@ EPISODIC_EDGE_SAVE = """
     MATCH (episode:Episodic {uuid: $episode_uuid})
     MATCH (node:Entity {uuid: $entity_uuid})
     MERGE (episode)-[e:MENTIONS {uuid: $uuid}]->(node)
-    SET e = {uuid: $uuid, group_id: $group_id, created_at: $created_at}
+    SET
+        e.group_id = $group_id,
+        e.created_at = $created_at
     RETURN e.uuid AS uuid
 """
 
-EPISODIC_EDGE_SAVE_BULK = """
-    UNWIND $episodic_edges AS edge
-    MATCH (episode:Episodic {uuid: edge.source_node_uuid})
-    MATCH (node:Entity {uuid: edge.target_node_uuid})
-    MERGE (episode)-[e:MENTIONS {uuid: edge.uuid}]->(node)
-    SET e = {uuid: edge.uuid, group_id: edge.group_id, created_at: edge.created_at}
-    RETURN e.uuid AS uuid
-"""
+def get_episodic_edge_save_bulk_query(provider: GraphProvider) -> str:
+    match provider:
+        case GraphProvider.FALKORDB:
+            return """
+                UNWIND $episodic_edges AS edge
+                MATCH (episode:Episodic {uuid: edge.source_node_uuid})
+                MATCH (node:Entity {uuid: edge.target_node_uuid})
+                MERGE (episode)-[e:MENTIONS {uuid: edge.uuid}]->(node)
+                SET
+                    e.group_id = edge.group_id,
+                    e.created_at = edge.created_at
+                RETURN e.uuid AS uuid
+            """            
 
 EPISODIC_EDGE_RETURN = """
     e.uuid AS uuid,
@@ -45,84 +52,82 @@ EPISODIC_EDGE_RETURN = """
 def get_entity_edge_save_query(provider: GraphProvider) -> str:
     # FalkorDB-only implementation - handle vector embedding separately to avoid type conflicts
     # Don't use bulk assignment for edge_data since it includes fact_embedding as raw list
-    return """
-        MATCH (source:Entity {uuid: $edge_data.source_uuid})
-        MATCH (target:Entity {uuid: $edge_data.target_uuid})
-        MERGE (source)-[e:RELATES_TO {uuid: $edge_data.uuid}]->(target)
-        SET e.uuid = $edge_data.uuid,
-            e.name = $edge_data.name,
-            e.group_id = $edge_data.group_id,
-            e.fact = $edge_data.fact,
-            e.episodes = $edge_data.episodes,
-            e.created_at = $edge_data.created_at,
-            e.expired_at = $edge_data.expired_at,
-            e.valid_at = $edge_data.valid_at,
-            e.invalid_at = $edge_data.invalid_at
-        WITH e
-        WHERE $edge_data.fact_embedding IS NOT NULL
-        SET e.fact_embedding = vecf32($edge_data.fact_embedding)
-        RETURN e.uuid AS uuid
-    """
+    match provider:
+        case GraphProvider.FALKORDB:
+            return """
+                MATCH (source:Entity {uuid: $edge_data.source_uuid})
+                MATCH (target:Entity {uuid: $edge_data.target_uuid})
+                MERGE (source)-[e:RELATES_TO {uuid: $edge_data.uuid}]->(target)
+                SET e.uuid = $edge_data.uuid,
+                    e.name = $edge_data.name,
+                    e.group_id = $edge_data.group_id,
+                    e.fact = $edge_data.fact,
+                    e.episodes = $edge_data.episodes,
+                    e.created_at = $edge_data.created_at,
+                    e.expired_at = $edge_data.expired_at,
+                    e.valid_at = $edge_data.valid_at,
+                    e.invalid_at = $edge_data.invalid_at
+                WITH e
+                WHERE $edge_data.fact_embedding IS NOT NULL
+                SET e.fact_embedding = vecf32($edge_data.fact_embedding)
+                RETURN e.uuid AS uuid
+            """
 
 
 def get_entity_edge_save_bulk_query(provider: GraphProvider) -> str:
     # FalkorDB-only implementation - handle vector embedding separately to avoid type conflicts
     # Don't use bulk assignment for edges since they include fact_embedding as raw list
-    return """
-        UNWIND $entity_edges AS edge
-        MATCH (source:Entity {uuid: edge.source_node_uuid})
-        MATCH (target:Entity {uuid: edge.target_node_uuid})
-        MERGE (source)-[r:RELATES_TO {uuid: edge.uuid}]->(target)
-        SET r.uuid = edge.uuid,
-            r.name = edge.name,
-            r.group_id = edge.group_id,
-            r.fact = edge.fact,
-            r.episodes = edge.episodes,
-            r.created_at = edge.created_at,
-            r.expired_at = edge.expired_at,
-            r.valid_at = edge.valid_at,
-            r.invalid_at = edge.invalid_at
-        WITH r, edge
-        WHERE edge.fact_embedding IS NOT NULL
-        SET r.fact_embedding = vecf32(edge.fact_embedding)
-        RETURN edge.uuid AS uuid
-    """
+    match provider:
+        case GraphProvider.FALKORDB:
+            return """
+                UNWIND $entity_edges AS edge
+                MATCH (source:Entity {uuid: edge.source_node_uuid})
+                MATCH (target:Entity {uuid: edge.target_node_uuid})
+                MERGE (source)-[r:RELATES_TO {uuid: edge.uuid}]->(target)
+                SET r.uuid = edge.uuid,
+                    r.name = edge.name,
+                    r.group_id = edge.group_id,
+                    r.fact = edge.fact,
+                    r.episodes = edge.episodes,
+                    r.created_at = edge.created_at,
+                    r.expired_at = edge.expired_at,
+                    r.valid_at = edge.valid_at,
+                    r.invalid_at = edge.invalid_at
+                WITH r, edge
+                WHERE edge.fact_embedding IS NOT NULL
+                SET r.fact_embedding = vecf32(edge.fact_embedding)
+                RETURN edge.uuid AS uuid
+            """
 
-
-ENTITY_EDGE_RETURN = """
-    e.uuid AS uuid,
-    n.uuid AS source_node_uuid,
-    m.uuid AS target_node_uuid,
-    e.group_id AS group_id,
-    e.name AS name,
-    e.fact AS fact,
-    e.episodes AS episodes,
-    e.created_at AS created_at,
-    e.expired_at AS expired_at,
-    e.valid_at AS valid_at,
-    e.invalid_at AS invalid_at,
-    properties(e) AS attributes
-"""
-
+def get_entity_edge_return_query(provider: GraphProvider) -> str:
+    # `fact_embedding` is not returned by default and must be manually loaded using `load_fact_embedding()`.
+    match provider:
+        case GraphProvider.FALKORDB:
+            return """
+                e.uuid AS uuid,
+            n.uuid AS source_node_uuid,
+            m.uuid AS target_node_uuid,
+            e.group_id AS group_id,
+            e.created_at AS created_at,
+            e.name AS name,
+            e.fact AS fact,
+            e.episodes AS episodes,
+            e.expired_at AS expired_at,
+            e.valid_at AS valid_at,
+            e.invalid_at AS invalid_at,
+            properties(e) AS attributes
+        """   
 
 def get_community_edge_save_query(provider: GraphProvider) -> str:
-    if provider == GraphProvider.FALKORDB:
-        return """
-            MATCH (community:Community {uuid: $community_uuid})
-            MATCH (node {uuid: $entity_uuid})
-            MERGE (community)-[e:HAS_MEMBER {uuid: $uuid}]->(node)
-            SET e = {uuid: $uuid, group_id: $group_id, created_at: $created_at}
-            RETURN e.uuid AS uuid
-        """
-
-    return """
-        MATCH (community:Community {uuid: $community_uuid})
-        MATCH (node:Entity | Community {uuid: $entity_uuid})
-        MERGE (community)-[e:HAS_MEMBER {uuid: $uuid}]->(node)
-        SET e = {uuid: $uuid, group_id: $group_id, created_at: $created_at}
-        RETURN e.uuid AS uuid
-    """
-
+    match provider:
+        case GraphProvider.FALKORDB:
+            return """
+                MATCH (community:Community {uuid: $community_uuid})
+                MATCH (node {uuid: $entity_uuid})
+                MERGE (community)-[e:HAS_MEMBER {uuid: $uuid}]->(node)
+                SET e = {uuid: $uuid, group_id: $group_id, created_at: $created_at}
+                RETURN e.uuid AS uuid
+            """
 
 COMMUNITY_EDGE_RETURN = """
     e.uuid AS uuid,

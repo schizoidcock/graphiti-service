@@ -44,6 +44,7 @@ def get_range_indices(provider: GraphProvider) -> list[LiteralString]:
         'CREATE INDEX has_member_uuid IF NOT EXISTS FOR ()-[e:HAS_MEMBER]-() ON (e.uuid)',
         'CREATE INDEX entity_group_id IF NOT EXISTS FOR (n:Entity) ON (n.group_id)',
         'CREATE INDEX episode_group_id IF NOT EXISTS FOR (n:Episodic) ON (n.group_id)',
+        'CREATE INDEX community_group_id IF NOT EXISTS FOR (n:Community) ON (n.group_id)',
         'CREATE INDEX relation_group_id IF NOT EXISTS FOR ()-[e:RELATES_TO]-() ON (e.group_id)',
         'CREATE INDEX mention_group_id IF NOT EXISTS FOR ()-[e:MENTIONS]-() ON (e.group_id)',
         'CREATE INDEX name_entity_index IF NOT EXISTS FOR (n:Entity) ON (n.name)',
@@ -79,14 +80,13 @@ def get_fulltext_indices(provider: GraphProvider) -> list[LiteralString]:
     ]
 
 
-def get_nodes_query(provider: GraphProvider, name: str = '', query: str | None = None) -> str:
+def get_nodes_query(name: str, query: str, limit: int, provider: GraphProvider) -> str:
     if provider == GraphProvider.FALKORDB:
         label = FULLTEXT_INDEX_MAPPING[name]
         # FalkorDB RediSearch requires quoted queries - use $query parameter for proper escaping
         return f"CALL db.idx.fulltext.queryNodes('{label}', $query)"
 
-    return f'CALL db.index.fulltext.queryNodes("{name}", {query}, {{limit: $limit}})'
-
+    return f'CALL db.index.fulltext.queryNodes("{name}", $query, {{limit: $limit}})'
 
 def get_vector_cosine_func_query(vec1, vec2, provider: GraphProvider) -> str:
     if provider == GraphProvider.FALKORDB:
@@ -98,7 +98,7 @@ def get_vector_cosine_func_query(vec1, vec2, provider: GraphProvider) -> str:
     return f'vector.similarity.cosine({vec1}, {vec2})'
 
 
-def get_relationships_query(name: str, provider: GraphProvider) -> str:
+def get_relationships_query(name: str, limit: int, provider: GraphProvider) -> str:
     if provider == GraphProvider.FALKORDB:
         label = FULLTEXT_INDEX_MAPPING[name]
         # FalkorDB RediSearch requires quoted queries - use $query parameter for proper escaping
