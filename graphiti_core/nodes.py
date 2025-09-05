@@ -32,7 +32,6 @@ from graphiti_core.helpers import parse_db_date
 from graphiti_core.models.nodes.node_db_queries import (
     COMMUNITY_NODE_RETURN,
     EPISODIC_NODE_RETURN,
-    EPISODIC_NODE_SAVE,
     get_community_node_save_query,
     get_entity_node_return_query,
     get_entity_node_save_query,
@@ -189,19 +188,6 @@ class EpisodicNode(Node):
     )
 
     async def save(self, driver: GraphDriver):
-        result = await driver.execute_query(
-            EPISODIC_NODE_SAVE,
-            uuid=self.uuid,
-            name=self.name,
-            group_id=self.group_id,
-            source_description=self.source_description,
-            content=self.content,
-            entity_edges=self.entity_edges,
-            created_at=self.created_at,
-            valid_at=self.valid_at,
-            source=self.source.value,
-        )
-
         episode_args = {
             'uuid': self.uuid,
             'name': self.name,
