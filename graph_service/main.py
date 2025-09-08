@@ -108,10 +108,10 @@ async def lifespan(app: FastAPI):
                 logger.info(f"🌐  Will listen on http://0.0.0.0:{port}")
                 logger.info(f"🏥  Health endpoint: http://0.0.0.0:{port}/healthcheck")
                 
-                # Dynamic service endpoint based on environment
-                service_name = os.getenv('RAILWAY_SERVICE_NAME', 'graphiti-service')
-                internal_domain = os.getenv('RAILWAY_PRIVATE_DOMAIN', 'railway.internal')
-                logger.info(f"🔌  Internal endpoint: http://{service_name}.{internal_domain}:{port}")
+                # Railway internal endpoint - use RAILWAY_PRIVATE_DOMAIN directly
+                private_domain = os.getenv('RAILWAY_PRIVATE_DOMAIN', 'graphiti-service.railway.internal')
+                internal_endpoint = f"http://{private_domain}:{port}"
+                logger.info(f"🔌  Internal endpoint: {internal_endpoint}")
             except Exception as net_error:
                 logger.warning(f"⚠️  Network debug failed: {net_error}")
             
