@@ -46,12 +46,17 @@ LOGGING_CONFIG = {
     'loggers': {
         'graph_service': {
             'level': 'DEBUG',
-            'handlers': ['service_handler'],
+            'handlers': ['stdout'],  # Use clean formatter instead of service_handler
             'propagate': False,
         },
         'graph_service.zep_graphiti': {
+            'level': 'DEBUG', 
+            'handlers': ['stdout'],  # Use clean formatter instead of service_handler
+            'propagate': False,
+        },
+        'graph_service.main': {
             'level': 'DEBUG',
-            'handlers': ['service_handler'],
+            'handlers': ['stdout'],  # Use clean formatter for main startup logs
             'propagate': False,
         },
         'uvicorn': {
