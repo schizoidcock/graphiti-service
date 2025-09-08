@@ -57,18 +57,15 @@ def get_episode_node_save_bulk_query(provider: GraphProvider) -> str:
             """
 
 EPISODIC_NODE_RETURN = """
-    e.content AS content,
-    e.created_at AS created_at,
-    e.valid_at AS valid_at,
     e.uuid AS uuid,
     e.name AS name,
+    e.content AS content,
     e.group_id AS group_id,
-    e.created_at AS created_at,
     e.source AS source,
     e.source_description AS source_description,
-    e.content AS content,
-    e.valid_at AS valid_at,
-    e.entity_edges AS entity_edges
+    e.entity_edges AS entity_edges,
+    e.created_at AS created_at,
+    e.valid_at AS valid_at
 """
 
 def get_entity_node_save_query(provider: GraphProvider, labels: str) -> str:
