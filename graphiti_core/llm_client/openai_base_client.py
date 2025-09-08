@@ -64,6 +64,9 @@ class BaseOpenAIClient(LLMClient):
 
         super().__init__(config, cache)
         self.max_tokens = max_tokens
+        # CRITICAL FIX: Store reasoning and verbosity as instance attributes
+        self.reasoning = reasoning
+        self.verbosity = verbosity
 
     @abstractmethod
     async def _create_completion(

@@ -85,6 +85,9 @@ async def search_graph(
     try:
         # Use fast mode for interactive queries (similar to session search optimization)
         max_results = int(request.max_results or 10)
+        # DEBUG: Log types to help debug arithmetic errors
+        logger.debug(f"🐛 Search Debug - max_results: {max_results} (type: {type(max_results)})")
+        
         if max_results <= 10 and len(request.query) <= 200:
             logger.info(f"🚀 Using fast search mode for graph search: {request.query[:50]}...")
             
@@ -136,8 +139,14 @@ async def search_graph(
                 continue
         
         # Process EpisodicNodes from search results (limit remaining slots)
-        remaining_slots = max(0, max_results - len(edges))
-        for episode in search_results.episodes[:remaining_slots]:
+        # CRITICAL FIX: Ensure edges is a list and add type safety
+        edges_count = len(edges) if isinstance(edges, list) else 0
+        remaining_slots = max(0, max_results - edges_count)
+        
+        # CRITICAL FIX: Ensure episodes is a list from search results
+        episodes_list = search_results.episodes if hasattr(search_results, 'episodes') and isinstance(search_results.episodes, list) else []
+        
+        for episode in episodes_list[:remaining_slots]:
             try:
                 converted_episode = EpisodicNode(
                     uuid=getattr(episode, 'uuid', str(uuid_lib.uuid4())),
@@ -158,8 +167,14 @@ async def search_graph(
                 continue
         
         # Process EntityNodes from search results (limit remaining slots)
-        remaining_slots = max(0, max_results - len(edges) - len(episodes))
-        for node in search_results.nodes[:remaining_slots]:
+        # CRITICAL FIX: Type-safe arithmetic to prevent string concatenation errors
+        episodes_count = len(episodes) if isinstance(episodes, list) else 0
+        remaining_slots = max(0, max_results - edges_count - episodes_count)
+        
+        # CRITICAL FIX: Ensure nodes is a list from search results
+        nodes_list = search_results.nodes if hasattr(search_results, 'nodes') and isinstance(search_results.nodes, list) else []
+        
+        for node in nodes_list[:remaining_slots]:
             try:
                 converted_node = EntityNode(
                     uuid=getattr(node, 'uuid', str(uuid_lib.uuid4())),

@@ -324,12 +324,13 @@ async def get_or_create_pooled_client_async(user_id: str, settings) -> "ZepGraph
             if hasattr(client.embedder, 'model'):
                 client.embedder.model = settings.embedding_model_name or "text-embedding-3-small"
         
-        # Build indices asynchronously without blocking
+        # Build indices asynchronously without blocking deployment
         try:
-            await client.build_indices_and_constraints()
-            logger.info(f"🔧 Built indices for user database: {client._database_name}")
+            # Create background task for index building (non-blocking)
+            asyncio.create_task(client.build_indices_and_constraints())
+            logger.info(f"🔧 Scheduled background index building for user database: {client._database_name}")
         except Exception as e:
-            logger.warning(f"Failed to build indices for {client._database_name}: {e}")
+            logger.warning(f"Failed to schedule index building for {client._database_name}: {e}")
         
         _graphiti_pool[pool_key] = client
         logger.info(f"📦 Added new connection to pool: {pool_key} (pool size: {len(_graphiti_pool)})")
@@ -426,7 +427,7 @@ class ZepGraphiti(Graphiti):
         self._database_name = database_name
         
     async def build_indices_and_constraints(self):
-        """Override to prevent duplicate index creation per database"""
+        """Override to prevent duplicate index creation per database with improved performance"""
         global _indices_initialized
         
         if self._database_name in _indices_initialized:
@@ -441,9 +442,14 @@ class ZepGraphiti(Graphiti):
         falkor_logger.setLevel(logging.WARNING)  # Hide INFO messages about existing indices
         
         try:
-            await super().build_indices_and_constraints()
+            # Run index building with timeout to prevent hanging
+            await asyncio.wait_for(super().build_indices_and_constraints(), timeout=300.0)  # 5 minute timeout
             _indices_initialized.add(self._database_name)
             logger.debug(f"Indices and constraints built successfully for database {self._database_name}")
+        except asyncio.TimeoutError:
+            logger.warning(f"Index building timed out for database {self._database_name} (non-critical)")
+        except Exception as e:
+            logger.warning(f"Index building failed for database {self._database_name}: {e} (non-critical)")
         finally:
             # Restore original log level
             falkor_logger.setLevel(original_level)
@@ -1642,15 +1648,25 @@ async def initialize_graphiti(settings: ZepEnvDep):
             password=settings.falkordb_password,
         )
         
-        # Only call build_indices_and_constraints once during app startup
-        logger.debug("Building FalkorDB indices and constraints...")
-        await client.build_indices_and_constraints()
-        logger.info("Graphiti initialization completed successfully")
+        # Schedule index building in background during app startup (non-blocking)
+        logger.debug("Scheduling FalkorDB indices and constraints building...")
+        
+        # Create background task for index building to avoid blocking startup
+        async def build_indices_background():
+            try:
+                await client.build_indices_and_constraints()
+                logger.info("Background index building completed successfully")
+            except Exception as e:
+                logger.warning(f"Background index building failed (non-critical): {e}")
+            finally:
+                await client.close()  # Close the initialization client
+        
+        # Schedule as background task
+        asyncio.create_task(build_indices_background())
+        logger.info("Graphiti initialization completed successfully (indices building in background)")
         
         # Mark as initialized to prevent duplication
         initialize_graphiti._initialized = True
-        
-        await client.close()  # Close the initialization client
     except Exception as e:
         logger.error(f"Failed to initialize Graphiti: {e}", exc_info=True)
         # Don't raise the exception to prevent app startup failure
