@@ -2,9 +2,6 @@
 # FastAPI service that connects to standalone FalkorDB
 FROM python:3.11-slim
 
-# Build argument for Railway service ID (passed from Railway environment)
-ARG RAILWAY_SERVICE_ID
-
 # Set working directory
 WORKDIR /app
 
@@ -22,9 +19,10 @@ COPY requirements.txt .
 
 # Install Python dependencies BEFORE copying application code
 # This creates a cached layer that only rebuilds when dependencies change
-# CRITICAL FIX: Use Railway service ID via build arg for cache mount
-# Railway passes RAILWAY_SERVICE_ID as build arg for proper cache isolation
-RUN --mount=type=cache,id=s/$RAILWAY_SERVICE_ID-pip-cache,target=/root/.cache/pip \
+# CRITICAL FIX: Use hardcoded Railway service ID for cache mount
+# Docker cache mount IDs must be static strings, not variables
+# Railway service ID: f1aa2989-4471-40e3-8919-eaf59d38f4a1
+RUN --mount=type=cache,id=s/f1aa2989-4471-40e3-8919-eaf59d38f4a1-pip-cache,target=/root/.cache/pip \
     pip install -r requirements.txt
 
 # Copy application code AFTER dependencies are installed
