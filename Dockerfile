@@ -19,8 +19,8 @@ COPY requirements.txt .
 
 # Install Python dependencies BEFORE copying application code
 # This creates a cached layer that only rebuilds when dependencies change
-# CRITICAL FIX: Enable pip cache for faster builds (removes --no-cache-dir)
-RUN --mount=type=cache,target=/root/.cache/pip \
+# CRITICAL FIX: Enable pip cache for faster builds with proper cache mount syntax
+RUN --mount=type=cache,id=pip-cache,target=/root/.cache/pip \
     pip install -r requirements.txt
 
 # Copy application code AFTER dependencies are installed

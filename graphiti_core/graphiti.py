@@ -113,6 +113,20 @@ class AddEpisodeResults(BaseModel):
     community_edges: list[CommunityEdge]
 
 
+class AddBulkEpisodeResults(BaseModel):
+    episodes: list[EpisodicNode]
+    episodic_edges: list[EpisodicEdge]
+    nodes: list[EntityNode]
+    edges: list[EntityEdge]
+    communities: list[CommunityNode]
+    community_edges: list[CommunityEdge]
+    
+
+class AddTripletResults(BaseModel):
+    nodes: list[EntityNode]
+    edges: list[EntityEdge]
+
+
 class Graphiti:
     def __init__(
         self,
@@ -575,7 +589,7 @@ class Graphiti:
         except Exception as e:
             raise e
 
-    ##### EXPERIMENTAL #####
+
     async def add_episode_bulk(
         self,
         bulk_episodes: list[RawEpisode],
@@ -584,7 +598,7 @@ class Graphiti:
         excluded_entity_types: list[str] | None = None,
         edge_types: dict[str, type[BaseModel]] | None = None,
         edge_type_map: dict[tuple[str, str], list[str]] | None = None,
-    ):
+    ) -> AddBulkEpisodeResults:
         """
         Process multiple episodes in bulk and update the graph.
 
@@ -857,6 +871,15 @@ class Graphiti:
             end = time()
             logger.info(f'Completed add_episode_bulk in {(end - start) * 1000} ms')
 
+            return AddBulkEpisodeResults(
+                episodes=episodes,
+                episodic_edges=resolved_episodic_edges,
+                nodes=final_hydrated_nodes,
+                edges=resolved_edges + invalidated_edges,
+                communities=[],
+                community_edges=[],
+            )
+
         except Exception as e:
             raise e
 
@@ -1006,7 +1029,9 @@ class Graphiti:
 
         return SearchResults(edges=edges, nodes=nodes)
 
-    async def add_triplet(self, source_node: EntityNode, edge: EntityEdge, target_node: EntityNode):
+    async def add_triplet(
+        self, source_node: EntityNode, edge: EntityEdge, target_node: EntityNode
+    ) -> AddTripletResults:
         if source_node.name_embedding is None:
             await source_node.generate_name_embedding(self.embedder)
         if target_node.name_embedding is None:
@@ -1051,7 +1076,8 @@ class Graphiti:
         await create_entity_node_embeddings(self.embedder, nodes)
 
         await add_nodes_and_edges_bulk(self.driver, [], [], nodes, edges, self.embedder)
-
+        return AddTripletResults(edges=edges, nodes=nodes)
+        
     async def remove_episode(self, episode_uuid: str):
         # Find the episode to be deleted
         episode = await EpisodicNode.get_by_uuid(self.driver, episode_uuid)
