@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
+import logging
 import typing
 
 from openai import AsyncOpenAI
@@ -22,6 +23,8 @@ from pydantic import BaseModel
 
 from .config import DEFAULT_MAX_TOKENS, LLMConfig
 from .openai_base_client import DEFAULT_REASONING, DEFAULT_VERBOSITY, BaseOpenAIClient
+
+logger = logging.getLogger(__name__)
 
 
 class OpenAIClient(BaseOpenAIClient):
@@ -72,18 +75,34 @@ class OpenAIClient(BaseOpenAIClient):
         reasoning: str | None = None,
         verbosity: str | None = None,
     ):
-        """Create a structured completion using OpenAI's beta parse API."""
-        response = await self.client.responses.parse(
-            model=model,
-            input=messages,  # type: ignore
-            temperature=temperature,
-            max_output_tokens=max_tokens,
-            text_format=response_model,  # type: ignore
-            reasoning={'effort': reasoning} if reasoning is not None else None,  # type: ignore
-            text={'verbosity': verbosity} if verbosity is not None else None,  # type: ignore
-        )
-
-        return response
+        """Create a structured completion using OpenAI's beta parse API with fallback."""
+        try:
+            # Try using the beta responses.parse API first
+            response = await self.client.responses.parse(
+                model=model,
+                input=messages,  # type: ignore
+                temperature=temperature,
+                max_output_tokens=max_tokens,
+                text_format=response_model,  # type: ignore
+                reasoning={'effort': reasoning} if reasoning is not None else None,  # type: ignore
+                text={'verbosity': verbosity} if verbosity is not None else None,  # type: ignore
+            )
+            return response
+        except Exception as e:
+            # If reasoning parameter is not supported, fall back to regular completion
+            if "reasoning.effort" in str(e) or "Unsupported parameter" in str(e):
+                logger.warning(f"Model {model} doesn't support reasoning parameter, falling back to regular completion")
+                # Fall back to regular chat completion without reasoning
+                return await self._create_completion(
+                    model=model,
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    response_model=None,  # Don't use structured output for fallback
+                )
+            else:
+                # Re-raise other errors
+                raise
 
     async def _create_completion(
         self,

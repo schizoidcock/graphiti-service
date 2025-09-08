@@ -146,9 +146,14 @@ def extract_user_id_from_request(request: Request) -> str | None:
             logger.info(f"✅ Found user_id from sessions_store: {user_id}")
             return user_id
         
-        logger.warning(f"⚠️ Session {session_id} not found in sessions_store, generating auto_user")
-        # Fallback: generate user_id from session_id for auto-created sessions
-        return f"auto_user_{session_id[:8]}"
+        logger.warning(f"⚠️ Session {session_id} not found in sessions_store, deriving proper user_id")
+        # CRITICAL FIX: Derive proper user_id using same logic as zep-hybrid-proxy
+        # This prevents dual database creation by ensuring consistent user_id format
+        import hashlib
+        hash_hex = hashlib.sha256(session_id.encode()).hexdigest()
+        derived_user_id = f"zep_{hash_hex[:32]}"
+        logger.info(f"🔧 Derived user_id from session_id: {session_id} → {derived_user_id}")
+        return derived_user_id
     
     # Method 2: Check for group_id in path parameters (format: user_id_session_id)
     if "group_id" in request.path_params:
