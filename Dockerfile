@@ -20,7 +20,7 @@ COPY requirements.txt .
 # Install Python dependencies BEFORE copying application code
 # This creates a cached layer that only rebuilds when dependencies change
 # CRITICAL FIX: Enable pip cache aligned with Railway volume mount at /app
-RUN --mount=type=cache,id=graphiti-pip-cache,target=/app/.cache/pip \
+RUN --mount=type=cache,id=pip,target=/app/.cache/pip \
     pip install --cache-dir=/app/.cache/pip -r requirements.txt
 
 # Copy application code AFTER dependencies are installed
