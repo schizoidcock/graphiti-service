@@ -21,6 +21,25 @@ from graph_service.response_cache import response_cache
 
 logger = logging.getLogger(__name__)
 
+# CRITICAL FIX: Global async task coordination system
+_background_tasks: Dict[str, asyncio.Task] = {}
+_task_lock = asyncio.Lock()
+
+async def _managed_background_task(task_name: str, coro, *args, **kwargs):
+    """Managed background task with proper logging coordination"""
+    try:
+        logger.debug(f"🚀 Starting background task: {task_name}")
+        result = await coro(*args, **kwargs)
+        logger.info(f"✅ Background task completed: {task_name}")
+        return result
+    except Exception as e:
+        logger.warning(f"⚠️ Background task failed: {task_name} - {e}")
+        raise
+    finally:
+        # Clean up completed task from registry
+        async with _task_lock:
+            _background_tasks.pop(task_name, None)
+
 # Official Zep Entity Types (based on Zep documentation)
 class User(BaseModel):
     """A human that is part of the current chat thread"""
@@ -331,9 +350,21 @@ async def get_or_create_pooled_client_async(user_id: str, settings) -> "ZepGraph
         
         # Build indices asynchronously without blocking deployment
         try:
-            # Create background task for index building (non-blocking)
-            asyncio.create_task(client.build_indices_and_constraints())
-            logger.info(f"🔧 Scheduled background index building for user database: {client._database_name}")
+            # CRITICAL FIX: Use managed background task for proper async coordination
+            task_name = f"build_indices_{client._database_name}"
+            async with _task_lock:
+                if task_name not in _background_tasks:
+                    task = asyncio.create_task(
+                        _managed_background_task(
+                            task_name,
+                            client.build_indices_and_constraints
+                        ),
+                        name=task_name
+                    )
+                    _background_tasks[task_name] = task
+                    logger.info(f"🔧 Scheduled managed index building: {client._database_name}")
+                else:
+                    logger.debug(f"Index building already scheduled for: {client._database_name}")
         except Exception as e:
             logger.warning(f"Failed to schedule index building for {client._database_name}: {e}")
         
@@ -375,13 +406,28 @@ def get_or_create_pooled_client(user_id: str, settings) -> "ZepGraphiti":
         if hasattr(client.embedder, 'model'):
             client.embedder.model = settings.embedding_model_name or "text-embedding-3-small"
     
-    # CRITICAL FIX: Build indices for user-specific database
+    # CRITICAL FIX: Build indices for user-specific database using managed tasks
     # This ensures search indices are created for episodes, edges, and nodes
     import asyncio
+    async def _schedule_index_building():
+        task_name = f"build_indices_{client._database_name}"
+        async with _task_lock:
+            if task_name not in _background_tasks:
+                task = asyncio.create_task(
+                    _managed_background_task(
+                        task_name,
+                        client.build_indices_and_constraints
+                    ),
+                    name=task_name
+                )
+                _background_tasks[task_name] = task
+                logger.info(f"🔧 Scheduled managed index building: {client._database_name}")
+            else:
+                logger.debug(f"Index building already scheduled for: {client._database_name}")
+    
     try:
-        # Run index building in a background task to avoid blocking
-        asyncio.create_task(client.build_indices_and_constraints())
-        logger.info(f"🔧 Scheduled index building for user database: {client._database_name}")
+        # Schedule the managed task
+        asyncio.create_task(_schedule_index_building())
     except Exception as e:
         logger.warning(f"Failed to schedule index building for {client._database_name}: {e}")
     
@@ -1653,21 +1699,36 @@ async def initialize_graphiti(settings: ZepEnvDep):
             password=settings.falkordb_password,
         )
         
-        # Schedule index building in background during app startup (non-blocking)
+        # Schedule index building in background during app startup with coordination
         logger.debug("Scheduling FalkorDB indices and constraints building...")
         
-        # Create background task for index building to avoid blocking startup
+        # Create managed background task for initialization index building
         async def build_indices_background():
             try:
                 await client.build_indices_and_constraints()
-                logger.info("Background index building completed successfully")
+                return "init_indices_completed"
             except Exception as e:
                 logger.warning(f"Background index building failed (non-critical): {e}")
+                raise
             finally:
                 await client.close()  # Close the initialization client
         
-        # Schedule as background task
-        asyncio.create_task(build_indices_background())
+        # Use managed background task system for proper coordination
+        task_name = "init_build_indices_default_db"
+        try:
+            async with _task_lock:
+                if task_name not in _background_tasks:
+                    task = asyncio.create_task(
+                        _managed_background_task(
+                            task_name,
+                            build_indices_background
+                        ),
+                        name=task_name
+                    )
+                    _background_tasks[task_name] = task
+        except Exception as e:
+            logger.warning(f"Failed to schedule initialization index building: {e}")
+            
         logger.info("Graphiti initialization completed successfully (indices building in background)")
         
         # Mark as initialized to prevent duplication
