@@ -81,13 +81,46 @@ LOGGING_CONFIG = {
 logging.config.dictConfig(LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
 
+# CRITICAL: Suppress ALL logging during startup to prevent racing
+import os
+_STARTUP_COMPLETE = False
+
+# Override all logging during startup
+class StartupSuppressor:
+    def __init__(self):
+        self.original_print = print
+        self.startup_messages = []
+    
+    def suppress_print(self, *args, **kwargs):
+        # Capture print messages during startup instead of showing them
+        if not _STARTUP_COMPLETE:
+            message = ' '.join(str(arg) for arg in args)
+            self.startup_messages.append(message)
+        else:
+            self.original_print(*args, **kwargs)
+    
+    def enable_startup_sequence(self):
+        global _STARTUP_COMPLETE
+        _STARTUP_COMPLETE = True
+        # Restore normal print
+        import builtins
+        builtins.print = self.original_print
+
+# Create suppressor and override print
+_suppressor = StartupSuppressor()
+import builtins
+builtins.print = _suppressor.suppress_print
+
 
 async def sequential_startup():
-    """Completely sequential startup coordinator - no async racing"""
-    import os
+    """Completely sequential startup coordinator with suppression control"""
+    global _STARTUP_COMPLETE
     import socket
     
-    # Step 1: Service startup announcement
+    # CRITICAL: Enable clean startup sequence and restore print
+    _suppressor.enable_startup_sequence()
+    
+    # Step 1: Service startup announcement  
     print("🚀  Starting Zep-Compatible Graphiti Service...")
     
     # Step 2: Network configuration  
