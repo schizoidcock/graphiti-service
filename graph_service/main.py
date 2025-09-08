@@ -78,48 +78,55 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan management with Zep compatibility"""
-    print("🚀  Starting Zep-Compatible Graphiti Service...")
+    """Application lifespan management with coordinated startup sequence"""
+    # CRITICAL FIX: Use logger instead of print to prevent output racing
+    # Create startup coordination lock to ensure sequential logging
+    import asyncio
+    from graph_service.zep_graphiti import _task_lock
     
-    try:
-        # Debug network configuration
-        import os
-        import socket
-        port = os.getenv('PORT')
-        print(f"🔧  Railway assigned PORT: {port}")
+    async with _task_lock:  # Use the same lock as background tasks
+        logger.info("🚀  Starting Zep-Compatible Graphiti Service...")
         
         try:
-            hostname = socket.gethostname()
-            local_ip = socket.gethostbyname(hostname)
-            print(f"🖥️  Hostname: {hostname}")
-            print(f"🔗  Local IP: {local_ip}")
-            print(f"🌐  Will listen on http://0.0.0.0:{port}")
-            print(f"🏥  Health endpoint: http://0.0.0.0:{port}/healthcheck")
-        except Exception as net_error:
-            print(f"⚠️  Network debug failed: {net_error}")
+            # Debug network configuration
+            import os
+            import socket
+            port = os.getenv('PORT')
+            logger.info(f"🔧  Railway assigned PORT: {port}")
+            
+            try:
+                hostname = socket.gethostname()
+                local_ip = socket.gethostbyname(hostname)
+                logger.info(f"🖥️  Hostname: {hostname}")
+                logger.info(f"🔗  Local IP: {local_ip}")
+                logger.info(f"🌐  Will listen on http://0.0.0.0:{port}")
+                logger.info(f"🏥  Health endpoint: http://0.0.0.0:{port}/healthcheck")
+            except Exception as net_error:
+                logger.warning(f"⚠️  Network debug failed: {net_error}")
+            
+            # Load and validate configuration
+            settings = get_settings()
+            logger.info(f"✅  Configuration loaded: FalkorDB at {settings.falkordb_host}:{settings.falkordb_port}")
+            logger.info(f"🤖  OpenAI API key configured: {bool(settings.openai_api_key and len(settings.openai_api_key) > 10)}")
+            
+            # Initialize Graphiti with enhanced error handling - WAIT for completion
+            try:
+                await initialize_graphiti(settings)
+                logger.info("✅  Graphiti initialization successful")
+            except Exception as init_error:
+                logger.warning(f"⚠️  Graphiti initialization failed: {init_error}")
+                logger.info("📝  Service will start but may have limited functionality")
+            
+            logger.info("✅  Zep-Compatible Graphiti Service startup completed")
+            
+        except Exception as e:
+            logger.error(f"❌  Startup error: {e}")
         
-        # Load and validate configuration
-        settings = get_settings()
-        print(f"✅  Configuration loaded: FalkorDB at {settings.falkordb_host}:{settings.falkordb_port}")
-        print(f"🤖  OpenAI API key configured: {bool(settings.openai_api_key and len(settings.openai_api_key) > 10)}")
-        
-        # Initialize Graphiti with enhanced error handling
-        try:
-            await initialize_graphiti(settings)
-            print("✅  Graphiti initialization successful")
-        except Exception as init_error:
-            print(f"⚠️  Graphiti initialization failed: {init_error}")
-            print("📝  Service will start but may have limited functionality")
-        
-        print("✅  Zep-Compatible Graphiti Service startup completed")
-        yield
-        
-    except Exception as e:
-        print(f"❌  Startup error: {e}")
-        # Still yield to allow the app to start even if there are initialization issues
-        yield
+        # All startup logging is now coordinated and sequential
     
-    print("👋  Zep-Compatible Graphiti Service shutting down...")
+    yield  # Service is running
+    
+    logger.info("👋  Zep-Compatible Graphiti Service shutting down...")
 
 
 # Create FastAPI app with Zep compatibility
@@ -145,15 +152,15 @@ async def log_requests(request: Request, call_next):
     import time
     start_time = time.time()
     
-    # Log incoming request
+    # Log incoming request using coordinated logger
     client_host = request.client.host if request.client else "unknown"
-    print(f"📥  Incoming: {request.method} {request.url.path} from {client_host}")
+    logger.info(f"📥  Incoming: {request.method} {request.url.path} from {client_host}")
     
     response = await call_next(request)
     
-    # Log response
+    # Log response using coordinated logger
     process_time = time.time() - start_time
-    print(f"📤  Response: {response.status_code} in {process_time:.3f}s")
+    logger.info(f"📤  Response: {response.status_code} in {process_time:.3f}s")
     
     return response
 
@@ -167,9 +174,9 @@ try:
     app.include_router(users.router)     # User management endpoints
     app.include_router(episodes.router)  # Episodes management endpoints
     app.include_router(maintenance.router)  # Maintenance and cleanup endpoints
-    print("✅  All routers loaded successfully")
+    logger.info("✅  All routers loaded successfully")
 except Exception as router_error:
-    print(f"❌  Error loading routers: {router_error}")
+    logger.error(f"❌  Error loading routers: {router_error}")
 
 
 @app.get('/')
