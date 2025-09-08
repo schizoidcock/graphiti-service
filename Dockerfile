@@ -19,9 +19,9 @@ COPY requirements.txt .
 
 # Install Python dependencies BEFORE copying application code
 # This creates a cached layer that only rebuilds when dependencies change
-# CRITICAL FIX: Use proper Railway cache mount format with cache key prefix
-# Railway cache mount format: --mount=type=cache,id=cache/<unique-id>,target=<target-path>
-RUN --mount=type=cache,id=cache/graphiti-pip,target=/root/.cache/pip \
+# CRITICAL FIX: Use correct Railway service ID format
+# Railway format: id=s/<SERVICE_ID>-/ where SERVICE_ID is graphiti-service
+RUN --mount=type=cache,id=s/graphiti-service-/,target=/root/.cache/pip \
     pip install -r requirements.txt
 
 # Copy application code AFTER dependencies are installed
