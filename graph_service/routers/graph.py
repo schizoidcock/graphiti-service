@@ -84,7 +84,7 @@ async def search_graph(
     
     try:
         # Use fast mode for interactive queries (similar to session search optimization)
-        max_results = request.max_results or 10
+        max_results = int(request.max_results or 10)
         if max_results <= 10 and len(request.query) <= 200:
             logger.info(f"🚀 Using fast search mode for graph search: {request.query[:50]}...")
             
