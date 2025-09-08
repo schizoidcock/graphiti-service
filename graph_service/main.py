@@ -112,7 +112,6 @@ async def lifespan(app: FastAPI):
                 service_name = os.getenv('RAILWAY_SERVICE_NAME', 'graphiti-service')
                 internal_domain = os.getenv('RAILWAY_PRIVATE_DOMAIN', 'railway.internal')
                 logger.info(f"🔌  Internal endpoint: http://{service_name}.{internal_domain}:{port}")
-                logger.info(f"📡  Memory endpoint: http://{service_name}.{internal_domain}:{port}/api/v2/sessions/[session_id]/memory")
             except Exception as net_error:
                 logger.warning(f"⚠️  Network debug failed: {net_error}")
             
