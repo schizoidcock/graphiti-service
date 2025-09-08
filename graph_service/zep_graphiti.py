@@ -332,12 +332,13 @@ async def get_or_create_pooled_client_async(user_id: str, settings) -> "ZepGraph
             user_id=user_id
         )
         
-        # Fast LLM configuration
+        # Fast LLM configuration with proper model name resolution
         if settings.openai_api_key and client.llm_client:
             if settings.openai_base_url:
                 client.llm_client.config.base_url = settings.openai_base_url
             client.llm_client.config.api_key = settings.openai_api_key
-            client.llm_client.model = settings.model_name or "gpt-4o-mini"
+            # CRITICAL FIX: Use effective_model_name to support LARGE_MODEL_NAME env var
+            client.llm_client.model = settings.effective_model_name
             client.llm_client.config.temperature = settings.temperature
         
         # Fast embedder configuration
@@ -395,7 +396,8 @@ def get_or_create_pooled_client(user_id: str, settings) -> "ZepGraphiti":
         if settings.openai_base_url:
             client.llm_client.config.base_url = settings.openai_base_url
         client.llm_client.config.api_key = settings.openai_api_key
-        client.llm_client.model = settings.model_name or "gpt-4o-mini"
+        # CRITICAL FIX: Use effective_model_name to support LARGE_MODEL_NAME env var
+        client.llm_client.model = settings.effective_model_name
         client.llm_client.config.temperature = settings.temperature
     
     # Fast embedder configuration
