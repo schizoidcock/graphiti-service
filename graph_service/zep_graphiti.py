@@ -339,6 +339,8 @@ async def get_or_create_pooled_client_async(user_id: str, settings) -> "ZepGraph
             client.llm_client.config.api_key = settings.openai_api_key
             # CRITICAL FIX: Use effective_model_name to support LARGE_MODEL_NAME env var
             client.llm_client.model = settings.effective_model_name
+            # CRITICAL FIX: Configure small_model for ModelSize.small operations
+            client.llm_client.small_model = settings.effective_small_model_name
             client.llm_client.config.temperature = settings.temperature
         
         # Fast embedder configuration
@@ -347,7 +349,8 @@ async def get_or_create_pooled_client_async(user_id: str, settings) -> "ZepGraph
             if settings.openai_base_url:
                 client.embedder.config.base_url = settings.openai_base_url
             if hasattr(client.embedder, 'model'):
-                client.embedder.model = settings.embedding_model_name or "text-embedding-3-small"
+                # CRITICAL FIX: Use effective_embedding_model_name (required env var)
+                client.embedder.model = settings.effective_embedding_model_name
         
         # Build indices asynchronously without blocking deployment
         try:
@@ -398,6 +401,8 @@ def get_or_create_pooled_client(user_id: str, settings) -> "ZepGraphiti":
         client.llm_client.config.api_key = settings.openai_api_key
         # CRITICAL FIX: Use effective_model_name to support LARGE_MODEL_NAME env var
         client.llm_client.model = settings.effective_model_name
+        # CRITICAL FIX: Configure small_model for ModelSize.small operations
+        client.llm_client.small_model = settings.effective_small_model_name
         client.llm_client.config.temperature = settings.temperature
     
     # Fast embedder configuration

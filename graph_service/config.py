@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     model_name: str | None = Field(default=None)
     large_model_name: str | None = Field(default=None)
     small_model_name: str | None = Field(default=None)
-    embedding_model_name: str | None = Field(default="text-embedding-3-small")
+    embedding_model_name: str | None = Field(default=None)
     
     temperature: float = Field(default=0.1)  # LLM temperature for response creativity/consistency
     falkordb_host: str = Field(default="localhost")
@@ -25,23 +25,31 @@ class Settings(BaseSettings):
     
     @property
     def effective_model_name(self) -> str:
-        """Get the effective model name with proper precedence"""
-        # Priority: LARGE_MODEL_NAME > MODEL_NAME > fallback
-        return (
-            self.large_model_name or 
-            self.model_name or 
-            "gpt-4o-mini"
-        )
+        """Get the effective model name with proper precedence (REQUIRED)"""
+        # Priority: LARGE_MODEL_NAME > MODEL_NAME
+        model = self.large_model_name or self.model_name
+        if not model:
+            raise ValueError("LARGE_MODEL_NAME or MODEL_NAME environment variable is required")
+        return model
     
     @property 
     def effective_small_model_name(self) -> str:
-        """Get the effective small model name"""
-        return (
+        """Get the effective small model name (REQUIRED)"""
+        model = (
             self.small_model_name or
             self.large_model_name or 
-            self.model_name or
-            "gpt-4o-mini"
+            self.model_name
         )
+        if not model:
+            raise ValueError("SMALL_MODEL_NAME, LARGE_MODEL_NAME, or MODEL_NAME environment variable is required")
+        return model
+    
+    @property
+    def effective_embedding_model_name(self) -> str:
+        """Get the effective embedding model name (REQUIRED)"""
+        if not self.embedding_model_name:
+            raise ValueError("EMBEDDING_MODEL_NAME environment variable is required")
+        return self.embedding_model_name
 
     model_config = SettingsConfigDict(env_file='.env', extra='ignore')
 
