@@ -5,6 +5,7 @@ FastAPI service that provides full Zep Cloud API v2 compatibility using remote F
 from contextlib import asynccontextmanager
 import logging
 import sys
+import time
 import logging.config
 
 from fastapi import FastAPI, Request
@@ -106,6 +107,8 @@ async def lifespan(app: FastAPI):
                 logger.info(f"🔗  Local IP: {local_ip}")
                 logger.info(f"🌐  Will listen on http://0.0.0.0:{port}")
                 logger.info(f"🏥  Health endpoint: http://0.0.0.0:{port}/healthcheck")
+                logger.info(f"🔌  Internal Railway endpoint: http://graphiti-service.railway.internal:{port}")
+                logger.info(f"📡  Memory endpoint: http://graphiti-service.railway.internal:{port}/api/v2/sessions/{{session_id}}/memory")
             except Exception as net_error:
                 logger.warning(f"⚠️  Network debug failed: {net_error}")
             
@@ -224,6 +227,27 @@ async def root():
 @app.get('/healthcheck')
 async def healthcheck():
     return JSONResponse(content={'status': 'healthy', 'service': 'zep-graphiti', 'version': '2.0.0'}, status_code=200)
+
+
+@app.get('/ping')
+async def ping():
+    """Simple connectivity test endpoint"""
+    return JSONResponse(content={'ping': 'pong', 'timestamp': time.time()}, status_code=200)
+
+
+@app.get('/api/v2/health')  
+async def api_health():
+    """Zep-compatible health check endpoint"""
+    return JSONResponse(content={
+        'status': 'healthy', 
+        'service': 'graphiti-service',
+        'version': '2.0.0',
+        'endpoints': {
+            'memory': '/api/v2/sessions/{session_id}/memory',
+            'sessions': '/api/v2/sessions', 
+            'graph_search': '/api/v2/graph/search'
+        }
+    }, status_code=200)
 
 
 # Add root-level search endpoint for zep-server compatibility
