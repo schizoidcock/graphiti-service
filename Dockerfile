@@ -24,7 +24,7 @@ COPY requirements.txt .
 # This creates a cached layer that only rebuilds when dependencies change
 # CRITICAL FIX: Use Railway service ID via build arg for cache mount
 # Railway passes RAILWAY_SERVICE_ID as build arg for proper cache isolation
-RUN --mount=type=cache,id=s/${RAILWAY_SERVICE_ID}-pip-cache,target=/root/.cache/pip \
+RUN --mount=type=cache,id=s/$RAILWAY_SERVICE_ID-pip-cache,target=/root/.cache/pip \
     pip install -r requirements.txt
 
 # Copy application code AFTER dependencies are installed
