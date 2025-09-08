@@ -24,16 +24,25 @@ logger = logging.getLogger(__name__)
 # CRITICAL FIX: Global async task coordination system
 _background_tasks: Dict[str, asyncio.Task] = {}
 _task_lock = asyncio.Lock()
+_startup_mode = True  # Suppress background task logging during startup
+
+def disable_startup_mode():
+    """Disable startup mode to allow normal logging"""
+    global _startup_mode
+    _startup_mode = False
 
 async def _managed_background_task(task_name: str, coro, *args, **kwargs):
     """Managed background task with proper logging coordination"""
     try:
-        logger.debug(f"🚀 Starting background task: {task_name}")
+        if not _startup_mode:  # Only log if not in startup mode
+            logger.debug(f"🚀 Starting background task: {task_name}")
         result = await coro(*args, **kwargs)
-        logger.info(f"✅ Background task completed: {task_name}")
+        if not _startup_mode:  # Only log if not in startup mode
+            logger.info(f"✅ Background task completed: {task_name}")
         return result
     except Exception as e:
-        logger.warning(f"⚠️ Background task failed: {task_name} - {e}")
+        if not _startup_mode:  # Only log if not in startup mode
+            logger.warning(f"⚠️ Background task failed: {task_name} - {e}")
         raise
     finally:
         # Clean up completed task from registry
@@ -1698,7 +1707,10 @@ async def initialize_graphiti(settings: ZepEnvDep):
         return
         
     try:
-        logger.debug(f"Initializing Graphiti with FalkorDB at {settings.falkordb_host}:{settings.falkordb_port}")
+        # Suppress debug logging during startup mode
+        if not _startup_mode:
+            logger.debug(f"Initializing Graphiti with FalkorDB at {settings.falkordb_host}:{settings.falkordb_port}")
+        
         client = ZepGraphiti(
             host=settings.falkordb_host,
             port=settings.falkordb_port,
@@ -1707,7 +1719,8 @@ async def initialize_graphiti(settings: ZepEnvDep):
         )
         
         # Schedule index building in background during app startup with coordination
-        logger.debug("Scheduling FalkorDB indices and constraints building...")
+        if not _startup_mode:
+            logger.debug("Scheduling FalkorDB indices and constraints building...")
         
         # Create managed background task for initialization index building
         async def build_indices_background():

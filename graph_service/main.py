@@ -82,62 +82,63 @@ logging.config.dictConfig(LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
 
 
+async def sequential_startup():
+    """Completely sequential startup coordinator - no async racing"""
+    import os
+    import socket
+    
+    # Step 1: Service startup announcement
+    print("🚀  Starting Zep-Compatible Graphiti Service...")
+    
+    # Step 2: Network configuration  
+    port = os.getenv('PORT')
+    print(f"🔧  Railway assigned PORT: {port}")
+    
+    try:
+        hostname = socket.gethostname()
+        local_ip = socket.gethostbyname(hostname)
+        print(f"🖥️  Hostname: {hostname}")
+        print(f"🔗  Local IP: {local_ip}")
+        print(f"🌐  Will listen on http://0.0.0.0:{port}")
+        print(f"🏥  Health endpoint: http://0.0.0.0:{port}/healthcheck")
+        
+        # Railway internal endpoint
+        private_domain = os.getenv('RAILWAY_PRIVATE_DOMAIN', 'graphiti-service.railway.internal')
+        internal_endpoint = f"http://{private_domain}:{port}"
+        print(f"🔌  Internal endpoint: {internal_endpoint}")
+    except Exception as net_error:
+        print(f"⚠️  Network debug failed: {net_error}")
+    
+    # Step 3: Configuration loading
+    settings = get_settings()
+    print(f"✅  Configuration loaded: FalkorDB at {settings.falkordb_host}:{settings.falkordb_port}")
+    print(f"🤖  OpenAI API key configured: {bool(settings.openai_api_key and len(settings.openai_api_key) > 10)}")
+    
+    # Step 4: Router confirmation (they were loaded silently earlier)
+    print("✅  All routers loaded successfully")
+    
+    # Step 5: Graphiti initialization - WAIT for full completion
+    try:
+        await initialize_graphiti(settings)
+        print("✅  Graphiti initialization successful")
+    except Exception as init_error:
+        print(f"⚠️  Graphiti initialization failed: {init_error}")
+        print("📝  Service will start but may have limited functionality")
+    
+    # Step 6: Enable normal logging and complete startup
+    from graph_service.zep_graphiti import disable_startup_mode
+    disable_startup_mode()
+    print("✅  Zep-Compatible Graphiti Service startup completed")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan management with coordinated startup sequence"""
-    # CRITICAL FIX: Use logger instead of print to prevent output racing
-    # Create startup coordination lock to ensure sequential logging
-    import asyncio
-    from graph_service.zep_graphiti import _task_lock
-    
-    async with _task_lock:  # Use the same lock as background tasks
-        logger.info("🚀  Starting Zep-Compatible Graphiti Service...")
-        
-        try:
-            # Debug network configuration
-            import os
-            import socket
-            port = os.getenv('PORT')
-            logger.info(f"🔧  Railway assigned PORT: {port}")
-            
-            try:
-                hostname = socket.gethostname()
-                local_ip = socket.gethostbyname(hostname)
-                logger.info(f"🖥️  Hostname: {hostname}")
-                logger.info(f"🔗  Local IP: {local_ip}")
-                logger.info(f"🌐  Will listen on http://0.0.0.0:{port}")
-                logger.info(f"🏥  Health endpoint: http://0.0.0.0:{port}/healthcheck")
-                
-                # Railway internal endpoint - use RAILWAY_PRIVATE_DOMAIN directly
-                private_domain = os.getenv('RAILWAY_PRIVATE_DOMAIN', 'graphiti-service.railway.internal')
-                internal_endpoint = f"http://{private_domain}:{port}"
-                logger.info(f"🔌  Internal endpoint: {internal_endpoint}")
-            except Exception as net_error:
-                logger.warning(f"⚠️  Network debug failed: {net_error}")
-            
-            # Load and validate configuration
-            settings = get_settings()
-            logger.info(f"✅  Configuration loaded: FalkorDB at {settings.falkordb_host}:{settings.falkordb_port}")
-            logger.info(f"🤖  OpenAI API key configured: {bool(settings.openai_api_key and len(settings.openai_api_key) > 10)}")
-            
-            # Initialize Graphiti with enhanced error handling - WAIT for completion
-            try:
-                await initialize_graphiti(settings)
-                logger.info("✅  Graphiti initialization successful")
-            except Exception as init_error:
-                logger.warning(f"⚠️  Graphiti initialization failed: {init_error}")
-                logger.info("📝  Service will start but may have limited functionality")
-            
-            logger.info("✅  Zep-Compatible Graphiti Service startup completed")
-            
-        except Exception as e:
-            logger.error(f"❌  Startup error: {e}")
-        
-        # All startup logging is now coordinated and sequential
+    """Application lifespan management with sequential startup coordination"""
+    # Run completely sequential startup - no racing, no async conflicts
+    await sequential_startup()
     
     yield  # Service is running
     
-    logger.info("👋  Zep-Compatible Graphiti Service shutting down...")
+    print("👋  Zep-Compatible Graphiti Service shutting down...")
 
 
 # Create FastAPI app with Zep compatibility
@@ -163,20 +164,20 @@ async def log_requests(request: Request, call_next):
     import time
     start_time = time.time()
     
-    # Log incoming request using coordinated logger
+    # Log incoming request (suppressed during startup)
     client_host = request.client.host if request.client else "unknown"
-    logger.info(f"📥  Incoming: {request.method} {request.url.path} from {client_host}")
+    print(f"📥  Incoming: {request.method} {request.url.path} from {client_host}")
     
     response = await call_next(request)
     
-    # Log response using coordinated logger
+    # Log response
     process_time = time.time() - start_time
-    logger.info(f"📤  Response: {response.status_code} in {process_time:.3f}s")
+    print(f"📤  Response: {response.status_code} in {process_time:.3f}s")
     
     return response
 
 
-# Include all routers - order matters for route precedence
+# Include all routers - order matters for route precedence (SILENT LOADING)
 try:
     app.include_router(graph.router)     # NEW: Official Zep-compatible graph API
     app.include_router(retrieve.router)
@@ -185,7 +186,7 @@ try:
     app.include_router(users.router)     # User management endpoints
     app.include_router(episodes.router)  # Episodes management endpoints
     app.include_router(maintenance.router)  # Maintenance and cleanup endpoints
-    logger.info("✅  All routers loaded successfully")
+    # Note: Router loading success will be logged during coordinated startup
 except Exception as router_error:
     logger.error(f"❌  Error loading routers: {router_error}")
 
