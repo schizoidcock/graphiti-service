@@ -193,6 +193,11 @@ class FalkorDriver(GraphDriver):
             params['query'] = escape_falkordb_query(str(original_query))
             logger.debug(f"FalkorDB query escaped: '{original_query}' → '{params['query']}'")
 
+        # DEBUG: Log parameter types to identify unary + string issues
+        for key, value in params.items():
+            if isinstance(value, str) and key in ['reference_time', 'valid_at', 'created_at']:
+                logger.debug(f"FalkorDB parameter {key}: '{value}' (type: {type(value)})")
+
         try:
             result = await graph.query(cypher_query_, params)  # type: ignore[reportUnknownArgumentType]
         except Exception as e:
