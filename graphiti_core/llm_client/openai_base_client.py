@@ -118,8 +118,15 @@ class BaseOpenAIClient(LLMClient):
         """Handle structured response parsing and validation."""
         response_object = response.output_text
 
+        # DEBUG: Log what we're getting from OpenAI
+        logger.debug(f"OpenAI response.output_text: {response_object} (type: {type(response_object)})")
+
         if response_object:
-            return json.loads(response_object)
+            try:
+                return json.loads(response_object)
+            except Exception as parse_error:
+                logger.error(f"Failed to parse OpenAI response: {parse_error}, response_object: {response_object}")
+                raise Exception(f"Failed to parse OpenAI response: {parse_error}")
         elif hasattr(response, 'refusal') and response.refusal:
             raise RefusalError(response.refusal)
         else:
