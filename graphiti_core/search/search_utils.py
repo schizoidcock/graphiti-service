@@ -450,7 +450,11 @@ async def node_bfs_search(
     if bfs_origin_node_uuids is None:
         return []
 
-    filter_query, filter_params = node_search_filter_query_constructor(search_filter, driver.provider)
+    filter_queries, filter_params = node_search_filter_query_constructor(search_filter, driver.provider)
+    
+    filter_query = ''
+    if filter_queries:
+        filter_query = ' AND ' + (' AND '.join(filter_queries))
 
     query = (
         f"""
@@ -706,8 +710,12 @@ async def get_relevant_nodes(
     # vector similarity search over entity names
     query_params: dict[str, Any] = {}
 
-    filter_query, filter_params = node_search_filter_query_constructor(search_filter, driver.provider)
+    filter_queries, filter_params = node_search_filter_query_constructor(search_filter, driver.provider)
     query_params.update(filter_params)
+    
+    filter_query = ''
+    if filter_queries:
+        filter_query = ' WHERE ' + (' AND '.join(filter_queries))
 
     query = (
         """
