@@ -1,6 +1,6 @@
 # Graphiti API Service - Optimized for fast builds
 # FastAPI service that connects to standalone FalkorDB
-FROM python:3.11-slim
+FROM python:3.13.7-slim
 
 # Set working directory
 WORKDIR /app
@@ -22,7 +22,7 @@ COPY requirements.txt .
 # CRITICAL FIX: Use proper pip cache directory with Railway service ID
 # Pip cache directory: ~/.cache/pip (expands to /root/.cache/pip)
 # Railway service ID: f1aa2989-4471-40e3-8919-eaf59d38f4a1
-RUN --mount=type=cache,id=s/f1aa2989-4471-40e3-8919-eaf59d38f4a1-~/.cache/pip,target=/root/.cache/pip \
+RUN --mount=type=cache,id=s/f1aa2989-4471-40e3-8919-eaf59d38f4a1-~/.cache/pip,target=/app/.cache/pip \
     pip install -r requirements.txt
 
 # Copy application code AFTER dependencies are installed
