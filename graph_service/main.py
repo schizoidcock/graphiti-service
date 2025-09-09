@@ -139,6 +139,19 @@ async def sequential_startup():
         private_domain = os.getenv('RAILWAY_PRIVATE_DOMAIN', 'graphiti-service.railway.internal')
         internal_endpoint = f"http://{private_domain}:{port}"
         print(f"🔌  Internal endpoint: {internal_endpoint}")
+        
+        # Additional network diagnostics
+        import subprocess
+        try:
+            # Check if we can bind to the port (diagnostic)
+            test_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            test_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            test_socket.bind(('0.0.0.0', int(port)))
+            test_socket.close()
+            print(f"✅  Port {port} is available for binding")
+        except Exception as port_test_error:
+            print(f"⚠️  Port binding test failed: {port_test_error}")
+            
     except Exception as net_error:
         print(f"⚠️  Network debug failed: {net_error}")
     

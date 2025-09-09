@@ -39,6 +39,11 @@ USER app
 # Set environment variables
 ENV PYTHONPATH=/app
 
+# Add health check to verify service is responding
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:${PORT}/healthcheck || exit 1
+
 # Start the FastAPI server with debug logging - use Railway's PORT  
 # Use 0.0.0.0 to bind to all interfaces (IPv4 and IPv6 compatible)
-CMD ["sh", "-c", "python -m uvicorn graph_service.main:app --host 0.0.0.0 --port ${PORT} --log-level info --access-log"]
+# Add brief startup delay to ensure proper initialization
+CMD ["sh", "-c", "echo '🚀 Starting uvicorn server...' && python -m uvicorn graph_service.main:app --host 0.0.0.0 --port ${PORT} --log-level info --access-log"]
