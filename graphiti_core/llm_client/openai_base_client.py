@@ -120,10 +120,10 @@ class BaseOpenAIClient(LLMClient):
 
         if response_object:
             return json.loads(response_object)
-        elif response_object.refusal:
-            raise RefusalError(response_object.refusal)
+        elif hasattr(response, 'refusal') and response.refusal:
+            raise RefusalError(response.refusal)
         else:
-            raise Exception(f'Invalid response from LLM: {response_object.model_dump()}')
+            raise Exception(f'Invalid response from LLM: {response}')
 
     def _handle_json_response(self, response: Any) -> dict[str, Any]:
         """Handle JSON response parsing."""
