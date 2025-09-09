@@ -81,7 +81,7 @@ class OpenAIClient(BaseOpenAIClient):
             "model": model,
             "input": messages,
             "temperature": temperature,
-            "max_completion_tokens": max_tokens,  # Changed from max_output_tokens to max_completion_tokens
+            "max_output_tokens": max_tokens,
             "text_format": response_model,
         }
         
