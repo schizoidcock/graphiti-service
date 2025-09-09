@@ -17,6 +17,19 @@ limitations under the License.
 import logging
 from typing import TYPE_CHECKING, Any
 
+try:
+    import boto3
+    from opensearchpy import OpenSearch
+    from opensearchpy.connection.http_urllib3 import Urllib3HttpConnection
+    from opensearchpy_aws import Urllib3AWSV4SignerAuth
+    _HAS_OPENSEARCH = True
+except ImportError:
+    boto3 = None
+    OpenSearch = None
+    Urllib3AWSV4SignerAuth = None
+    Urllib3HttpConnection = None
+    _HAS_OPENSEARCH = False
+
 if TYPE_CHECKING:
     from falkordb import Graph as FalkorGraph
     from falkordb.asyncio import FalkorDB
@@ -83,6 +96,8 @@ class FalkorDriver(GraphDriver):
         password: str | None = None,
         falkor_db: FalkorDB | None = None,
         database: str = 'default_db',
+        aoss_host: str | None = None,
+        aoss_port: int | None = None,
     ):
         """
         Initialize the FalkorDB driver.
@@ -90,6 +105,16 @@ class FalkorDriver(GraphDriver):
         FalkorDB is a multi-tenant graph database.
         To connect, provide the host and port.
         The default parameters assume a local (on-premises) FalkorDB instance.
+        
+        Args:
+            host: FalkorDB host address
+            port: FalkorDB port number  
+            username: FalkorDB username (optional)
+            password: FalkorDB password (optional)
+            falkor_db: Existing FalkorDB instance (optional)
+            database: Database name
+            aoss_host: AWS OpenSearch Service host (optional)
+            aoss_port: AWS OpenSearch Service port (optional)
         """
         super().__init__()
 
@@ -103,6 +128,25 @@ class FalkorDriver(GraphDriver):
             
         # Configure Redis to avoid persistence issues on Railway
         self._configure_redis_for_railway()
+
+        # Initialize OpenSearch client if configured
+        self.aoss_client = None
+        if aoss_host and aoss_port and boto3 is not None:
+            try:
+                session = boto3.Session()
+                self.aoss_client = OpenSearch(  # type: ignore
+                    hosts=[{'host': aoss_host, 'port': aoss_port}],
+                    http_auth=Urllib3AWSV4SignerAuth(  # type: ignore
+                        session.get_credentials(), session.region_name, 'aoss'
+                    ),
+                    use_ssl=True,
+                    verify_certs=True,
+                    connection_class=Urllib3HttpConnection,
+                    pool_maxsize=20,
+                )  # type: ignore
+            except Exception as e:
+                logger.warning(f'Failed to initialize OpenSearch client: {e}')
+                self.aoss_client = None
 
         self.fulltext_syntax = '@'  # FalkorDB uses a redisearch-like syntax for fulltext queries see https://redis.io/docs/latest/develop/ai/search-and-query/query/full-text/
 
