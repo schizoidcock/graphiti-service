@@ -544,7 +544,7 @@ async def community_fulltext_search(
         return []
 
     query = (
-        get_nodes_query(driver.provider, 'community_name', '$query')
+        get_nodes_query('community_name', '$query', limit=limit, provider=driver.provider)
         + """
         YIELD node AS n, score
         WHERE n.group_id IN $group_ids
@@ -581,18 +581,18 @@ async def community_similarity_search(
 
     group_filter_query: LiteralString = ''
     if group_ids is not None:
-        group_filter_query += 'WHERE n.group_id IN $group_ids'
+        group_filter_query += 'WHERE c.group_id IN $group_ids'
         query_params['group_ids'] = group_ids
 
     query = (
         """
-        MATCH (n:Community)
+        MATCH (c:Community)
         """
         + group_filter_query
         + """
-        WITH n,
+        WITH c,
         """
-        + get_vector_cosine_func_query('n.name_embedding', '$search_vector', driver.provider)
+        + get_vector_cosine_func_query('c.name_embedding', '$search_vector', driver.provider)
         + """ AS score
         WHERE score > $min_score
         RETURN
@@ -722,7 +722,7 @@ async def get_relevant_nodes(
         WHERE score > $min_score
         WITH node, collect(n)[..$limit] AS top_vector_nodes, collect(n.uuid) AS vector_node_uuids
         """
-        + get_nodes_query(driver.provider, 'node_name_and_summary', 'node.fulltext_query')
+        + get_nodes_query('node_name_and_summary', 'node.fulltext_query', limit=limit, provider=driver.provider)
         + """
         YIELD node AS m
         WHERE m.group_id = $group_id
@@ -796,7 +796,7 @@ async def get_relevant_edges(
 
     query_params: dict[str, Any] = {}
 
-    filter_query, filter_params = edge_search_filter_query_constructor(search_filter)
+    filter_query, filter_params = edge_search_filter_query_constructor(search_filter, driver.provider)
     query_params.update(filter_params)
 
     query = (
@@ -864,7 +864,7 @@ async def get_edge_invalidation_candidates(
 
     query_params: dict[str, Any] = {}
 
-    filter_query, filter_params = edge_search_filter_query_constructor(search_filter)
+    filter_query, filter_params = edge_search_filter_query_constructor(search_filter, driver.provider)
     query_params.update(filter_params)
 
     query = (
