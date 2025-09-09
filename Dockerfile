@@ -44,6 +44,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:${PORT}/healthcheck || exit 1
 
 # Start the FastAPI server with debug logging - use Railway's PORT  
-# Use 0.0.0.0 to bind to all interfaces (IPv4 and IPv6 compatible)
-# Add brief startup delay to ensure proper initialization
-CMD ["sh", "-c", "echo '🚀 Starting uvicorn server...' && python -m uvicorn graph_service.main:app --host 0.0.0.0 --port ${PORT} --log-level info --access-log"]
+# Use :: to bind to all IPv6 interfaces (Railway internal network uses IPv6)
+CMD ["sh", "-c", "echo '🚀 Starting uvicorn server...' && python -m uvicorn graph_service.main:app --host :: --port ${PORT} --log-level info --access-log"]
