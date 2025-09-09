@@ -1574,11 +1574,14 @@ class ZepGraphiti(Graphiti):
                 
                 # Add episode using Graphiti's enhanced method
                 try:
+                    # Structure episode content to clearly indicate speaker for proper entity extraction
+                    episode_content = f"{role_type.title()}: {content}"
+                    
                     await self.enhanced_add_episode(
                         uuid=episode_uuid,
                         group_id=group_id,
                         name=f"{role_type}_message_{i}",
-                        episode_body=content,
+                        episode_body=episode_content,
                         reference_time=datetime.now(timezone.utc),
                         source=role_type,
                         source_description=f"Message from {role_type}"
