@@ -459,8 +459,9 @@ async def node_bfs_search(
     query = (
         f"""
             UNWIND $bfs_origin_node_uuids AS origin_uuid
-            MATCH (origin:Entity|Episodic {{uuid: origin_uuid}})-[:RELATES_TO|MENTIONS*1..{bfs_max_depth}]->(n:Entity)
-            WHERE n.group_id = origin.group_id
+            MATCH (origin {{uuid: origin_uuid}})-[:RELATES_TO|MENTIONS*1..{bfs_max_depth}]->(n:Entity)
+            WHERE (origin:Entity OR origin:Episodic)
+            AND n.group_id = origin.group_id
             AND origin.group_id IN $group_ids
         """
         + filter_query
@@ -804,8 +805,12 @@ async def get_relevant_edges(
 
     query_params: dict[str, Any] = {}
 
-    filter_query, filter_params = edge_search_filter_query_constructor(search_filter, driver.provider)
+    filter_queries, filter_params = edge_search_filter_query_constructor(search_filter, driver.provider)
     query_params.update(filter_params)
+
+    filter_query = ''
+    if filter_queries:
+        filter_query = ' WHERE ' + (' AND '.join(filter_queries))
 
     query = (
         """
@@ -872,8 +877,12 @@ async def get_edge_invalidation_candidates(
 
     query_params: dict[str, Any] = {}
 
-    filter_query, filter_params = edge_search_filter_query_constructor(search_filter, driver.provider)
+    filter_queries, filter_params = edge_search_filter_query_constructor(search_filter, driver.provider)
     query_params.update(filter_params)
+
+    filter_query = ''
+    if filter_queries:
+        filter_query = ' AND ' + (' AND '.join(filter_queries))
 
     query = (
         """
