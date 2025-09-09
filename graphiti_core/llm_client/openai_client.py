@@ -82,8 +82,6 @@ class OpenAIClient(BaseOpenAIClient):
             temperature=temperature,
             max_output_tokens=max_tokens,
             text_format=response_model,  # type: ignore
-            reasoning={'effort': reasoning} if reasoning is not None else None,  # type: ignore
-            text={'verbosity': verbosity} if verbosity is not None else None,  # type: ignore
         )
 
         return response
