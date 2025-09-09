@@ -33,11 +33,11 @@ async def add_episode_async(graphiti, message_uuid: str, group_id: str, session_
         result = await graphiti.enhanced_add_episode(
             uuid=message_uuid,
             group_id=group_id,
-            name=f"{session_message.role.title()} Message",
+            name=f"{session_message.role_type.title()} Message",
             episode_body=session_message.content,
             reference_time=current_time,
             source=EpisodeType.message,
-            source_description=f"{session_message.role} message in session {session_id}"
+            source_description=f"{session_message.role_type} message in session {session_id}"
         )
         
         processing_time = time.time() - start_time

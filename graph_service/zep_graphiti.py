@@ -1545,7 +1545,7 @@ class ZepGraphiti(Graphiti):
                 
                 # Extract message data
                 msg_uuid = msg.get('uuid', '')
-                role = msg.get('role', 'user')
+                role_type = msg.get('role_type', msg.get('role', 'user'))  # Prefer role_type over role
                 content = msg.get('content', '')
                 
                 if add_group_id_prefix and msg_uuid:
@@ -1562,11 +1562,11 @@ class ZepGraphiti(Graphiti):
                     await self.enhanced_add_episode(
                         uuid=episode_uuid,
                         group_id=group_id,
-                        name=f"{role}_message_{i}",
+                        name=f"{role_type}_message_{i}",
                         episode_body=content,
                         reference_time=datetime.now(timezone.utc),
-                        source=role,
-                        source_description=f"Message from {role}"
+                        source=role_type,
+                        source_description=f"Message from {role_type}"
                     )
                     logger.debug(f"Added episode {episode_uuid} for group {group_id}")
                 except Exception as episode_error:
