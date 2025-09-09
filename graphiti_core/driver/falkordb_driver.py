@@ -73,6 +73,7 @@ class FalkorDriverSession(GraphDriverSession):
 
 class FalkorDriver(GraphDriver):
     provider = GraphProvider.FALKORDB
+    aoss_client: None = None
 
     def __init__(
         self,
