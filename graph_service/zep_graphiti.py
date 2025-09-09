@@ -13,7 +13,7 @@ from graphiti_core.driver.falkordb_driver import FalkorDriver  # type: ignore
 from graphiti_core.edges import EntityEdge  # type: ignore
 from graphiti_core.errors import EdgeNotFoundError, GroupsEdgesNotFoundError, NodeNotFoundError
 from graphiti_core.llm_client import LLMClient  # type: ignore
-from graphiti_core.nodes import EntityNode, EpisodicNode  # type: ignore
+from graphiti_core.nodes import EntityNode, EpisodicNode, EpisodeType  # type: ignore
 
 from graph_service.config import ZepEnvDep
 from graph_service.dto import FactResult
@@ -1585,7 +1585,7 @@ class ZepGraphiti(Graphiti):
                         name=f"{safe_role_type}_message_{i}",
                         episode_body=episode_content,
                         reference_time=datetime.now(timezone.utc),
-                        source=safe_role_type,
+                        source=EpisodeType.message,  # Use EpisodeType enum instead of string
                         source_description=f"Message from {safe_role_type}"
                     )
                     logger.debug(f"Added episode {episode_uuid} for group {group_id}")

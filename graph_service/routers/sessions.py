@@ -41,7 +41,7 @@ async def add_episode_async(graphiti, message_uuid: str, group_id: str, session_
             name=f"{safe_role_type.title()} Message",
             episode_body=episode_content,
             reference_time=current_time,
-            source=safe_role_type,  # Use role_type as source for proper entity classification
+            source=EpisodeType.message,  # Use EpisodeType enum instead of string
             source_description=f"{safe_role_type} message in session {session_id}"
         )
         
