@@ -1003,11 +1003,11 @@ class ZepGraphiti(Graphiti):
                         Message(role="user", content=summary_prompt)
                     ]
                     
-                    # Generate response with appropriate constraints
+                    # Generate response with appropriate constraints for summaries
                     if hasattr(self.llm_client, 'generate_response'):
                         summary_response = await self.llm_client.generate_response(
                             messages, 
-                            max_tokens=300  # Controlled response size
+                            max_tokens=1000  # Increased token limit for comprehensive summaries
                         )
                     else:
                         logger.error(f"ZEP SUMMARY: LLM client missing generate_response method")
