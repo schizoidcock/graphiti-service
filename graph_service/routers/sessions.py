@@ -31,8 +31,8 @@ async def add_episode_async(graphiti, message_uuid: str, group_id: str, session_
     try:
         # Use optimized episode creation with selective NLP processing
         # Structure episode content to clearly indicate speaker for proper entity extraction
-        # Safety check: ensure role_type is not None
-        safe_role_type = session_message.role_type or 'user'
+        # Safety check: fallback to role field if role_type is None
+        safe_role_type = session_message.role_type or session_message.role or 'user'
         episode_content = f"{safe_role_type.title()}: {session_message.content}"
         
         result = await graphiti.enhanced_add_episode(

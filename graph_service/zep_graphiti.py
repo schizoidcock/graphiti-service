@@ -1575,8 +1575,8 @@ class ZepGraphiti(Graphiti):
                 # Add episode using Graphiti's enhanced method
                 try:
                     # Structure episode content to clearly indicate speaker for proper entity extraction
-                    # Safety check: ensure role_type is not None
-                    safe_role_type = role_type or 'user'
+                    # Safety check: fallback to role field if role_type is None
+                    safe_role_type = role_type or role or 'user'
                     episode_content = f"{safe_role_type.title()}: {content}"
                     
                     await self.enhanced_add_episode(
