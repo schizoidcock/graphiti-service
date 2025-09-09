@@ -357,11 +357,18 @@ async def add_memory_to_session(
         current_time = datetime.now(timezone.utc)
         
         # Create structured message
+        # Determine appropriate role_type default based on role field
+        default_role_type = 'user'
+        if message.get('role') == 'assistant':
+            default_role_type = 'assistant'
+        elif message.get('role') == 'system':
+            default_role_type = 'system'
+        
         session_message = SessionMessage(
             uuid=message_uuid,
             created_at=current_time,
             role=message.get('role', 'user'),
-            role_type=message.get('role_type', 'user'),  # Always use role_type, default to 'user'
+            role_type=message.get('role_type', default_role_type),  # Smart default based on role
             content=message.get('content', ''),
             metadata=message.get('metadata', {}),
             token_count=message.get('token_count')

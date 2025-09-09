@@ -1545,7 +1545,15 @@ class ZepGraphiti(Graphiti):
                 
                 # Extract message data
                 msg_uuid = msg.get('uuid', '')
-                role_type = msg.get('role_type', 'user')  # Always use role_type, default to 'user'
+                
+                # Determine appropriate role_type default based on role field
+                default_role_type = 'user'
+                if msg.get('role') == 'assistant':
+                    default_role_type = 'assistant'
+                elif msg.get('role') == 'system':
+                    default_role_type = 'system'
+                
+                role_type = msg.get('role_type', default_role_type)  # Smart default based on role
                 content = msg.get('content', '')
                 
                 if add_group_id_prefix and msg_uuid:
