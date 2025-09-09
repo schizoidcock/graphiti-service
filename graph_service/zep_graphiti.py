@@ -1547,11 +1547,18 @@ class ZepGraphiti(Graphiti):
                 msg_uuid = msg.get('uuid', '')
                 
                 # Determine appropriate role_type default based on role field
-                default_role_type = 'user'
-                if msg.get('role') == 'assistant':
-                    default_role_type = 'assistant'
-                elif msg.get('role') == 'system':
+                # Enum order: norole, system, user, assistant, function, tool
+                role = msg.get('role', 'user')
+                if role == 'system':
                     default_role_type = 'system'
+                elif role == 'assistant':
+                    default_role_type = 'assistant'
+                elif role == 'function':
+                    default_role_type = 'function'
+                elif role == 'tool':
+                    default_role_type = 'tool'
+                else:  # user or any other value
+                    default_role_type = 'user'
                 
                 role_type = msg.get('role_type', default_role_type)  # Smart default based on role
                 content = msg.get('content', '')

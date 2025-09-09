@@ -358,11 +358,18 @@ async def add_memory_to_session(
         
         # Create structured message
         # Determine appropriate role_type default based on role field
-        default_role_type = 'user'
-        if message.get('role') == 'assistant':
-            default_role_type = 'assistant'
-        elif message.get('role') == 'system':
+        # Enum order: norole, system, user, assistant, function, tool
+        role = message.get('role', 'user')
+        if role == 'system':
             default_role_type = 'system'
+        elif role == 'assistant':
+            default_role_type = 'assistant'
+        elif role == 'function':
+            default_role_type = 'function'
+        elif role == 'tool':
+            default_role_type = 'tool'
+        else:  # user or any other value
+            default_role_type = 'user'
         
         session_message = SessionMessage(
             uuid=message_uuid,
