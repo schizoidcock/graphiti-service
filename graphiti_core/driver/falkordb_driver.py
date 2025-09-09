@@ -185,6 +185,14 @@ class FalkorDriver(GraphDriver):
         # Convert datetime objects to ISO strings (FalkorDB does not support datetime objects directly)
         params = convert_datetimes_to_strings(dict(kwargs))
 
+        # CRITICAL FIX: Escape special characters in fulltext search queries for FalkorDB
+        if 'db.idx.fulltext.queryNodes' in cypher_query_ and 'query' in params:
+            # Import here to avoid circular imports
+            from graphiti_core.graph_queries import escape_falkordb_query
+            original_query = params['query']
+            params['query'] = escape_falkordb_query(str(original_query))
+            logger.debug(f"FalkorDB query escaped: '{original_query}' → '{params['query']}'")
+
         try:
             result = await graph.query(cypher_query_, params)  # type: ignore[reportUnknownArgumentType]
         except Exception as e:
