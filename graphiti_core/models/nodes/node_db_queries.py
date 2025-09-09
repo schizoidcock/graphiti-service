@@ -124,16 +124,16 @@ def get_entity_node_save_bulk_query(provider: GraphProvider, nodes: list[dict]) 
 
 def get_entity_node_return_query(provider: GraphProvider) -> str:
     # `name_embedding` is not returned by default and must be loaded manually using `load_name_embedding()`.
-    if provider == GraphProvider.FALKORDB:
-        return """
-            n.uuid AS uuid,
-            n.name AS name,
-            n.group_id AS group_id,
-            n.created_at AS created_at,
-            n.summary AS summary,
-            labels(n) AS labels,
-            properties(n) AS attributes
-        """
+    # FalkorDB-only implementation
+    return """
+        n.uuid AS uuid,
+        n.name AS name,
+        n.group_id AS group_id,
+        n.created_at AS created_at,
+        n.summary AS summary,
+        labels(n) AS labels,
+        properties(n) AS attributes
+    """
 
 def get_community_node_save_query(provider: GraphProvider) -> str:
     # FalkorDB-only implementation - handle vector embedding separately to avoid type conflicts
