@@ -406,7 +406,7 @@ async def node_similarity_search(
     search_vector_var = '$search_vector'
 
     query = (
-        + """
+        """
         MATCH (n:Entity)
         """
         + filter_query
@@ -585,7 +585,7 @@ async def community_similarity_search(
         query_params['group_ids'] = group_ids
 
     query = (
-        + """
+        """
         MATCH (n:Community)
         """
         + group_filter_query
@@ -710,7 +710,7 @@ async def get_relevant_nodes(
     query_params.update(filter_params)
 
     query = (
-        + """
+        """
         UNWIND $nodes AS node
         MATCH (n:Entity {group_id: $group_id})
         """
@@ -800,7 +800,7 @@ async def get_relevant_edges(
     query_params.update(filter_params)
 
     query = (
-        + """
+        """
         UNWIND $edges AS edge
         MATCH (n:Entity {uuid: edge.source_node_uuid})-[e:RELATES_TO {group_id: edge.group_id}]-(m:Entity {uuid: edge.target_node_uuid})
         """
@@ -868,7 +868,7 @@ async def get_edge_invalidation_candidates(
     query_params.update(filter_params)
 
     query = (
-        + """
+        """
         UNWIND $edges AS edge
         MATCH (n:Entity)-[e:RELATES_TO {group_id: edge.group_id}]->(m:Entity)
         WHERE n.uuid IN [edge.source_node_uuid, edge.target_node_uuid] OR m.uuid IN [edge.target_node_uuid, edge.source_node_uuid]
