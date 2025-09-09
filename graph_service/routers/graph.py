@@ -74,7 +74,9 @@ async def search_graph(
     
     # Check cache first for fast responses (import search_cache)
     from graph_service.search_cache import search_cache
-    cache_key = f"graph_{user_id}_{request.query}_{request.max_results}_{request.search_type}"
+    # SECURITY FIX: Include database name to prevent cross-user cache contamination
+    database_name = graphiti._database_name if hasattr(graphiti, '_database_name') else user_id
+    cache_key = f"graph_{database_name}_{request.query}_{request.max_results}_{request.search_type}"
     cached_result = search_cache.get_by_key(cache_key)
     if cached_result:
         logger.info(f"⚡ Cache HIT for graph search: {request.query[:50]}...")
@@ -203,6 +205,7 @@ async def search_graph(
             search_metadata={
                 "execution_time_ms": round(execution_time_ms, 2),
                 "user_id": user_id,
+                "database_name": database_name,  # Add database name for transparency
                 "group_ids": search_group_ids,
                 "query_processed": request.query,
                 "search_type": request.search_type,
@@ -216,7 +219,7 @@ async def search_graph(
             }
         )
         
-        # Cache the response for future requests
+        # Cache the response for future requests (with database-specific key for user isolation)
         search_cache.put_by_key(cache_key, response)
         logger.info(f"⚡ Graph search completed in {execution_time_ms:.2f}ms, cached for future requests")
         
