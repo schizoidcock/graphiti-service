@@ -450,7 +450,7 @@ async def node_bfs_search(
     if bfs_origin_node_uuids is None:
         return []
 
-    filter_query, filter_params = node_search_filter_query_constructor(search_filter)
+    filter_query, filter_params = node_search_filter_query_constructor(search_filter, driver.provider)
 
     query = (
         f"""
@@ -546,8 +546,8 @@ async def community_fulltext_search(
     query = (
         get_nodes_query('community_name', '$query', limit=limit, provider=driver.provider)
         + """
-        YIELD node AS n, score
-        WHERE n.group_id IN $group_ids
+        YIELD node AS c, score
+        WHERE c.group_id IN $group_ids
         RETURN
         """
         + COMMUNITY_NODE_RETURN
@@ -706,7 +706,7 @@ async def get_relevant_nodes(
     # vector similarity search over entity names
     query_params: dict[str, Any] = {}
 
-    filter_query, filter_params = node_search_filter_query_constructor(search_filter)
+    filter_query, filter_params = node_search_filter_query_constructor(search_filter, driver.provider)
     query_params.update(filter_params)
 
     query = (
