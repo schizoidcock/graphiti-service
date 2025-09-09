@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Literal
 from pydantic import BaseModel, Field
 from graphiti_core.utils.datetime_utils import utc_now
 
@@ -54,7 +54,9 @@ class SessionMessage(BaseModel):
     uuid: str = Field(..., description='Message UUID')
     created_at: datetime = Field(default_factory=utc_now, description='Message creation time')
     role: str = Field(..., description='Message role (user, assistant, system)')
-    role_type: str = Field(..., description='Role type classification')
+    role_type: Literal['norole', 'system', 'user', 'assistant', 'function', 'tool'] | None = Field(
+        None, description='Role type classification (norole, system, user, assistant, function, tool)'
+    )
     content: str = Field(..., description='Message content')  
     metadata: Dict[str, Any] = Field(default_factory=dict, description='Message metadata')
     token_count: Optional[int] = Field(None, description='Token count for the message')

@@ -375,7 +375,7 @@ async def add_memory_to_session(
             uuid=message_uuid,
             created_at=current_time,
             role=message.get('role', 'user'),
-            role_type=message.get('role_type', default_role_type),  # Smart default based on role
+            role_type=message.get('role_type') or default_role_type,  # Smart default only when None/missing
             content=message.get('content', ''),
             metadata=message.get('metadata', {}),
             token_count=message.get('token_count')

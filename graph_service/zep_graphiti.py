@@ -1560,7 +1560,7 @@ class ZepGraphiti(Graphiti):
                 else:  # user or any other value
                     default_role_type = 'user'
                 
-                role_type = msg.get('role_type', default_role_type)  # Smart default based on role
+                role_type = msg.get('role_type') or default_role_type  # Smart default only when None/missing
                 content = msg.get('content', '')
                 
                 if add_group_id_prefix and msg_uuid:
