@@ -31,16 +31,18 @@ async def add_episode_async(graphiti, message_uuid: str, group_id: str, session_
     try:
         # Use optimized episode creation with selective NLP processing
         # Structure episode content to clearly indicate speaker for proper entity extraction
-        episode_content = f"{session_message.role_type.title()}: {session_message.content}"
+        # Safety check: ensure role_type is not None
+        safe_role_type = session_message.role_type or 'user'
+        episode_content = f"{safe_role_type.title()}: {session_message.content}"
         
         result = await graphiti.enhanced_add_episode(
             uuid=message_uuid,
             group_id=group_id,
-            name=f"{session_message.role_type.title()} Message",
+            name=f"{safe_role_type.title()} Message",
             episode_body=episode_content,
             reference_time=current_time,
-            source=session_message.role_type,  # Use role_type as source for proper entity classification
-            source_description=f"{session_message.role_type} message in session {session_id}"
+            source=safe_role_type,  # Use role_type as source for proper entity classification
+            source_description=f"{safe_role_type} message in session {session_id}"
         )
         
         processing_time = time.time() - start_time

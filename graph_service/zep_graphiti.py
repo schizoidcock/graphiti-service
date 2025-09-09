@@ -1575,16 +1575,18 @@ class ZepGraphiti(Graphiti):
                 # Add episode using Graphiti's enhanced method
                 try:
                     # Structure episode content to clearly indicate speaker for proper entity extraction
-                    episode_content = f"{role_type.title()}: {content}"
+                    # Safety check: ensure role_type is not None
+                    safe_role_type = role_type or 'user'
+                    episode_content = f"{safe_role_type.title()}: {content}"
                     
                     await self.enhanced_add_episode(
                         uuid=episode_uuid,
                         group_id=group_id,
-                        name=f"{role_type}_message_{i}",
+                        name=f"{safe_role_type}_message_{i}",
                         episode_body=episode_content,
                         reference_time=datetime.now(timezone.utc),
-                        source=role_type,
-                        source_description=f"Message from {role_type}"
+                        source=safe_role_type,
+                        source_description=f"Message from {safe_role_type}"
                     )
                     logger.debug(f"Added episode {episode_uuid} for group {group_id}")
                 except Exception as episode_error:
