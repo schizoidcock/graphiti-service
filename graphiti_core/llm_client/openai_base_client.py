@@ -116,6 +116,10 @@ class BaseOpenAIClient(LLMClient):
 
     def _handle_structured_response(self, response: Any) -> dict[str, Any]:
         """Handle structured response parsing and validation."""
+        # Check for refusal first (on the response object, not output_text)
+        if hasattr(response, 'refusal') and response.refusal:
+            raise RefusalError(response.refusal)
+            
         response_object = response.output_text
 
         # DEBUG: Log what we're getting from OpenAI
@@ -127,10 +131,8 @@ class BaseOpenAIClient(LLMClient):
             except Exception as parse_error:
                 logger.error(f"Failed to parse OpenAI response: {parse_error}, response_object: {response_object}")
                 raise Exception(f"Failed to parse OpenAI response: {parse_error}")
-        elif hasattr(response, 'refusal') and response.refusal:
-            raise RefusalError(response.refusal)
         else:
-            raise Exception(f'Invalid response from LLM: {response}')
+            raise Exception(f'Empty response from OpenAI: {response}')
 
     def _handle_json_response(self, response: Any) -> dict[str, Any]:
         """Handle JSON response parsing."""
