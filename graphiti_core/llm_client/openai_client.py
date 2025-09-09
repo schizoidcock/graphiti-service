@@ -76,13 +76,24 @@ class OpenAIClient(BaseOpenAIClient):
         verbosity: str | None = None,
     ):
         """Create a structured completion using OpenAI's beta parse API."""
-        response = await self.client.responses.parse(
-            model=model,
-            input=messages,  # type: ignore
-            temperature=temperature,
-            max_output_tokens=max_tokens,
-            text_format=response_model,  # type: ignore
-        )
+        # Build parameters for OpenAI Responses API according to official spec
+        params = {
+            "model": model,
+            "input": messages,
+            "temperature": temperature,
+            "max_output_tokens": max_tokens,
+            "text_format": response_model,
+        }
+        
+        # Add reasoning parameter if provided (supported by Responses API)
+        if reasoning is not None:
+            params["reasoning"] = {"effort": reasoning}
+            
+        # Add verbosity parameter if provided (supported by Responses API)
+        if verbosity is not None:
+            params["text"] = {"verbosity": verbosity}
+            
+        response = await self.client.responses.parse(**params)
 
         return response
 
