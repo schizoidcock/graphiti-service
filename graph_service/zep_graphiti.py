@@ -25,11 +25,43 @@ logger = logging.getLogger(__name__)
 _background_tasks: Dict[str, asyncio.Task] = {}
 _task_lock = asyncio.Lock()
 _startup_mode = True  # Suppress background task logging during startup
+_initialization_client = None  # Store initialization client for later background work
 
 def disable_startup_mode():
     """Disable startup mode to allow normal logging"""
     global _startup_mode
     _startup_mode = False
+
+async def start_background_tasks():
+    """Start background tasks after startup is complete"""
+    global _initialization_client
+    if _initialization_client:
+        # Now start the background index building
+        async def build_indices_background():
+            try:
+                await _initialization_client.build_indices_and_constraints()
+                return "init_indices_completed"
+            except Exception as e:
+                logger.warning(f"Background index building failed (non-critical): {e}")
+                raise
+            finally:
+                await _initialization_client.close()  # Close the initialization client
+        
+        # Use managed background task system for proper coordination
+        task_name = "init_build_indices_default_db"
+        try:
+            async with _task_lock:
+                if task_name not in _background_tasks:
+                    task = asyncio.create_task(
+                        _managed_background_task(
+                            task_name,
+                            build_indices_background
+                        ),
+                        name=task_name
+                    )
+                    _background_tasks[task_name] = task
+        except Exception as e:
+            logger.warning(f"Failed to schedule initialization index building: {e}")
 
 async def _managed_background_task(task_name: str, coro, *args, **kwargs):
     """Managed background task with proper logging coordination"""
@@ -1701,16 +1733,13 @@ async def get_graphiti_for_user(user_id: str, settings: ZepEnvDep):
 
 
 async def initialize_graphiti(settings: ZepEnvDep):
+    """Initialize Graphiti WITHOUT starting any background tasks during startup"""
     # Use a global flag to prevent multiple initializations
     if hasattr(initialize_graphiti, '_initialized'):
-        logger.info("Graphiti already initialized, skipping...")
         return
         
     try:
-        # Suppress debug logging during startup mode
-        if not _startup_mode:
-            logger.debug(f"Initializing Graphiti with FalkorDB at {settings.falkordb_host}:{settings.falkordb_port}")
-        
+        # Create client but don't start any background tasks yet
         client = ZepGraphiti(
             host=settings.falkordb_host,
             port=settings.falkordb_port,
@@ -1718,46 +1747,15 @@ async def initialize_graphiti(settings: ZepEnvDep):
             password=settings.falkordb_password,
         )
         
-        # Schedule index building in background during app startup with coordination
-        if not _startup_mode:
-            logger.debug("Scheduling FalkorDB indices and constraints building...")
-        
-        # Create managed background task for initialization index building
-        async def build_indices_background():
-            try:
-                await client.build_indices_and_constraints()
-                return "init_indices_completed"
-            except Exception as e:
-                logger.warning(f"Background index building failed (non-critical): {e}")
-                raise
-            finally:
-                await client.close()  # Close the initialization client
-        
-        # Use managed background task system for proper coordination
-        task_name = "init_build_indices_default_db"
-        try:
-            async with _task_lock:
-                if task_name not in _background_tasks:
-                    task = asyncio.create_task(
-                        _managed_background_task(
-                            task_name,
-                            build_indices_background
-                        ),
-                        name=task_name
-                    )
-                    _background_tasks[task_name] = task
-        except Exception as e:
-            logger.warning(f"Failed to schedule initialization index building: {e}")
-            
-        logger.info("Graphiti initialization completed successfully (indices building in background)")
+        # Store client for later background initialization
+        global _initialization_client
+        _initialization_client = client
         
         # Mark as initialized to prevent duplication
         initialize_graphiti._initialized = True
     except Exception as e:
         logger.error(f"Failed to initialize Graphiti: {e}", exc_info=True)
         # Don't raise the exception to prevent app startup failure
-        # The service will still start but NLP features may not work
-        logger.warning("Service starting with limited functionality due to initialization failure")
 
 
 def get_fact_result_from_edge(edge: EntityEdge):

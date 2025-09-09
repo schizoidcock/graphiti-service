@@ -158,9 +158,17 @@ async def sequential_startup():
         print(f"⚠️  Graphiti initialization failed: {init_error}")
         print("📝  Service will start but may have limited functionality")
     
-    # Step 6: Enable normal logging and complete startup
-    from graph_service.zep_graphiti import disable_startup_mode
+    # Step 6: Start background tasks now that startup is complete
+    from graph_service.zep_graphiti import disable_startup_mode, start_background_tasks
     disable_startup_mode()
+    
+    # Start background tasks after main startup sequence is done
+    try:
+        await start_background_tasks()
+        print("✅  Background tasks started successfully")
+    except Exception as bg_error:
+        print(f"⚠️  Background task startup failed (non-critical): {bg_error}")
+    
     print("✅  Zep-Compatible Graphiti Service startup completed")
 
 @asynccontextmanager
