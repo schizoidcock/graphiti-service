@@ -82,9 +82,12 @@ def get_fulltext_indices(provider: GraphProvider) -> list[LiteralString]:
 
 def escape_falkordb_query(query: str) -> str:
     """Escape special characters in FalkorDB RediSearch queries"""
-    # Only escape @ symbol for email addresses - keep it simple
-    # Over-escaping is causing more problems than helping
-    return query.replace('@', '\\@')
+    # Escape critical RediSearch special characters that cause syntax errors
+    # Over-escaping is problematic, but these specific characters break queries
+    return (query
+            .replace('@', '\\@')      # Email addresses
+            .replace('$', '\\$')      # Dollar signs (e.g., $7,000,000)
+            .replace('#', '\\#'))     # Hash symbols
 
 
 def get_nodes_query(name: str, query: str, limit: int, provider: GraphProvider) -> str:
