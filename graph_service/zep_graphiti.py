@@ -13,7 +13,7 @@ from graphiti_core.driver.falkordb_driver import FalkorDriver  # type: ignore
 from graphiti_core.edges import EntityEdge  # type: ignore
 from graphiti_core.errors import EdgeNotFoundError, GroupsEdgesNotFoundError, NodeNotFoundError
 from graphiti_core.llm_client import LLMClient  # type: ignore
-from graphiti_core.nodes import EntityNode, EpisodicNode  # type: ignore
+from graphiti_core.nodes import EntityNode, EpisodicNode, EpisodeType  # type: ignore
 
 from graph_service.config import ZepEnvDep
 from graph_service.dto import FactResult
@@ -21,51 +21,102 @@ from graph_service.response_cache import response_cache
 
 logger = logging.getLogger(__name__)
 
+# CRITICAL FIX: Global async task coordination system
+_background_tasks: Dict[str, asyncio.Task] = {}
+_task_lock = asyncio.Lock()
+_startup_mode = True  # Suppress background task logging during startup
+_initialization_client = None  # Store initialization client for later background work
+
+def disable_startup_mode():
+    """Disable startup mode to allow normal logging"""
+    global _startup_mode
+    _startup_mode = False
+
+async def start_background_tasks():
+    """Start background tasks after startup is complete"""
+    global _initialization_client
+    if _initialization_client:
+        # Now start the background index building
+        async def build_indices_background():
+            try:
+                await _initialization_client.build_indices_and_constraints()
+                return "init_indices_completed"
+            except Exception as e:
+                logger.warning(f"Background index building failed (non-critical): {e}")
+                raise
+            finally:
+                await _initialization_client.close()  # Close the initialization client
+        
+        # Use managed background task system for proper coordination
+        task_name = "init_build_indices_default_db"
+        try:
+            async with _task_lock:
+                if task_name not in _background_tasks:
+                    task = asyncio.create_task(
+                        _managed_background_task(
+                            task_name,
+                            build_indices_background
+                        ),
+                        name=task_name
+                    )
+                    _background_tasks[task_name] = task
+        except Exception as e:
+            logger.warning(f"Failed to schedule initialization index building: {e}")
+
+async def _managed_background_task(task_name: str, coro, *args, **kwargs):
+    """Managed background task with proper logging coordination"""
+    try:
+        if not _startup_mode:  # Only log if not in startup mode
+            logger.debug(f"🚀 Starting background task: {task_name}")
+        result = await coro(*args, **kwargs)
+        if not _startup_mode:  # Only log if not in startup mode
+            logger.info(f"✅ Background task completed: {task_name}")
+        return result
+    except Exception as e:
+        if not _startup_mode:  # Only log if not in startup mode
+            logger.warning(f"⚠️ Background task failed: {task_name} - {e}")
+        raise
+    finally:
+        # Clean up completed task from registry
+        async with _task_lock:
+            _background_tasks.pop(task_name, None)
+
 # Official Zep Entity Types (based on Zep documentation)
 class User(BaseModel):
     """A human that is part of the current chat thread"""
-    entity_name: str = Field(..., description="Name or identifier of the user")
-    entity_summary: str = Field(default="", description="Summary of the user")
+    pass
 
 class Assistant(BaseModel):
     """The AI assistant in the conversation"""
-    entity_name: str = Field(..., description="Name or identifier of the assistant")
-    entity_summary: str = Field(default="", description="Summary of the assistant")
+    pass
 
 class Preference(BaseModel):
     """A user's expressed like, dislike, or preference for something"""
-    entity_name: str = Field(..., description="Name or description of the preference")
-    entity_summary: str = Field(default="", description="Summary of the preference")
+    pass
 
 class Location(BaseModel):
     """A physical or virtual place where activities occur or entities exist"""
-    entity_name: str = Field(..., description="Name of the location")
-    entity_summary: str = Field(default="", description="Summary of the location")
+    pass
 
 class Event(BaseModel):
     """A time-bound activity, occurrence, or experience"""
-    entity_name: str = Field(..., description="Name or description of the event")
-    entity_summary: str = Field(default="", description="Summary of the event")
+    pass
 
 class Object(BaseModel):
     """A physical item, tool, device, or possession"""
-    entity_name: str = Field(..., description="Name or description of the object")
-    entity_summary: str = Field(default="", description="Summary of the object")
+    pass
 
 class Topic(BaseModel):
     """A subject of conversation, interest, or knowledge domain"""
-    entity_name: str = Field(..., description="Name of the topic or subject")
-    entity_summary: str = Field(default="", description="Summary of the topic content")
-    
+    pass
+
 class Organization(BaseModel):
     """A company, institution, group, or formal entity"""
-    entity_name: str = Field(..., description="Name of the organization")
-    entity_summary: str = Field(default="", description="Summary of the organization")
-    
+    pass
+
 class Document(BaseModel):
     """Information content in various forms"""
-    entity_name: str = Field(..., description="Name or title of the document")
-    entity_summary: str = Field(default="", description="Summary of the document content")
+    pass
 
 # Function to get the official Zep entity types
 def get_zep_entity_types() -> dict[str, type[BaseModel]]:
@@ -155,9 +206,14 @@ def extract_user_id_from_request(request: Request) -> str | None:
             logger.info(f"✅ Found user_id from sessions_store: {user_id}")
             return user_id
         
-        logger.warning(f"⚠️ Session {session_id} not found in sessions_store, generating auto_user")
-        # Fallback: generate user_id from session_id for auto-created sessions
-        return f"auto_user_{session_id[:8]}"
+        logger.warning(f"⚠️ Session {session_id} not found in sessions_store, deriving proper user_id")
+        # CRITICAL FIX: Derive proper user_id using same logic as zep-hybrid-proxy
+        # This prevents dual database creation by ensuring consistent user_id format
+        import hashlib
+        hash_hex = hashlib.sha256(session_id.encode()).hexdigest()
+        derived_user_id = f"zep_{hash_hex[:32]}"
+        logger.info(f"🔧 Derived user_id from session_id: {session_id} → {derived_user_id}")
+        return derived_user_id
     
     # Method 2: Check for group_id in path parameters (format: user_id_session_id)
     if "group_id" in request.path_params:
@@ -295,15 +351,9 @@ async def get_or_create_pooled_client_async(user_id: str, settings) -> "ZepGraph
     # Periodic cleanup
     await cleanup_connection_pool()
     
-    # Fast path: return existing client (but verify it has clients attribute)
+    # Fast path: return existing client
     if pool_key in _graphiti_pool:
-        existing_client = _graphiti_pool[pool_key]
-        if hasattr(existing_client, 'clients'):
-            logger.debug(f"✅ Returning existing async pooled client for {user_id}")
-            return existing_client
-        else:
-            logger.warning(f"⚠️ Existing async pooled client for {user_id} missing clients attribute, recreating...")
-            del _graphiti_pool[pool_key]
+        return _graphiti_pool[pool_key]
     
     # Use per-key locks to prevent race conditions
     if pool_key not in _pool_locks:
@@ -314,33 +364,25 @@ async def get_or_create_pooled_client_async(user_id: str, settings) -> "ZepGraph
         if pool_key in _graphiti_pool:
             return _graphiti_pool[pool_key]
         
-        # Create LLM client with proper configuration first (only if API key is available)
-        llm_client = None
-        if settings.openai_api_key:
-            try:
-                from graphiti_core.llm_client import OpenAIClient, LLMConfig
-                
-                llm_config = LLMConfig(
-                    api_key=settings.openai_api_key,
-                    base_url=settings.openai_base_url,
-                    model=settings.model_name or "gpt-4o-mini",
-                    temperature=settings.temperature
-                )
-                llm_client = OpenAIClient(config=llm_config)
-                logger.debug(f"✅ Created LLM client with API key for user {user_id}")
-            except Exception as e:
-                logger.warning(f"⚠️ Failed to create LLM client for user {user_id}: {e}")
-                llm_client = None
-        
-        # Create new client with pre-configured LLM client
+        # Create new client
         client = ZepGraphiti(
             host=settings.falkordb_host,
             port=settings.falkordb_port,
             username=settings.falkordb_username,
             password=settings.falkordb_password,
-            user_id=user_id,
-            llm_client=llm_client
+            user_id=user_id
         )
+        
+        # Fast LLM configuration with proper model name resolution
+        if settings.openai_api_key and client.llm_client:
+            if settings.openai_base_url:
+                client.llm_client.config.base_url = settings.openai_base_url
+            client.llm_client.config.api_key = settings.openai_api_key
+            # CRITICAL FIX: Use effective_model_name to support LARGE_MODEL_NAME env var
+            client.llm_client.model = settings.effective_model_name
+            # CRITICAL FIX: Configure small_model for ModelSize.small operations
+            client.llm_client.small_model = settings.effective_small_model_name
+            client.llm_client.config.temperature = settings.temperature
         
         # Fast embedder configuration
         if settings.openai_api_key and hasattr(client, 'embedder') and client.embedder and hasattr(client.embedder, 'config'):
@@ -348,14 +390,28 @@ async def get_or_create_pooled_client_async(user_id: str, settings) -> "ZepGraph
             if settings.openai_base_url:
                 client.embedder.config.base_url = settings.openai_base_url
             if hasattr(client.embedder, 'model'):
-                client.embedder.model = settings.embedding_model_name or "text-embedding-3-small"
+                # CRITICAL FIX: Use effective_embedding_model_name (required env var)
+                client.embedder.model = settings.effective_embedding_model_name
         
-        # Build indices asynchronously without blocking
+        # Build indices asynchronously without blocking deployment
         try:
-            await client.build_indices_and_constraints()
-            logger.info(f"🔧 Built indices for user database: {client._database_name}")
+            # CRITICAL FIX: Use managed background task for proper async coordination
+            task_name = f"build_indices_{client._database_name}"
+            async with _task_lock:
+                if task_name not in _background_tasks:
+                    task = asyncio.create_task(
+                        _managed_background_task(
+                            task_name,
+                            client.build_indices_and_constraints
+                        ),
+                        name=task_name
+                    )
+                    _background_tasks[task_name] = task
+                    logger.info(f"🔧 Scheduled managed index building: {client._database_name}")
+                else:
+                    logger.debug(f"Index building already scheduled for: {client._database_name}")
         except Exception as e:
-            logger.warning(f"Failed to build indices for {client._database_name}: {e}")
+            logger.warning(f"Failed to schedule index building for {client._database_name}: {e}")
         
         _graphiti_pool[pool_key] = client
         logger.info(f"📦 Added new connection to pool: {pool_key} (pool size: {len(_graphiti_pool)})")
@@ -366,43 +422,29 @@ def get_or_create_pooled_client(user_id: str, settings) -> "ZepGraphiti":
     """Get or create a pooled ZepGraphiti client for the given user - optimized"""
     pool_key = f"{user_id}_{settings.falkordb_host}_{settings.falkordb_port}"
     
-    # Fast path: return existing client (but verify it has clients attribute)
+    # Fast path: return existing client
     if pool_key in _graphiti_pool:
-        existing_client = _graphiti_pool[pool_key]
-        if hasattr(existing_client, 'clients'):
-            logger.debug(f"✅ Returning existing pooled client for {user_id}")
-            return existing_client
-        else:
-            logger.warning(f"⚠️ Existing pooled client for {user_id} missing clients attribute, recreating...")
-            del _graphiti_pool[pool_key]
+        return _graphiti_pool[pool_key]
     
-    # Create LLM client with proper configuration first (only if API key is available)
-    llm_client = None
-    if settings.openai_api_key:
-        try:
-            from graphiti_core.llm_client import OpenAIClient, LLMConfig
-            
-            llm_config = LLMConfig(
-                api_key=settings.openai_api_key,
-                base_url=settings.openai_base_url,
-                model=settings.model_name or "gpt-4o-mini",
-                temperature=settings.temperature
-            )
-            llm_client = OpenAIClient(config=llm_config)
-            logger.debug(f"✅ Created LLM client with API key for user {user_id}")
-        except Exception as e:
-            logger.warning(f"⚠️ Failed to create LLM client for user {user_id}: {e}")
-            llm_client = None
-    
-    # Create new client with pre-configured LLM client
+    # Create new client (only when needed)
     client = ZepGraphiti(
         host=settings.falkordb_host,
         port=settings.falkordb_port,
         username=settings.falkordb_username,
         password=settings.falkordb_password,
-        user_id=user_id,
-        llm_client=llm_client
+        user_id=user_id
     )
+    
+    # Fast LLM configuration
+    if settings.openai_api_key and client.llm_client:
+        if settings.openai_base_url:
+            client.llm_client.config.base_url = settings.openai_base_url
+        client.llm_client.config.api_key = settings.openai_api_key
+        # CRITICAL FIX: Use effective_model_name to support LARGE_MODEL_NAME env var
+        client.llm_client.model = settings.effective_model_name
+        # CRITICAL FIX: Configure small_model for ModelSize.small operations
+        client.llm_client.small_model = settings.effective_small_model_name
+        client.llm_client.config.temperature = settings.temperature
     
     # Fast embedder configuration
     if settings.openai_api_key and hasattr(client, 'embedder') and client.embedder and hasattr(client.embedder, 'config'):
@@ -412,13 +454,28 @@ def get_or_create_pooled_client(user_id: str, settings) -> "ZepGraphiti":
         if hasattr(client.embedder, 'model'):
             client.embedder.model = settings.embedding_model_name or "text-embedding-3-small"
     
-    # CRITICAL FIX: Build indices for user-specific database
+    # CRITICAL FIX: Build indices for user-specific database using managed tasks
     # This ensures search indices are created for episodes, edges, and nodes
     import asyncio
+    async def _schedule_index_building():
+        task_name = f"build_indices_{client._database_name}"
+        async with _task_lock:
+            if task_name not in _background_tasks:
+                task = asyncio.create_task(
+                    _managed_background_task(
+                        task_name,
+                        client.build_indices_and_constraints
+                    ),
+                    name=task_name
+                )
+                _background_tasks[task_name] = task
+                logger.info(f"🔧 Scheduled managed index building: {client._database_name}")
+            else:
+                logger.debug(f"Index building already scheduled for: {client._database_name}")
+    
     try:
-        # Run index building in a background task to avoid blocking
-        asyncio.create_task(client.build_indices_and_constraints())
-        logger.info(f"🔧 Scheduled index building for user database: {client._database_name}")
+        # Schedule the managed task
+        asyncio.create_task(_schedule_index_building())
     except Exception as e:
         logger.warning(f"Failed to schedule index building for {client._database_name}: {e}")
     
@@ -463,28 +520,13 @@ class ZepGraphiti(Graphiti):
             password=password if password and password.strip() else None,
             database=database_name
         )
-        
-        try:
-            super().__init__(graph_driver=falkor_driver, llm_client=llm_client, ensure_ascii=False)
-            logger.debug(f"✅ Successfully initialized Graphiti parent class for database {database_name}")
-            
-            # Verify clients attribute was created
-            if not hasattr(self, 'clients'):
-                logger.error(f"❌ clients attribute not created during initialization for database {database_name}")
-                raise RuntimeError("Graphiti initialization failed: clients attribute missing")
-            else:
-                logger.debug(f"✅ clients attribute verified for database {database_name}")
-                
-        except Exception as e:
-            logger.error(f"❌ Failed to initialize Graphiti parent class for database {database_name}: {e}")
-            raise
-            
+        super().__init__(graph_driver=falkor_driver, llm_client=llm_client)
         self._skip_init = skip_init
         self._user_id = user_id
         self._database_name = database_name
         
     async def build_indices_and_constraints(self):
-        """Override to prevent duplicate index creation per database"""
+        """Override to prevent duplicate index creation per database with improved performance"""
         global _indices_initialized
         
         if self._database_name in _indices_initialized:
@@ -499,9 +541,14 @@ class ZepGraphiti(Graphiti):
         falkor_logger.setLevel(logging.WARNING)  # Hide INFO messages about existing indices
         
         try:
-            await super().build_indices_and_constraints()
+            # Run index building with timeout to prevent hanging
+            await asyncio.wait_for(super().build_indices_and_constraints(), timeout=300.0)  # 5 minute timeout
             _indices_initialized.add(self._database_name)
             logger.debug(f"Indices and constraints built successfully for database {self._database_name}")
+        except asyncio.TimeoutError:
+            logger.warning(f"Index building timed out for database {self._database_name} (non-critical)")
+        except Exception as e:
+            logger.warning(f"Index building failed for database {self._database_name}: {e} (non-critical)")
         finally:
             # Restore original log level
             falkor_logger.setLevel(original_level)
@@ -795,15 +842,6 @@ class ZepGraphiti(Graphiti):
         try:
             logger.info(f"🚀 ENHANCED_ADD_EPISODE: Starting episode processing for group {group_id}")
             
-            # DEBUG: Check if clients attribute exists
-            if not hasattr(self, 'clients'):
-                logger.error(f"❌ CRITICAL: self.clients attribute is missing! Instance type: {type(self)}")
-                logger.error(f"❌ Available attributes: {[attr for attr in dir(self) if not attr.startswith('_')]}")
-                raise AttributeError("self.clients attribute not found - Graphiti initialization may have failed")
-            
-            logger.debug(f"✅ self.clients attribute found: {type(self.clients)}")
-            logger.debug(f"✅ Database: {getattr(self, '_database_name', 'unknown')}")
-            
             # CRITICAL FIX: The root cause was UUID handling in the base graphiti library
             # When we pass uuid=uuid, it tries to FETCH an existing episode, not CREATE a new one
             # Solution: Don't pass the UUID parameter, let graphiti create the episode, then manually set the UUID
@@ -824,11 +862,9 @@ class ZepGraphiti(Graphiti):
                     edge_type_map=None  # Use default entity->entity mapping
                 )
                 
-                # MANUAL UUID ASSIGNMENT: Set the desired UUID after creation
+                # Episode UUID is auto-generated by Graphiti - no manual setting needed
                 if hasattr(result, 'episode') and result.episode:
-                    original_uuid = result.episode.uuid
-                    result.episode.uuid = uuid  # Set our desired UUID
-                    logger.info(f"🔧 ENHANCED_ADD_EPISODE: Manually set episode UUID from {original_uuid} to {uuid}")
+                    logger.debug(f"🔧 ENHANCED_ADD_EPISODE: Episode created with UUID {result.episode.uuid}")
                 
                 # Log successful extraction results
                 node_count = len(result.nodes) if hasattr(result, 'nodes') else 0
@@ -967,11 +1003,11 @@ class ZepGraphiti(Graphiti):
                         Message(role="user", content=summary_prompt)
                     ]
                     
-                    # Generate response with appropriate constraints
+                    # Generate response with appropriate constraints for summaries
                     if hasattr(self.llm_client, 'generate_response'):
                         summary_response = await self.llm_client.generate_response(
                             messages, 
-                            max_tokens=300  # Controlled response size
+                            max_tokens=1000  # Increased token limit for comprehensive summaries
                         )
                     else:
                         logger.error(f"ZEP SUMMARY: LLM client missing generate_response method")
@@ -1509,7 +1545,22 @@ class ZepGraphiti(Graphiti):
                 
                 # Extract message data
                 msg_uuid = msg.get('uuid', '')
+                
+                # Determine appropriate role_type default based on role field
+                # Enum order: norole, system, user, assistant, function, tool
                 role = msg.get('role', 'user')
+                if role == 'system':
+                    default_role_type = 'system'
+                elif role == 'assistant':
+                    default_role_type = 'assistant'
+                elif role == 'function':
+                    default_role_type = 'function'
+                elif role == 'tool':
+                    default_role_type = 'tool'
+                else:  # user or any other value
+                    default_role_type = 'user'
+                
+                role_type = msg.get('role_type') or default_role_type  # Smart default only when None/missing
                 content = msg.get('content', '')
                 
                 if add_group_id_prefix and msg_uuid:
@@ -1523,14 +1574,19 @@ class ZepGraphiti(Graphiti):
                 
                 # Add episode using Graphiti's enhanced method
                 try:
+                    # Structure episode content to clearly indicate speaker for proper entity extraction
+                    # Safety check: fallback to role field if role_type is None
+                    safe_role_type = role_type or role or 'user'
+                    episode_content = f"{safe_role_type.title()}: {content}"
+                    
                     await self.enhanced_add_episode(
                         uuid=episode_uuid,
                         group_id=group_id,
-                        name=f"{role}_message_{i}",
-                        episode_body=content,
+                        name=f"{safe_role_type}_message_{i}",
+                        episode_body=episode_content,
                         reference_time=datetime.now(timezone.utc),
-                        source=role,
-                        source_description=f"Message from {role}"
+                        source=EpisodeType.message,  # Use EpisodeType enum instead of string
+                        source_description=f"Message from {safe_role_type}"
                     )
                     logger.debug(f"Added episode {episode_uuid} for group {group_id}")
                 except Exception as episode_error:
@@ -1695,54 +1751,29 @@ async def get_graphiti_for_user(user_id: str, settings: ZepEnvDep):
 
 
 async def initialize_graphiti(settings: ZepEnvDep):
+    """Initialize Graphiti WITHOUT starting any background tasks during startup"""
     # Use a global flag to prevent multiple initializations
     if hasattr(initialize_graphiti, '_initialized'):
-        logger.info("Graphiti already initialized, skipping...")
         return
         
     try:
-        logger.debug(f"Initializing Graphiti with FalkorDB at {settings.falkordb_host}:{settings.falkordb_port}")
-        
-        # Create LLM client with proper configuration for initialization (only if API key is available)
-        llm_client = None
-        if settings.openai_api_key:
-            try:
-                from graphiti_core.llm_client import OpenAIClient, LLMConfig
-                
-                llm_config = LLMConfig(
-                    api_key=settings.openai_api_key,
-                    base_url=settings.openai_base_url,
-                    model=settings.model_name or "gpt-4o-mini",
-                    temperature=settings.temperature
-                )
-                llm_client = OpenAIClient(config=llm_config)
-                logger.debug("✅ Created LLM client for initialization")
-            except Exception as e:
-                logger.warning(f"⚠️ Failed to create LLM client for initialization: {e}")
-                llm_client = None
-        
+        # Create client but don't start any background tasks yet
         client = ZepGraphiti(
             host=settings.falkordb_host,
             port=settings.falkordb_port,
             username=settings.falkordb_username,
             password=settings.falkordb_password,
-            llm_client=llm_client
         )
         
-        # Only call build_indices_and_constraints once during app startup
-        logger.debug("Building FalkorDB indices and constraints...")
-        await client.build_indices_and_constraints()
-        logger.info("Graphiti initialization completed successfully")
+        # Store client for later background initialization
+        global _initialization_client
+        _initialization_client = client
         
         # Mark as initialized to prevent duplication
         initialize_graphiti._initialized = True
-        
-        await client.close()  # Close the initialization client
     except Exception as e:
         logger.error(f"Failed to initialize Graphiti: {e}", exc_info=True)
         # Don't raise the exception to prevent app startup failure
-        # The service will still start but NLP features may not work
-        logger.warning("Service starting with limited functionality due to initialization failure")
 
 
 def get_fact_result_from_edge(edge: EntityEdge):

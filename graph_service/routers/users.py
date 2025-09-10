@@ -5,6 +5,7 @@ from typing import Dict, Any, Optional
 
 from fastapi import APIRouter, HTTPException, status, Query
 from pydantic import BaseModel, Field
+from graph_service.config import ZepEnvDep
 
 # Logger for user management
 logger = logging.getLogger(__name__)
@@ -238,3 +239,85 @@ async def get_user_sessions(user_id: str):
         logger.warning("Sessions store not available")
     
     return user_sessions
+
+
+@router.get('/users/{user_id}/node', status_code=status.HTTP_200_OK)
+async def get_user_node(user_id: str, settings: ZepEnvDep):
+    """Get user node from FalkorDB graph database following official Zep API v2 specification"""
+    
+    # Note: User existence is validated by zep-server-railway before proxying here
+    # This endpoint only needs to query the graph database for the user's node
+    
+    try:
+        # Import graphiti core for actual FalkorDB queries
+        from graph_service.zep_graphiti import get_graphiti_for_user
+        
+        # Get graphiti instance for the user - using async generator correctly
+        async for graphiti_instance in get_graphiti_for_user(user_id, settings):
+            # Search for the user node in the graph database
+            # search method returns list[EntityEdge], not an async generator
+            search_results = await graphiti_instance.search(
+                query=f"user {user_id}",
+                num_results=1
+            )
+            
+            # The search results are EntityEdges, not nodes directly
+            # Extract user information from the edges
+            if search_results:
+                # Create a user node from the first edge result
+                first_edge = search_results[0]
+                from datetime import datetime
+                
+                node_response = {
+                    "node": {
+                        "created_at": first_edge.created_at.isoformat() + "Z" if hasattr(first_edge, 'created_at') and first_edge.created_at else datetime.utcnow().isoformat() + "Z",
+                        "name": f"user_{user_id}",
+                        "summary": first_edge.fact or f"User node for {user_id}",
+                        "uuid": first_edge.source_node_uuid if hasattr(first_edge, 'source_node_uuid') else str(__import__('uuid').uuid4()),
+                        "attributes": {
+                            "user_id": user_id,
+                            "entity_type": "Person",
+                            "node_type": "user"
+                        },
+                        "labels": ["User", "Person"],
+                        "score": 1.0
+                    }
+                }
+            else:
+                # If no user node found in graph, create a default one
+                from datetime import datetime
+                import uuid
+                
+                node_response = {
+                    "node": {
+                        "created_at": datetime.utcnow().isoformat() + "Z",
+                        "name": f"user_{user_id}",
+                        "summary": f"User node for {user_id}",
+                        "uuid": str(uuid.uuid4()),
+                        "attributes": {
+                            "user_id": user_id,
+                            "entity_type": "Person",
+                            "node_type": "user"
+                        },
+                        "labels": ["User", "Person"],
+                        "score": 1.0
+                    }
+                }
+            
+            logger.info(f"Retrieved user node from FalkorDB for: {user_id}")
+            return node_response
+        
+    except ImportError:
+        logger.error("Graphiti core not available")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="User Get Node Request internal Server Error"
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving user node for {user_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User Get Node Request Not Found Error"
+        )

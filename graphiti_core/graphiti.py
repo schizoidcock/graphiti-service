@@ -25,8 +25,14 @@ from typing_extensions import LiteralString
 from graphiti_core.cross_encoder.client import CrossEncoderClient
 from graphiti_core.cross_encoder.openai_reranker_client import OpenAIRerankerClient
 from graphiti_core.driver.driver import GraphDriver
-from graphiti_core.driver.neo4j_driver import Neo4jDriver
-from graphiti_core.edges import CommunityEdge, EntityEdge, EpisodicEdge
+from graphiti_core.driver.falkordb_driver import FalkorDriver
+from graphiti_core.edges import (
+    CommunityEdge,
+    Edge,
+    EntityEdge,
+    EpisodicEdge,
+    create_entity_edge_embeddings,
+)
 from graphiti_core.embedder import EmbedderClient, OpenAIEmbedder
 from graphiti_core.graphiti_types import GraphitiClients
 from graphiti_core.helpers import (
@@ -36,7 +42,14 @@ from graphiti_core.helpers import (
     validate_group_id,
 )
 from graphiti_core.llm_client import LLMClient, OpenAIClient
-from graphiti_core.nodes import CommunityNode, EntityNode, EpisodeType, EpisodicNode
+from graphiti_core.nodes import (
+    CommunityNode,
+    EntityNode,
+    EpisodeType,
+    EpisodicNode,
+    Node,
+    create_entity_node_embeddings,
+)
 from graphiti_core.search.search import SearchConfig, search
 from graphiti_core.search.search_config import DEFAULT_SEARCH_LIMIT, SearchResults
 from graphiti_core.search.search_config_recipes import (
@@ -100,6 +113,20 @@ class AddEpisodeResults(BaseModel):
     community_edges: list[CommunityEdge]
 
 
+class AddBulkEpisodeResults(BaseModel):
+    episodes: list[EpisodicNode]
+    episodic_edges: list[EpisodicEdge]
+    nodes: list[EntityNode]
+    edges: list[EntityEdge]
+    communities: list[CommunityNode]
+    community_edges: list[CommunityEdge]
+    
+
+class AddTripletResults(BaseModel):
+    nodes: list[EntityNode]
+    edges: list[EntityEdge]
+
+
 class Graphiti:
     def __init__(
         self,
@@ -112,7 +139,7 @@ class Graphiti:
         store_raw_episode_content: bool = True,
         graph_driver: GraphDriver | None = None,
         max_coroutines: int | None = None,
-        ensure_ascii: bool = True,
+        ensure_ascii: bool = False,
     ):
         """
         Initialize a Graphiti instance.
@@ -123,11 +150,11 @@ class Graphiti:
         Parameters
         ----------
         uri : str
-            The URI of the Neo4j database.
+            The host for the FalkorDB database.
         user : str
-            The username for authenticating with the Neo4j database.
+            The username for authenticating with the FalkorDB database.
         password : str
-            The password for authenticating with the Neo4j database.
+            The password for authenticating with the FalkorDB database.
         llm_client : LLMClient | None, optional
             An instance of LLMClient for natural language processing tasks.
             If not provided, a default OpenAIClient will be initialized.
@@ -141,12 +168,12 @@ class Graphiti:
             Whether to store the raw content of episodes. Defaults to True.
         graph_driver : GraphDriver | None, optional
             An instance of GraphDriver for database operations.
-            If not provided, a default Neo4jDriver will be initialized.
+            If not provided, a default FalkorDriver will be initialized.
         max_coroutines : int | None, optional
             The maximum number of concurrent operations allowed. Overrides SEMAPHORE_LIMIT set in the environment.
             If not set, the Graphiti default is used.
         ensure_ascii : bool, optional
-            Whether to escape non-ASCII characters in JSON serialization for prompts. Defaults to True.
+            Whether to escape non-ASCII characters in JSON serialization for prompts. Defaults to False.
             Set as False to preserve non-ASCII characters (e.g., Korean, Japanese, Chinese) in their
             original form, making them readable in LLM logs and improving model understanding.
 
@@ -156,7 +183,7 @@ class Graphiti:
 
         Notes
         -----
-        This method establishes a connection to a graph database (Neo4j by default) using the provided
+        This method establishes a connection to a graph database (FalkorDB by default) using the provided
         credentials. It also sets up the LLM client, either using the provided client
         or by creating a default OpenAIClient.
 
@@ -174,7 +201,7 @@ class Graphiti:
         else:
             if uri is None:
                 raise ValueError('uri must be provided when graph_driver is None')
-            self.driver = Neo4jDriver(uri, user, password)
+            self.driver = FalkorDriver(host=uri, username=user, password=password)
 
         self.store_raw_episode_content = store_raw_episode_content
         self.max_coroutines = max_coroutines
@@ -245,8 +272,6 @@ class Graphiti:
         elif 'groq' in class_name:
             return 'groq'
         # Database providers
-        elif 'neo4j' in class_name:
-            return 'neo4j'
         elif 'falkor' in class_name:
             return 'falkordb'
         # Embedder providers
@@ -257,9 +282,9 @@ class Graphiti:
 
     async def close(self):
         """
-        Close the connection to the Neo4j database.
+        Close the connection to the FalkorDB database.
 
-        This method safely closes the driver connection to the Neo4j database.
+        This method safely closes the driver connection to the FalkorDB database.
         It should be called when the Graphiti instance is no longer needed or
         when the application is shutting down.
 
@@ -289,9 +314,9 @@ class Graphiti:
 
     async def build_indices_and_constraints(self, delete_existing: bool = False):
         """
-        Build indices and constraints in the Neo4j database.
+        Build indices and constraints in the FalkorDB database.
 
-        This method sets up the necessary indices and constraints in the Neo4j database
+        This method sets up the necessary indices and constraints in the FalkorDB database
         to optimize query performance and ensure data integrity for the knowledge graph.
 
         Parameters
@@ -366,10 +391,10 @@ class Graphiti:
         group_id: str | None = None,
         uuid: str | None = None,
         update_communities: bool = False,
-        entity_types: dict[str, BaseModel] | None = None,
+        entity_types: dict[str, type[BaseModel]] | None = None,
         excluded_entity_types: list[str] | None = None,
         previous_episode_uuids: list[str] | None = None,
-        edge_types: dict[str, BaseModel] | None = None,
+        edge_types: dict[str, type[BaseModel]] | None = None,
         edge_type_map: dict[tuple[str, str], list[str]] | None = None,
     ) -> AddEpisodeResults:
         """
@@ -564,16 +589,16 @@ class Graphiti:
         except Exception as e:
             raise e
 
-    ##### EXPERIMENTAL #####
+
     async def add_episode_bulk(
         self,
         bulk_episodes: list[RawEpisode],
         group_id: str | None = None,
-        entity_types: dict[str, BaseModel] | None = None,
+        entity_types: dict[str, type[BaseModel]] | None = None,
         excluded_entity_types: list[str] | None = None,
-        edge_types: dict[str, BaseModel] | None = None,
+        edge_types: dict[str, type[BaseModel]] | None = None,
         edge_type_map: dict[tuple[str, str], list[str]] | None = None,
-    ):
+    ) -> AddBulkEpisodeResults:
         """
         Process multiple episodes in bulk and update the graph.
 
@@ -846,6 +871,15 @@ class Graphiti:
             end = time()
             logger.info(f'Completed add_episode_bulk in {(end - start) * 1000} ms')
 
+            return AddBulkEpisodeResults(
+                episodes=episodes,
+                episodic_edges=resolved_episodic_edges,
+                nodes=final_hydrated_nodes,
+                edges=resolved_edges + invalidated_edges,
+                communities=[],
+                community_edges=[],
+            )
+
         except Exception as e:
             raise e
 
@@ -995,7 +1029,9 @@ class Graphiti:
 
         return SearchResults(edges=edges, nodes=nodes)
 
-    async def add_triplet(self, source_node: EntityNode, edge: EntityEdge, target_node: EntityNode):
+    async def add_triplet(
+        self, source_node: EntityNode, edge: EntityEdge, target_node: EntityNode
+    ) -> AddTripletResults:
         if source_node.name_embedding is None:
             await source_node.generate_name_embedding(self.embedder)
         if target_node.name_embedding is None:
@@ -1003,7 +1039,8 @@ class Graphiti:
         if edge.fact_embedding is None:
             await edge.generate_embedding(self.embedder)
 
-        resolved_nodes, uuid_map, _ = await resolve_extracted_nodes(
+
+        nodes, uuid_map, _ = await resolve_extracted_nodes(
             self.clients,
             [source_node, target_node],
         )
@@ -1030,13 +1067,17 @@ class Graphiti:
                 group_id=edge.group_id,
             ),
             None,
-            self.clients.ensure_ascii,
+            self.ensure_ascii,
         )
 
-        await add_nodes_and_edges_bulk(
-            self.driver, [], [], resolved_nodes, [resolved_edge] + invalidated_edges, self.embedder
-        )
+        edges: list[EntityEdge] = [resolved_edge] + invalidated_edges
 
+        await create_entity_edge_embeddings(self.embedder, edges)
+        await create_entity_node_embeddings(self.embedder, nodes)
+
+        await add_nodes_and_edges_bulk(self.driver, [], [], nodes, edges, self.embedder)
+        return AddTripletResults(edges=edges, nodes=nodes)
+        
     async def remove_episode(self, episode_uuid: str):
         # Find the episode to be deleted
         episode = await EpisodicNode.get_by_uuid(self.driver, episode_uuid)
@@ -1062,12 +1103,7 @@ class Graphiti:
                 if record['episode_count'] == 1:
                     nodes_to_delete.append(node)
 
-        await semaphore_gather(
-            *[node.delete(self.driver) for node in nodes_to_delete],
-            max_coroutines=self.max_coroutines,
-        )
-        await semaphore_gather(
-            *[edge.delete(self.driver) for edge in edges_to_delete],
-            max_coroutines=self.max_coroutines,
-        )
+        await Edge.delete_by_uuids(self.driver, [edge.uuid for edge in edges_to_delete])
+        await Node.delete_by_uuids(self.driver, [node.uuid for node in nodes_to_delete])
+
         await episode.delete(self.driver)

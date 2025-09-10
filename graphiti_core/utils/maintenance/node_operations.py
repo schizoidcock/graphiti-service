@@ -48,7 +48,7 @@ async def extract_nodes_reflexion(
     episode: EpisodicNode,
     previous_episodes: list[EpisodicNode],
     node_names: list[str],
-    ensure_ascii: bool = True,
+    ensure_ascii: bool = False,
 ) -> list[str]:
     # Prepare context for LLM
     context = {
@@ -152,9 +152,13 @@ async def extract_nodes(
     # Convert the extracted data into EntityNode objects
     extracted_nodes = []
     for extracted_entity in filtered_extracted_entities:
-        entity_type_name = entity_types_context[extracted_entity.entity_type_id].get(
-            'entity_type_name'
-        )
+        type_id = extracted_entity.entity_type_id
+        if 0 <= type_id < len(entity_types_context):
+            entity_type_name = entity_types_context[extracted_entity.entity_type_id].get(
+                'entity_type_name'
+            )
+        else:
+            entity_type_name = 'Entity'
 
         # Check if this entity type should be excluded
         if excluded_entity_types and entity_type_name in excluded_entity_types:
@@ -188,26 +192,24 @@ async def resolve_extracted_nodes(
     llm_client = clients.llm_client
     driver = clients.driver
 
-    # PERFORMANCE OPTIMIZATION: Batch entity search instead of individual searches
-    # Each individual search was taking 688ms, causing 6+ second episode processing
-    if existing_nodes_override is None:
-        # Create batch search query for all entity names at once
-        all_entity_names = [node.name for node in extracted_nodes]
-        all_group_ids = list(set(node.group_id for node in extracted_nodes))
-        
-        # Single batch search instead of N individual searches (major performance improvement)
-        batch_search_query = " OR ".join(all_entity_names)
-        batch_search_results = await search(
-            clients=clients,
-            query=batch_search_query,
-            group_ids=all_group_ids,
-            search_filter=SearchFilters(),
-            config=NODE_HYBRID_SEARCH_RRF,
-        )
-        
-        candidate_nodes: list[EntityNode] = batch_search_results.nodes
-    else:
-        candidate_nodes: list[EntityNode] = existing_nodes_override
+    search_results: list[SearchResults] = await semaphore_gather(
+        *[
+            search(
+                clients=clients,
+                query=node.name,
+                group_ids=[node.group_id],
+                search_filter=SearchFilters(),
+                config=NODE_HYBRID_SEARCH_RRF,
+            )
+            for node in extracted_nodes
+        ]
+    )
+
+    candidate_nodes: list[EntityNode] = (
+        [node for result in search_results for node in result.nodes]
+        if existing_nodes_override is None
+        else existing_nodes_override
+    )
 
     existing_nodes_dict: dict[str, EntityNode] = {node.uuid: node for node in candidate_nodes}
 
@@ -316,6 +318,7 @@ async def extract_attributes_from_nodes(
                 entity_types.get(next((item for item in node.labels if item != 'Entity'), ''))
                 if entity_types is not None
                 else None,
+                clients.ensure_ascii,
             )
             for node in nodes
         ]
@@ -332,6 +335,7 @@ async def extract_attributes_from_node(
     episode: EpisodicNode | None = None,
     previous_episodes: list[EpisodicNode] | None = None,
     entity_type: type[BaseModel] | None = None,
+    ensure_ascii: bool = False,
 ) -> EntityNode:
     node_context: dict[str, Any] = {
         'name': node.name,
@@ -346,6 +350,7 @@ async def extract_attributes_from_node(
         'previous_episodes': [ep.content for ep in previous_episodes]
         if previous_episodes is not None
         else [],
+        'ensure_ascii': ensure_ascii,
     }
 
     summary_context: dict[str, Any] = {
@@ -354,6 +359,7 @@ async def extract_attributes_from_node(
         'previous_episodes': [ep.content for ep in previous_episodes]
         if previous_episodes is not None
         else [],
+        'ensure_ascii': ensure_ascii,
     }
 
     llm_response = (
@@ -362,7 +368,6 @@ async def extract_attributes_from_node(
                 prompt_library.extract_nodes.extract_attributes(attributes_context),
                 response_model=entity_type,
                 model_size=ModelSize.small,
-                max_tokens=2000,  # Limit token output for conciseness
             )
         )
         if entity_type is not None
@@ -373,7 +378,6 @@ async def extract_attributes_from_node(
         prompt_library.extract_nodes.extract_summary(summary_context),
         response_model=EntitySummary,
         model_size=ModelSize.small,
-        max_tokens=1500,  # Limit summary generation tokens
     )
 
     if entity_type is not None:

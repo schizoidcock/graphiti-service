@@ -74,17 +74,9 @@ async def search_graph(
     
     # Check cache first for fast responses (import search_cache)
     from graph_service.search_cache import search_cache
-    import hashlib
-    
-    # CACHE OPTIMIZATION: Generate normalized cache key to improve hit rate
-    # Normalize query to improve cache hits (trim whitespace, lowercase)
-    normalized_query = request.query.strip().lower()
-    search_group_ids_str = "|".join(sorted(search_group_ids)) if search_group_ids else "all"
-    
-    # Use structured cache key with hashing to avoid collisions and improve hits
-    cache_data = f"graph_{user_id}_{normalized_query}_{request.max_results}_{request.search_type}_{search_group_ids_str}"
-    cache_key = hashlib.md5(cache_data.encode()).hexdigest()
-    
+    # SECURITY FIX: Include database name to prevent cross-user cache contamination
+    database_name = graphiti._database_name if hasattr(graphiti, '_database_name') else user_id
+    cache_key = f"graph_{database_name}_{request.query}_{request.max_results}_{request.search_type}"
     cached_result = search_cache.get_by_key(cache_key)
     if cached_result:
         logger.info(f"⚡ Cache HIT for graph search: {request.query[:50]}...")
@@ -94,7 +86,10 @@ async def search_graph(
     
     try:
         # Use fast mode for interactive queries (similar to session search optimization)
-        max_results = request.max_results or 10
+        max_results = int(request.max_results or 10)
+        # DEBUG: Log types to help debug arithmetic errors
+        logger.debug(f"🐛 Search Debug - max_results: {max_results} (type: {type(max_results)})")
+        
         if max_results <= 10 and len(request.query) <= 200:
             logger.info(f"🚀 Using fast search mode for graph search: {request.query[:50]}...")
             
@@ -146,8 +141,14 @@ async def search_graph(
                 continue
         
         # Process EpisodicNodes from search results (limit remaining slots)
-        remaining_slots = max(0, max_results - len(edges))
-        for episode in search_results.episodes[:remaining_slots]:
+        # CRITICAL FIX: Ensure edges is a list and add type safety
+        edges_count = len(edges) if isinstance(edges, list) else 0
+        remaining_slots = max(0, max_results - edges_count)
+        
+        # CRITICAL FIX: Ensure episodes is a list from search results
+        episodes_list = search_results.episodes if hasattr(search_results, 'episodes') and isinstance(search_results.episodes, list) else []
+        
+        for episode in episodes_list[:remaining_slots]:
             try:
                 converted_episode = EpisodicNode(
                     uuid=getattr(episode, 'uuid', str(uuid_lib.uuid4())),
@@ -168,8 +169,14 @@ async def search_graph(
                 continue
         
         # Process EntityNodes from search results (limit remaining slots)
-        remaining_slots = max(0, max_results - len(edges) - len(episodes))
-        for node in search_results.nodes[:remaining_slots]:
+        # CRITICAL FIX: Type-safe arithmetic to prevent string concatenation errors
+        episodes_count = len(episodes) if isinstance(episodes, list) else 0
+        remaining_slots = max(0, max_results - edges_count - episodes_count)
+        
+        # CRITICAL FIX: Ensure nodes is a list from search results
+        nodes_list = search_results.nodes if hasattr(search_results, 'nodes') and isinstance(search_results.nodes, list) else []
+        
+        for node in nodes_list[:remaining_slots]:
             try:
                 converted_node = EntityNode(
                     uuid=getattr(node, 'uuid', str(uuid_lib.uuid4())),
@@ -198,6 +205,7 @@ async def search_graph(
             search_metadata={
                 "execution_time_ms": round(execution_time_ms, 2),
                 "user_id": user_id,
+                "database_name": database_name,  # Add database name for transparency
                 "group_ids": search_group_ids,
                 "query_processed": request.query,
                 "search_type": request.search_type,
@@ -211,7 +219,7 @@ async def search_graph(
             }
         )
         
-        # Cache the response for future requests
+        # Cache the response for future requests (with database-specific key for user isolation)
         search_cache.put_by_key(cache_key, response)
         logger.info(f"⚡ Graph search completed in {execution_time_ms:.2f}ms, cached for future requests")
         
@@ -691,9 +699,7 @@ async def get_user_graph_triplets(
         user_group_debug_result = await graphiti.driver.execute_query(user_group_debug_query, user_id=user_id)
         logger.info(f"🔍 DEBUG - User-related group_ids: {user_group_debug_result}")
         
-        # Step 1: Query for regular RELATES_TO relationships between different Entity nodes
-        triplets = []
-        
+        # Step 1: Query for EntityEdges AND nodes in one go (since source/target_node_uuid are null)
         edge_query = """
         MATCH (n:Entity)-[e:RELATES_TO]->(m:Entity)
         WHERE e.group_id STARTS WITH $user_id_pattern
@@ -711,6 +717,7 @@ async def get_user_graph_triplets(
         LIMIT $limit
         """
         
+        # Use the exact pattern that worked in testing
         user_id_pattern = f"{user_id}_"
         
         try:
@@ -722,8 +729,9 @@ async def get_user_graph_triplets(
             
             # Handle FalkorDB result format
             actual_records = edge_result[0] if isinstance(edge_result, tuple) and len(edge_result) > 0 else edge_result
-            logger.info(f"📊 Found {len(actual_records) if hasattr(actual_records, '__len__') else 'unknown'} regular relationship records for user {user_id}")
+            logger.info(f"📊 Found {len(actual_records) if hasattr(actual_records, '__len__') else 'unknown'} triplet records for user {user_id}")
             
+            triplets = []
             for record in actual_records:
                 if record is None:
                     continue
@@ -792,130 +800,10 @@ async def get_user_graph_triplets(
                     continue
                 
         except Exception as e:
-            logger.error(f"Regular edge+node query failed: {e}")
+            logger.error(f"Combined edge+node query failed: {e}")
+            triplets = []
         
-        # Step 2: Query for isolated User nodes (like official Zep behavior)
-        # Official Zep creates isolated_node relationships when User nodes exist without other relationships
-        
-        # Debug: Check what group_ids actually exist for this user
-        try:
-            debug_query = """
-            MATCH (n:Entity)
-            WHERE (n.group_id STARTS WITH $user_id_pattern 
-               OR n.group_id CONTAINS $user_id)
-            RETURN DISTINCT n.group_id as group_id, labels(n) as labels, n.entity_type as entity_type
-            LIMIT 10
-            """
-            debug_result = await graphiti.driver.execute_query(
-                debug_query, 
-                user_id_pattern=user_id_pattern,
-                user_id=user_id
-            )
-            debug_records = debug_result[0] if isinstance(debug_result, tuple) and len(debug_result) > 0 else debug_result
-            logger.info(f"🔍 DEBUG - Group IDs found for user {user_id}: {[record.get('group_id') if isinstance(record, dict) else record for record in debug_records[:5]]}")
-        except Exception as e:
-            logger.warning(f"Debug query failed: {e}")
-        
-        try:
-            isolated_user_query = """
-            MATCH (n:Entity)
-            WHERE (n.group_id STARTS WITH $user_id_pattern 
-               OR n.group_id CONTAINS $user_id)
-               AND ('User' IN labels(n) OR n.entity_type = 'User')
-               AND NOT (n)-[:RELATES_TO]-(:Entity)
-               AND NOT (:Entity)-[:RELATES_TO]-(n)
-            RETURN n.uuid as node_uuid, n.name as node_name, n.summary as node_summary,
-                   n.labels as node_labels, n.attributes as node_attributes,
-                   n.created_at as node_created_at, n.updated_at as node_updated_at,
-                   n.entity_type as entity_type, n.group_id as group_id
-            ORDER BY n.created_at DESC
-            LIMIT $limit
-            """
-            
-            isolated_result = await graphiti.driver.execute_query(
-                isolated_user_query, 
-                user_id_pattern=user_id_pattern,
-                user_id=user_id,
-                limit=limit - len(triplets)  # Leave room for isolated nodes
-            )
-            
-            isolated_records = isolated_result[0] if isinstance(isolated_result, tuple) and len(isolated_result) > 0 else isolated_result
-            logger.info(f"📊 Found {len(isolated_records) if hasattr(isolated_records, '__len__') else 'unknown'} isolated User nodes for user {user_id}")
-            logger.info(f"🔍 DEBUG - Isolated result format: {type(isolated_result)}, records: {isolated_records[:2] if hasattr(isolated_records, '__len__') and len(isolated_records) > 0 else isolated_records}")
-            
-            # Create isolated node triplets (like official Zep)
-            for i, record in enumerate(isolated_records):
-                if record is None:
-                    logger.warning(f"🔍 DEBUG - Record {i} is None, skipping")
-                    continue
-                
-                # Handle both dictionary and list formats
-                logger.info(f"🔍 DEBUG - Record {i} type: {type(record)}, content: {record}")
-                if isinstance(record, dict):
-                    node_data = record
-                elif isinstance(record, list):
-                    field_names = ['node_uuid', 'node_name', 'node_summary', 'node_labels', 'node_attributes', 'node_created_at', 'node_updated_at', 'entity_type', 'group_id']
-                    logger.info(f"🔍 DEBUG - Converting list record (len={len(record)}) to dict with {len(field_names)} fields")
-                    if len(record) == len(field_names):
-                        node_data = dict(zip(field_names, record))
-                        logger.info(f"🔍 DEBUG - Successfully converted to: {node_data}")
-                    else:
-                        logger.warning(f"🔍 DEBUG - Record length mismatch: {len(record)} != {len(field_names)}, skipping")
-                        continue
-                else:
-                    logger.warning(f"🔍 DEBUG - Unknown record type {type(record)}, skipping")
-                    continue
-                
-                try:
-                    # Create isolated node triplet (both source and target are the same User node)
-                    node_uuid = node_data.get('node_uuid', '')
-                    
-                    # Create the user node structure
-                    user_node = {
-                        "uuid": node_uuid,
-                        "name": node_data.get('node_name', ''),
-                        "graph_id": node_uuid,  # Match official Zep structure
-                        "labels": ["Entity", "User"],  # Match official Zep structure
-                        "created_at": node_data.get('node_created_at', ''),
-                        "score": None,
-                        "summary": node_data.get('node_summary', f"user with the id of {user_id}"),
-                        "attributes": {
-                            "email": "",
-                            "first_name": "",
-                            "last_name": "",
-                            "role_type": "user",
-                            "user_id": user_id,
-                            **(node_data.get('node_attributes') or {})
-                        }
-                    }
-                    
-                    # Create isolated node edge (like official Zep)
-                    isolated_edge = {
-                        "uuid": f"isolated-node-{node_uuid}",
-                        "source_node_uuid": node_uuid,
-                        "target_node_uuid": node_uuid,  # Points to itself
-                        "type": "_isolated_node_",
-                        "name": "",
-                        "created_at": node_data.get('node_created_at', '')
-                    }
-                    
-                    # Build triplet with isolated node structure
-                    triplet = {
-                        "sourceNode": user_node,
-                        "edge": isolated_edge,
-                        "targetNode": user_node  # Same as source for isolated nodes
-                    }
-                    
-                    triplets.append(triplet)
-                    
-                except Exception as e:
-                    logger.warning(f"Failed to build isolated node triplet from record: {e}")
-                    continue
-        
-        except Exception as e:
-            logger.error(f"Isolated User nodes query failed: {e}")
-        
-        logger.info(f"✅ Built {len(triplets)} graph triplets for user {user_id} (including isolated nodes)")
+        logger.info(f"✅ Built {len(triplets)} actual graph triplets for user {user_id}")
         return triplets
         
     except Exception as e:

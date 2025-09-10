@@ -24,16 +24,16 @@ from uuid import uuid4
 from pydantic import BaseModel, Field
 from typing_extensions import LiteralString
 
-from graphiti_core.driver.driver import GraphDriver
+from graphiti_core.driver.driver import GraphDriver, GraphProvider
 from graphiti_core.embedder import EmbedderClient
 from graphiti_core.errors import EdgeNotFoundError, GroupsEdgesNotFoundError
 from graphiti_core.helpers import parse_db_date
 from graphiti_core.models.edges.edge_db_queries import (
     COMMUNITY_EDGE_RETURN,
-    ENTITY_EDGE_RETURN,
     EPISODIC_EDGE_RETURN,
     EPISODIC_EDGE_SAVE,
     get_community_edge_save_query,
+    get_entity_edge_return_query,
     get_entity_edge_save_query,
 )
 from graphiti_core.nodes import Node
@@ -54,7 +54,7 @@ class Edge(BaseModel, ABC):
     async def delete(self, driver: GraphDriver):
         result = await driver.execute_query(
             """
-            MATCH (n)-[e:MENTIONS|:RELATES_TO|:HAS_MEMBER {uuid: $uuid}]->(m)
+            MATCH (n)-[e:MENTIONS|RELATES_TO|HAS_MEMBER {uuid: $uuid}]->(m)
             DELETE e
             """,
             uuid=self.uuid,
@@ -64,6 +64,21 @@ class Edge(BaseModel, ABC):
 
         return result
 
+    @classmethod
+    async def delete_by_uuids(cls, driver: GraphDriver, uuids: list[str]):
+        result = await driver.execute_query(
+            """
+            MATCH (n)-[e:MENTIONS|RELATES_TO|HAS_MEMBER]->(m)
+            WHERE e.uuid IN $uuids
+            DELETE e
+            """,
+            uuids=uuids,
+        )
+
+        logger.debug(f'Deleted Edges: {uuids}')
+
+        return result
+        
     def __hash__(self):
         return hash(self.uuid)
 
@@ -150,7 +165,7 @@ class EpisodicEdge(Edge):
             """
             + EPISODIC_EDGE_RETURN
             + """
-            ORDER BY e.uuid DESC 
+            ORDER BY e.uuid DESC
             """
             + limit_query,
             group_ids=group_ids,
@@ -247,12 +262,12 @@ class EntityEdge(Edge):
             MATCH (n:Entity)-[e:RELATES_TO {uuid: $uuid}]->(m:Entity)
             RETURN
             """
-            + ENTITY_EDGE_RETURN,
+            + get_entity_edge_return_query(driver.provider),
             uuid=uuid,
             routing_='r',
         )
 
-        edges = [get_entity_edge_from_record(record) for record in records]
+        edges = [get_entity_edge_from_record(record, driver.provider) for record in records]
 
         if len(edges) == 0:
             raise EdgeNotFoundError(uuid)
@@ -269,12 +284,12 @@ class EntityEdge(Edge):
             WHERE e.uuid IN $uuids
             RETURN
             """
-            + ENTITY_EDGE_RETURN,
+            + get_entity_edge_return_query(driver.provider),
             uuids=uuids,
             routing_='r',
         )
 
-        edges = [get_entity_edge_from_record(record) for record in records]
+        edges = [get_entity_edge_from_record(record, driver.provider) for record in records]
 
         return edges
 
@@ -306,7 +321,7 @@ class EntityEdge(Edge):
             + """
             RETURN
             """
-            + ENTITY_EDGE_RETURN
+            + get_entity_edge_return_query(driver.provider)
             + with_embeddings_query
             + """
             ORDER BY e.uuid DESC 
@@ -318,7 +333,7 @@ class EntityEdge(Edge):
             routing_='r',
         )
 
-        edges = [get_entity_edge_from_record(record) for record in records]
+        edges = [get_entity_edge_from_record(record, driver.provider) for record in records]
 
         if len(edges) == 0:
             raise GroupsEdgesNotFoundError(group_ids)
@@ -331,12 +346,12 @@ class EntityEdge(Edge):
             MATCH (n:Entity {uuid: $node_uuid})-[e:RELATES_TO]-(m:Entity)
             RETURN
             """
-            + ENTITY_EDGE_RETURN,
+            + get_entity_edge_return_query(driver.provider),
             node_uuid=node_uuid,
             routing_='r',
         )
 
-        edges = [get_entity_edge_from_record(record) for record in records]
+        edges = [get_entity_edge_from_record(record, driver.provider) for record in records]
 
         return edges
 
@@ -436,7 +451,23 @@ def get_episodic_edge_from_record(record: Any) -> EpisodicEdge:
     )
 
 
-def get_entity_edge_from_record(record: Any) -> EntityEdge:
+def get_entity_edge_from_record(record: Any, provider: GraphProvider) -> EntityEdge:
+    episodes = record['episodes']
+    if provider == GraphProvider.FALKORDB:
+        attributes = record['attributes']
+        attributes.pop('uuid', None)
+        attributes.pop('source_node_uuid', None)
+        attributes.pop('target_node_uuid', None)
+        attributes.pop('fact', None)
+        attributes.pop('fact_embedding', None)
+        attributes.pop('name', None)
+        attributes.pop('group_id', None)
+        attributes.pop('episodes', None)
+        attributes.pop('created_at', None)
+        attributes.pop('expired_at', None)
+        attributes.pop('valid_at', None)
+        attributes.pop('invalid_at', None)
+
     edge = EntityEdge(
         uuid=record['uuid'],
         source_node_uuid=record['source_node_uuid'],
@@ -445,25 +476,13 @@ def get_entity_edge_from_record(record: Any) -> EntityEdge:
         fact_embedding=record.get('fact_embedding'),
         name=record['name'],
         group_id=record['group_id'],
-        episodes=record['episodes'],
+        episodes=episodes,
         created_at=parse_db_date(record['created_at']),  # type: ignore
         expired_at=parse_db_date(record['expired_at']),
         valid_at=parse_db_date(record['valid_at']),
         invalid_at=parse_db_date(record['invalid_at']),
-        attributes=record['attributes'],
+        attributes=attributes,
     )
-
-    edge.attributes.pop('uuid', None)
-    edge.attributes.pop('source_node_uuid', None)
-    edge.attributes.pop('target_node_uuid', None)
-    edge.attributes.pop('fact', None)
-    edge.attributes.pop('name', None)
-    edge.attributes.pop('group_id', None)
-    edge.attributes.pop('episodes', None)
-    edge.attributes.pop('created_at', None)
-    edge.attributes.pop('expired_at', None)
-    edge.attributes.pop('valid_at', None)
-    edge.attributes.pop('invalid_at', None)
 
     return edge
 

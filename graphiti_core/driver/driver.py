@@ -25,7 +25,6 @@ logger = logging.getLogger(__name__)
 
 
 class GraphProvider(Enum):
-    NEO4J = 'neo4j'
     FALKORDB = 'falkordb'
 
 
@@ -53,9 +52,7 @@ class GraphDriverSession(ABC):
 
 class GraphDriver(ABC):
     provider: GraphProvider
-    fulltext_syntax: str = (
-        ''  # Neo4j (default) syntax does not require a prefix for fulltext queries
-    )
+    fulltext_syntax: str = '@'  # FalkorDB uses '@' prefix for fulltext queries
     _database: str
 
     @abstractmethod
@@ -77,7 +74,7 @@ class GraphDriver(ABC):
     def with_database(self, database: str) -> 'GraphDriver':
         """
         Returns a shallow copy of this driver with a different default database.
-        Reuses the same connection (e.g. FalkorDB, Neo4j).
+        Reuses the same connection (e.g. FalkorDB).
         """
         cloned = copy.copy(self)
         cloned._database = database

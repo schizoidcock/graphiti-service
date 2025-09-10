@@ -30,14 +30,19 @@ async def add_episode_async(graphiti, message_uuid: str, group_id: str, session_
     
     try:
         # Use optimized episode creation with selective NLP processing
+        # Structure episode content to clearly indicate speaker for proper entity extraction
+        # Safety check: fallback to role field if role_type is None
+        safe_role_type = session_message.role_type or session_message.role or 'user'
+        episode_content = f"{safe_role_type.title()}: {session_message.content}"
+        
         result = await graphiti.enhanced_add_episode(
             uuid=message_uuid,
             group_id=group_id,
-            name=f"{session_message.role.title()} Message",
-            episode_body=session_message.content,
+            name=f"{safe_role_type.title()} Message",
+            episode_body=episode_content,
             reference_time=current_time,
-            source=EpisodeType.message,
-            source_description=f"{session_message.role} message in session {session_id}"
+            source=EpisodeType.message,  # Use EpisodeType enum instead of string
+            source_description=f"{safe_role_type} message in session {session_id}"
         )
         
         processing_time = time.time() - start_time
@@ -357,11 +362,25 @@ async def add_memory_to_session(
         current_time = datetime.now(timezone.utc)
         
         # Create structured message
+        # Determine appropriate role_type default based on role field
+        # Enum order: norole, system, user, assistant, function, tool
+        role = message.get('role', 'user')
+        if role == 'system':
+            default_role_type = 'system'
+        elif role == 'assistant':
+            default_role_type = 'assistant'
+        elif role == 'function':
+            default_role_type = 'function'
+        elif role == 'tool':
+            default_role_type = 'tool'
+        else:  # user or any other value
+            default_role_type = 'user'
+        
         session_message = SessionMessage(
             uuid=message_uuid,
             created_at=current_time,
             role=message.get('role', 'user'),
-            role_type=message.get('role_type', message.get('role', 'user')),
+            role_type=message.get('role_type') or default_role_type,  # Smart default only when None/missing
             content=message.get('content', ''),
             metadata=message.get('metadata', {}),
             token_count=message.get('token_count')

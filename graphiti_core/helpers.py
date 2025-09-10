@@ -23,10 +23,8 @@ from typing import Any
 
 import numpy as np
 from dotenv import load_dotenv
-from neo4j import time as neo4j_time
 from numpy._typing import NDArray
 from pydantic import BaseModel
-from typing_extensions import LiteralString
 
 from graphiti_core.driver.driver import GraphProvider
 from graphiti_core.errors import GroupIdValidationError
@@ -38,17 +36,12 @@ SEMAPHORE_LIMIT = int(os.getenv('SEMAPHORE_LIMIT', 20))
 MAX_REFLEXION_ITERATIONS = int(os.getenv('MAX_REFLEXION_ITERATIONS', 0))
 DEFAULT_PAGE_LIMIT = 20
 
-RUNTIME_QUERY: LiteralString = (
-    'CYPHER runtime = parallel parallelRuntimeSupport=all\n' if USE_PARALLEL_RUNTIME else ''
-)
 
-
-def parse_db_date(neo_date: neo4j_time.DateTime | str | None) -> datetime | None:
+def parse_db_date(date_value: str | None) -> datetime | None:
+    """Parse database date string into datetime object."""
     return (
-        neo_date.to_native()
-        if isinstance(neo_date, neo4j_time.DateTime)
-        else datetime.fromisoformat(neo_date)
-        if neo_date
+        datetime.fromisoformat(date_value)
+        if date_value
         else None
     )
 
@@ -88,6 +81,7 @@ def lucene_sanitize(query: str) -> str:
             ':': r'\:',
             '\\': r'\\',
             '/': r'\/',
+            '$': r'\$',  # Escape dollar sign for RediSearch
             'O': r'\O',
             'R': r'\R',
             'N': r'\N',
@@ -148,7 +142,7 @@ def validate_group_id(group_id: str) -> bool:
 
 
 def validate_excluded_entity_types(
-    excluded_entity_types: list[str] | None, entity_types: dict[str, BaseModel] | None = None
+    excluded_entity_types: list[str] | None, entity_types: dict[str, type[BaseModel]] | None = None
 ) -> bool:
     """
     Validate that excluded entity types are valid type names.

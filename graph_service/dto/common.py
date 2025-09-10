@@ -16,8 +16,8 @@ class Message(BaseModel):
     name: str = Field(
         default='', description='The name of the episodic node for the message (optional)'
     )
-    role_type: Literal['user', 'assistant', 'system'] = Field(
-        ..., description='The role type of the message (user, assistant or system)'
+    role_type: Literal['norole', 'system', 'user', 'assistant', 'function', 'tool'] | None = Field(
+        None, description='The role type of the message (norole, system, user, assistant, function, tool)'
     )
     role: str | None = Field(
         description='The custom role of the message to be used alongside role_type (user name, bot name, etc.)',

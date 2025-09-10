@@ -21,7 +21,7 @@ from time import time
 from pydantic import BaseModel
 from typing_extensions import LiteralString
 
-from graphiti_core.driver.driver import GraphDriver
+from graphiti_core.driver.driver import GraphDriver, GraphProvider
 from graphiti_core.edges import (
     CommunityEdge,
     EntityEdge,
@@ -114,7 +114,7 @@ async def extract_edges(
     previous_episodes: list[EpisodicNode],
     edge_type_map: dict[tuple[str, str], list[str]],
     group_id: str = '',
-    edge_types: dict[str, BaseModel] | None = None,
+    edge_types: dict[str, type[BaseModel]] | None = None,
 ) -> list[EntityEdge]:
     start = time()
 
@@ -250,7 +250,7 @@ async def resolve_extracted_edges(
     extracted_edges: list[EntityEdge],
     episode: EpisodicNode,
     entities: list[EntityNode],
-    edge_types: dict[str, BaseModel],
+    edge_types: dict[str, type[BaseModel]],
     edge_type_map: dict[tuple[str, str], list[str]],
 ) -> tuple[list[EntityEdge], list[EntityEdge]]:
     driver = clients.driver
@@ -273,7 +273,7 @@ async def resolve_extracted_edges(
     uuid_entity_map: dict[str, EntityNode] = {entity.uuid: entity for entity in entities}
 
     # Determine which edge types are relevant for each edge
-    edge_types_lst: list[dict[str, BaseModel]] = []
+    edge_types_lst: list[dict[str, type[BaseModel]]] = []
     for extracted_edge in extracted_edges:
         source_node = uuid_entity_map.get(extracted_edge.source_node_uuid)
         target_node = uuid_entity_map.get(extracted_edge.target_node_uuid)
@@ -383,7 +383,7 @@ async def resolve_extracted_edge(
     related_edges: list[EntityEdge],
     existing_edges: list[EntityEdge],
     episode: EpisodicNode,
-    edge_types: dict[str, BaseModel] | None = None,
+    edge_types: dict[str, type[BaseModel]] | None = None,
     ensure_ascii: bool = True,
 ) -> tuple[EntityEdge, list[EntityEdge], list[EntityEdge]]:
     if len(related_edges) == 0 and len(existing_edges) == 0:
@@ -453,6 +453,7 @@ async def resolve_extracted_edge(
             'episode_content': episode.content,
             'reference_time': episode.valid_at,
             'fact': resolved_edge.fact,
+            'ensure_ascii': ensure_ascii,
         }
 
         edge_model = edge_types.get(fact_type)
@@ -503,23 +504,28 @@ async def resolve_extracted_edge(
 async def filter_existing_duplicate_of_edges(
     driver: GraphDriver, duplicates_node_tuples: list[tuple[EntityNode, EntityNode]]
 ) -> list[tuple[EntityNode, EntityNode]]:
-    query: LiteralString = """
-        UNWIND $duplicate_node_uuids AS duplicate_tuple
-        MATCH (n:Entity {uuid: duplicate_tuple[0]})-[r:RELATES_TO {name: 'IS_DUPLICATE_OF'}]->(m:Entity {uuid: duplicate_tuple[1]})
-        RETURN DISTINCT
-            n.uuid AS source_uuid,
-            m.uuid AS target_uuid
-    """
+    if not duplicates_node_tuples:
+        return []
 
     duplicate_nodes_map = {
         (source.uuid, target.uuid): (source, target) for source, target in duplicates_node_tuples
     }
 
-    records, _, _ = await driver.execute_query(
-        query,
-        duplicate_node_uuids=list(duplicate_nodes_map.keys()),
-        routing_='r',
-    )
+    if driver.provider == GraphProvider.FALKORDB:
+        query: LiteralString = """
+            UNWIND $duplicate_node_uuids AS duplicate_tuple
+            MATCH (n:Entity {uuid: duplicate_tuple[0]})-[r:RELATES_TO {name: 'IS_DUPLICATE_OF'}]->(m:Entity {uuid: duplicate_tuple[1]})
+            RETURN DISTINCT
+                n.uuid AS source_uuid,
+                m.uuid AS target_uuid
+        """
+        duplicate_node_uuids = list(duplicate_nodes_map.keys())
+
+        records, _, _ = await driver.execute_query(
+            query,
+            duplicate_node_uuids=duplicate_node_uuids,
+            routing_='r',
+        )        
 
     # Remove duplicates that already have the IS_DUPLICATE_OF edge
     for record in records:

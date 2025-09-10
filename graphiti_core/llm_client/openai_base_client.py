@@ -31,8 +31,10 @@ from .errors import RateLimitError, RefusalError
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_MODEL = 'gpt-4.1-mini'
-DEFAULT_SMALL_MODEL = 'gpt-4.1-nano'
+DEFAULT_MODEL = 'gpt-5-mini'
+DEFAULT_SMALL_MODEL = 'gpt-5-nano'
+DEFAULT_REASONING = 'minimal'
+DEFAULT_VERBOSITY = 'low'
 
 
 class BaseOpenAIClient(LLMClient):
@@ -51,6 +53,8 @@ class BaseOpenAIClient(LLMClient):
         config: LLMConfig | None = None,
         cache: bool = False,
         max_tokens: int = DEFAULT_MAX_TOKENS,
+        reasoning: str | None = DEFAULT_REASONING,
+        verbosity: str | None = DEFAULT_VERBOSITY,
     ):
         if cache:
             raise NotImplementedError('Caching is not implemented for OpenAI-based clients')
@@ -60,6 +64,9 @@ class BaseOpenAIClient(LLMClient):
 
         super().__init__(config, cache)
         self.max_tokens = max_tokens
+        # CRITICAL FIX: Store reasoning and verbosity as instance attributes
+        self.reasoning = reasoning
+        self.verbosity = verbosity
 
     @abstractmethod
     async def _create_completion(
@@ -81,6 +88,8 @@ class BaseOpenAIClient(LLMClient):
         temperature: float | None,
         max_tokens: int,
         response_model: type[BaseModel],
+        reasoning: str | None,
+        verbosity: str | None,
     ) -> Any:
         """Create a structured completion using the specific client implementation."""
         pass
@@ -107,14 +116,23 @@ class BaseOpenAIClient(LLMClient):
 
     def _handle_structured_response(self, response: Any) -> dict[str, Any]:
         """Handle structured response parsing and validation."""
-        response_object = response.choices[0].message
+        # Check for refusal first (on the response object, not output_text)
+        if hasattr(response, 'refusal') and response.refusal:
+            raise RefusalError(response.refusal)
+            
+        response_object = response.output_text
 
-        if response_object.parsed:
-            return response_object.parsed.model_dump()
-        elif response_object.refusal:
-            raise RefusalError(response_object.refusal)
+        # DEBUG: Log what we're getting from OpenAI
+        logger.debug(f"OpenAI response.output_text: {response_object} (type: {type(response_object)})")
+
+        if response_object:
+            try:
+                return json.loads(response_object)
+            except Exception as parse_error:
+                logger.error(f"Failed to parse OpenAI response: {parse_error}, response_object: {response_object}")
+                raise Exception(f"Failed to parse OpenAI response: {parse_error}")
         else:
-            raise Exception(f'Invalid response from LLM: {response_object.model_dump()}')
+            raise Exception(f'Empty response from OpenAI: {response}')
 
     def _handle_json_response(self, response: Any) -> dict[str, Any]:
         """Handle JSON response parsing."""
@@ -140,6 +158,8 @@ class BaseOpenAIClient(LLMClient):
                     temperature=self.temperature,
                     max_tokens=max_tokens or self.max_tokens,
                     response_model=response_model,
+                    reasoning=self.reasoning,
+                    verbosity=self.verbosity,
                 )
                 return self._handle_structured_response(response)
             else:

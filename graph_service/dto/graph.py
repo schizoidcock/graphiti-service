@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Dict, List, Optional, Any, Literal
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, validator, model_validator
 from graphiti_core.utils.datetime_utils import utc_now
 
 
@@ -117,17 +117,17 @@ class GraphAddRequest(BaseModel):
     created_at: Optional[str] = Field(None, description="Timestamp for when the data was created")
     source_description: Optional[str] = Field(None, max_length=500, description="Source description (max 500 chars)")
     
-    @validator('group_id', 'user_id')
-    def validate_isolation(cls, v, values):
+    @model_validator(mode='after')
+    def validate_isolation(self):
         """Ensure either user_id OR group_id is provided (Zep v2 requirement)"""
-        user_id = values.get('user_id')
-        group_id = v if 'group_id' in values else values.get('group_id')
+        user_id = self.user_id
+        group_id = self.group_id
         
         if not user_id and not group_id:
             raise ValueError("Either user_id OR group_id must be provided")
         if user_id and group_id:
             raise ValueError("Cannot specify both user_id AND group_id - use either one")
-        return v
+        return self
 
 
 class GraphAddResponse(BaseModel):
