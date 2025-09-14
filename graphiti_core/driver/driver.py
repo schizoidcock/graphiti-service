@@ -22,7 +22,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Coroutine
 from datetime import datetime
 from enum import Enum
-from typing import Any
+from typing import Any, Union
 
 from dotenv import load_dotenv
 
@@ -35,6 +35,7 @@ except ImportError:
     AsyncOpenSearch = None
     helpers = None
     _HAS_OPENSEARCH = False
+
 
 logger = logging.getLogger(__name__)
 
@@ -187,7 +188,7 @@ class GraphDriver(ABC):
     provider: GraphProvider
     fulltext_syntax: str = '@'  # FalkorDB uses '@' prefix for fulltext queries
     _database: str
-    aoss_client: AsyncOpenSearch | None = None
+    aoss_client: Union[Any, None] = None
 
     @abstractmethod
     def execute_query(self, cypher_query_: str, **kwargs: Any) -> Coroutine:
