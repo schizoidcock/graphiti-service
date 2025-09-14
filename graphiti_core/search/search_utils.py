@@ -23,7 +23,13 @@ import numpy as np
 from numpy._typing import NDArray
 from typing_extensions import LiteralString
 
-from graphiti_core.driver.driver import GraphDriver, GraphProvider
+from graphiti_core.driver.driver import (
+    ENTITY_EDGE_INDEX_NAME,
+    ENTITY_INDEX_NAME,
+    EPISODE_INDEX_NAME,
+    GraphDriver,
+    GraphProvider,
+)
 from graphiti_core.edges import EntityEdge, get_entity_edge_from_record
 from graphiti_core.graph_queries import (
     get_nodes_query,
@@ -161,15 +167,18 @@ async def edge_fulltext_search(
     if driver.aoss_client:
         route = group_ids[0] if group_ids else None
         filters = build_aoss_edge_filters(group_ids or [], search_filter)
-        res = driver.aoss_client.search(
-            index='entity_edges',
-            routing=route,
-            _source=['uuid'],
-            query={
-                'bool': {
-                    'filter': filters,
-                    'must': [{'match': {'fact': {'query': query, 'operator': 'or'}}}],
-                }
+        res = await driver.aoss_client.search(
+            index=ENTITY_EDGE_INDEX_NAME,
+            params={'routing': route},
+            body={
+                'size': limit,
+                '_source': ['uuid'],
+                'query': {
+                    'bool': {
+                        'filter': filters,
+                        'must': [{'match': {'fact': {'query': query, 'operator': 'or'}}}],
+                    }
+                },
             },
         )
         if res['hits']['total']['value'] > 0:
@@ -248,17 +257,19 @@ async def edge_similarity_search(
     if driver.aoss_client:
         route = group_ids[0] if group_ids else None
         filters = build_aoss_edge_filters(group_ids or [], search_filter)
-        res = driver.aoss_client.search(
-            index='entity_edges',
-            routing=route,
-            _source=['uuid'],
-            knn={
-                'field': 'fact_embedding',
-                'query_vector': search_vector,
-                'k': limit,
-                'num_candidates': 1000,
+        res = await driver.aoss_client.search(
+            index=ENTITY_EDGE_INDEX_NAME,
+            params={'routing': route},
+            body={
+                '_source': ['uuid'],
+                'knn': {
+                    'field': 'fact_embedding',
+                    'query_vector': search_vector,
+                    'k': limit,
+                    'num_candidates': 1000,
+                },
+                'query': {'bool': {'filter': filters}},
             },
-            query={'bool': {'filter': filters}},
         )
 
         if res['hits']['total']['value'] > 0:
@@ -395,25 +406,27 @@ async def node_fulltext_search(
     if driver.aoss_client:
         route = group_ids[0] if group_ids else None
         filters = build_aoss_node_filters(group_ids or [], search_filter)
-        res = driver.aoss_client.search(
-            'entities',
-            routing=route,
-            _source=['uuid'],
-            query={
-                'bool': {
-                    'filter': filters,
-                    'must': [
-                        {
-                            'multi_match': {
-                                'query': query,
-                                'field': ['name', 'summary'],
-                                'operator': 'or',
+        res = await driver.aoss_client.search(
+            index=ENTITY_INDEX_NAME,
+            params={'routing': route},
+            body={
+                'size': limit,
+                '_source': ['uuid'],
+                'query': {
+                    'bool': {
+                        'filter': filters,
+                        'must': [
+                            {
+                                'multi_match': {
+                                    'query': query,
+                                    'fields': ['name', 'summary'],
+                                    'operator': 'or',
+                                }
                             }
-                        }
-                    ],
-                }
+                        ],
+                    }
+                },
             },
-            limit=limit,
         )
 
         if res['hits']['total']['value'] > 0:
@@ -486,17 +499,19 @@ async def node_similarity_search(
     if driver.aoss_client:
         route = group_ids[0] if group_ids else None
         filters = build_aoss_node_filters(group_ids or [], search_filter)
-        res = driver.aoss_client.search(
-            index='entities',
-            routing=route,
-            _source=['uuid'],
-            knn={
-                'field': 'fact_embedding',
-                'query_vector': search_vector,
-                'k': limit,
-                'num_candidates': 1000,
+        res = await driver.aoss_client.search(
+            index=ENTITY_INDEX_NAME,
+            params={'routing': route},
+            body={
+                '_source': ['uuid'],
+                'knn': {
+                    'field': 'name_embedding',
+                    'query_vector': search_vector,
+                    'k': limit,
+                    'num_candidates': 1000,
+                },
+                'query': {'bool': {'filter': filters}},
             },
-            query={'bool': {'filter': filters}},
         )
 
         if res['hits']['total']['value'] > 0:
@@ -616,25 +631,27 @@ async def episode_fulltext_search(
 ) -> list[EpisodicNode]:
     if driver.aoss_client:
         route = group_ids[0] if group_ids else None
-        res = driver.aoss_client.search(
-            'episodes',
-            routing=route,
-            _source=['uuid'],
-            query={
-                'bool': {
-                    'filter': {'terms': group_ids},
-                    'must': [
-                        {
-                            'multi_match': {
-                                'query': query,
-                                'field': ['name', 'content'],
-                                'operator': 'or',
+        res = await driver.aoss_client.search(
+            index=EPISODE_INDEX_NAME,
+            params={'routing': route},
+            body={
+                'size': limit,
+                '_source': ['uuid'],
+                'query': {
+                    'bool': {
+                        'filter': {'terms': {'group_id': group_ids or []}},
+                        'must': [
+                            {
+                                'multi_match': {
+                                    'query': query,
+                                    'fields': ['name', 'content'],
+                                    'operator': 'or',
+                                }
                             }
-                        }
-                    ],
-                }
+                        ],
+                    }
+                },
             },
-            limit=limit,
         )
 
         if res['hits']['total']['value'] > 0:

@@ -53,6 +53,7 @@ class SearchFilters(BaseModel):
     invalid_at: list[list[DateFilter]] | None = Field(default=None)
     created_at: list[list[DateFilter]] | None = Field(default=None)
     expired_at: list[list[DateFilter]] | None = Field(default=None)
+    edge_uuids: list[str] | None = Field(default=None)
 
 
 def node_search_filter_query_constructor(
@@ -264,6 +265,9 @@ def build_aoss_edge_filters(group_ids: list[str], search_filters: SearchFilters)
 
     if search_filters.edge_types:
         filters.append({'terms': {'edge_types': search_filters.edge_types}})
+
+    if search_filters.edge_uuids:
+        filters.append({'terms': {'uuid': search_filters.edge_uuids}})
 
     for field in ['valid_at', 'invalid_at', 'created_at', 'expired_at']:
         ranges = getattr(search_filters, field)
