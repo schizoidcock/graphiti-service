@@ -24,7 +24,11 @@ from uuid import uuid4
 from pydantic import BaseModel, Field
 from typing_extensions import LiteralString
 
-from graphiti_core.driver.driver import GraphDriver, GraphProvider
+from graphiti_core.driver.driver import (
+    ENTITY_EDGE_INDEX_NAME,
+    GraphDriver,
+    GraphProvider,
+)
 from graphiti_core.embedder import EmbedderClient
 from graphiti_core.errors import EdgeNotFoundError, GroupsEdgesNotFoundError
 from graphiti_core.helpers import parse_db_date
@@ -60,6 +64,17 @@ class Edge(BaseModel, ABC):
             uuid=self.uuid,
         )
 
+        # Delete from OpenSearch if available
+        if driver.aoss_client:
+            try:
+                await driver.aoss_client.delete(
+                    index=ENTITY_EDGE_INDEX_NAME,
+                    id=self.uuid,
+                    params={'routing': self.group_id},
+                )
+            except Exception as e:
+                logger.debug(f"Edge {self.uuid} not found in OpenSearch: {e}")
+
         logger.debug(f'Deleted Edge: {self.uuid}')
 
         return result
@@ -74,6 +89,15 @@ class Edge(BaseModel, ABC):
             """,
             uuids=uuids,
         )
+
+        # Bulk delete from OpenSearch if available
+        if driver.aoss_client and uuids:
+            actions = []
+            for uuid in uuids:
+                actions.append({'delete': {'_index': ENTITY_EDGE_INDEX_NAME, '_id': uuid}})
+
+            if actions:
+                await driver.aoss_client.bulk(body=actions)
 
         logger.debug(f'Deleted Edges: {uuids}')
 

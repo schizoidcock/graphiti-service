@@ -25,7 +25,14 @@ from uuid import uuid4
 from pydantic import BaseModel, Field
 from typing_extensions import LiteralString
 
-from graphiti_core.driver.driver import GraphDriver, GraphProvider
+from graphiti_core.driver.driver import (
+    COMMUNITY_INDEX_NAME,
+    ENTITY_EDGE_INDEX_NAME,
+    ENTITY_INDEX_NAME,
+    EPISODE_INDEX_NAME,
+    GraphDriver,
+    GraphProvider,
+)
 from graphiti_core.embedder import EmbedderClient
 from graphiti_core.errors import NodeNotFoundError
 from graphiti_core.helpers import parse_db_date
@@ -89,26 +96,54 @@ class Node(BaseModel, ABC):
     async def save(self, driver: GraphDriver): ...
 
     async def delete(self, driver: GraphDriver):
-        if driver.provider == GraphProvider.FALKORDB:
-            for label in ['Entity', 'Episodic', 'Community']:
-                await driver.execute_query(
-                    f"""
-                    MATCH (n:{label} {{uuid: $uuid}})
-                    DETACH DELETE n
-                    """,
-                    uuid=self.uuid,
-                )
-        else:
-            await driver.execute_query(
-                """
-                MATCH (n:Entity {uuid: $uuid}) DETACH DELETE n
-                UNION ALL
-                MATCH (n:Episodic {uuid: $uuid}) DETACH DELETE n
-                UNION ALL
-                MATCH (n:Community {uuid: $uuid}) DETACH DELETE n
-                """,
-                uuid=self.uuid,
-            )
+        match driver.provider:
+            case GraphProvider.FALKORDB:
+                # First collect edge UUIDs that will be deleted
+                edge_uuids: list[str] = []
+                for label in ['Entity', 'Episodic', 'Community']:
+                    # Get edge UUIDs before deletion
+                    records, _, _ = await driver.execute_query(
+                        f"""
+                        MATCH (n:{label} {{uuid: $uuid}})
+                        OPTIONAL MATCH (n)-[r]-()
+                        RETURN collect(r.uuid) AS edge_uuids
+                        """,
+                        uuid=self.uuid,
+                    )
+                    if records:
+                        edge_uuids.extend(records[0].get('edge_uuids', []))
+
+                    # Delete the node
+                    await driver.execute_query(
+                        f"""
+                        MATCH (n:{label} {{uuid: $uuid}})
+                        DETACH DELETE n
+                        """,
+                        uuid=self.uuid,
+                    )
+
+                # Delete from OpenSearch indices if available
+                if driver.aoss_client:
+                    # Delete the node from OpenSearch indices
+                    for index in (EPISODE_INDEX_NAME, ENTITY_INDEX_NAME, COMMUNITY_INDEX_NAME):
+                        try:
+                            await driver.aoss_client.delete(
+                                index=index,
+                                id=self.uuid,
+                                params={'routing': self.group_id},
+                            )
+                        except Exception as e:
+                            logger.debug(f"Node {self.uuid} not found in index {index}: {e}")
+
+                    # Bulk delete the detached edges
+                    if edge_uuids:
+                        actions = []
+                        for eid in edge_uuids:
+                            actions.append(
+                                {'delete': {'_index': ENTITY_EDGE_INDEX_NAME, '_id': eid}}
+                            )
+
+                        await driver.aoss_client.bulk(body=actions)
 
         logger.debug(f'Deleted Node: {self.uuid}')
 
@@ -122,33 +157,63 @@ class Node(BaseModel, ABC):
 
     @classmethod
     async def delete_by_group_id(cls, driver: GraphDriver, group_id: str, batch_size: int = 100):
-        if driver.provider == GraphProvider.FALKORDB:
-            for label in ['Entity', 'Episodic', 'Community']:
-                await driver.execute_query(
-                    f"""
-                    MATCH (n:{label} {{group_id: $group_id}})
-                    DETACH DELETE n
-                    """,
-                    group_id=group_id,
-                )
-        else:
-            async with driver.session() as session:
-                await session.run(
-                    """
-                    MATCH (n:Entity|Episodic|Community {group_id: $group_id})
-                    CALL {
-                        WITH n
+        match driver.provider:
+            case GraphProvider.FALKORDB:
+                for label in ['Entity', 'Episodic', 'Community']:
+                    await driver.execute_query(
+                        f"""
+                        MATCH (n:{label} {{group_id: $group_id}})
                         DETACH DELETE n
-                    } IN TRANSACTIONS OF $batch_size ROWS
-                    """,
-                    group_id=group_id,
-                    batch_size=batch_size,
-                )
+                        """,
+                        group_id=group_id,
+                    )
+
+                # Delete from OpenSearch indices if available
+                if driver.aoss_client:
+                    await driver.aoss_client.delete_by_query(
+                        index=EPISODE_INDEX_NAME,
+                        body={'query': {'term': {'group_id': group_id}}},
+                        params={'routing': group_id},
+                    )
+
+                    await driver.aoss_client.delete_by_query(
+                        index=ENTITY_INDEX_NAME,
+                        body={'query': {'term': {'group_id': group_id}}},
+                        params={'routing': group_id},
+                    )
+
+                    await driver.aoss_client.delete_by_query(
+                        index=COMMUNITY_INDEX_NAME,
+                        body={'query': {'term': {'group_id': group_id}}},
+                        params={'routing': group_id},
+                    )
+
+                    await driver.aoss_client.delete_by_query(
+                        index=ENTITY_EDGE_INDEX_NAME,
+                        body={'query': {'term': {'group_id': group_id}}},
+                        params={'routing': group_id},
+                    )
                 
     @classmethod
     async def delete_by_uuids(cls, driver: GraphDriver, uuids: list[str], batch_size: int = 100):
-         match driver.provider:
+        match driver.provider:
             case GraphProvider.FALKORDB:
+                # Collect all edge UUIDs before deleting nodes
+                edge_uuids: list[str] = []
+                records, _, _ = await driver.execute_query(
+                    """
+                    MATCH (n:Entity|Episodic|Community)
+                    WHERE n.uuid IN $uuids
+                    OPTIONAL MATCH (n)-[r]-()
+                    RETURN collect(r.uuid) AS edge_uuids
+                    """,
+                    uuids=uuids,
+                )
+
+                if records:
+                    edge_uuids = records[0].get('edge_uuids', [])
+
+                # Delete nodes
                 for label in ['Entity', 'Episodic', 'Community']:
                     await driver.execute_query(
                         f"""
@@ -158,15 +223,24 @@ class Node(BaseModel, ABC):
                         """,
                         uuids=uuids,
                     )
-                await driver.execute_query(
-                        """
-                        MATCH (n:Entity)
-                        WHERE n.uuid IN $uuids
-                        DETACH DELETE n
-                        """,
-                        uuids=uuids,
-                        batch_size=batch_size,
-                    ) 
+
+                # Delete from OpenSearch indices if available
+                if driver.aoss_client and uuids:
+                    # Bulk delete nodes from OpenSearch indices
+                    actions = []
+                    for uuid in uuids:
+                        for index in (EPISODE_INDEX_NAME, ENTITY_INDEX_NAME, COMMUNITY_INDEX_NAME):
+                            actions.append({'delete': {'_index': index, '_id': uuid}})
+
+                    # Bulk delete the detached edges
+                    if edge_uuids:
+                        for eid in edge_uuids:
+                            actions.append(
+                                {'delete': {'_index': ENTITY_EDGE_INDEX_NAME, '_id': eid}}
+                            )
+
+                    if actions:
+                        await driver.aoss_client.bulk(body=actions) 
 
     @classmethod
     async def get_by_uuid(cls, driver: GraphDriver, uuid: str): ...

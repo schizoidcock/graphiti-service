@@ -1,6 +1,6 @@
 [project]
 name = "graphiti-api-service"
-version = "0.21.0pre1"
+version = "0.21.0pre2"
 description = "Zep-Compatible Graphiti API service with FalkorDB backend"
 authors = [{name = "Zep AI", email = "support@getzep.com"}]
 license = {text = "Apache-2.0"}
