@@ -23,7 +23,14 @@ import numpy as np
 from pydantic import BaseModel, Field
 from typing_extensions import Any
 
-from graphiti_core.driver.driver import GraphDriver, GraphDriverSession, GraphProvider
+from graphiti_core.driver.driver import (
+    ENTITY_EDGE_INDEX_NAME,
+    ENTITY_INDEX_NAME,
+    EPISODE_INDEX_NAME,
+    GraphDriver,
+    GraphDriverSession,
+    GraphProvider,
+)
 from graphiti_core.edges import Edge, EntityEdge, EpisodicEdge, create_entity_edge_embeddings
 from graphiti_core.embedder import EmbedderClient
 from graphiti_core.graphiti_types import GraphitiClients
@@ -130,11 +137,13 @@ async def add_nodes_and_edges_bulk_tx(
         entity_data: dict[str, Any] = {
             'uuid': node.uuid,
             'name': node.name,
-            'name_embedding': node.name_embedding,
             'group_id': node.group_id,
             'summary': node.summary,
             'created_at': node.created_at,
         }
+
+        if not bool(driver.aoss_client):
+            entity_data['name_embedding'] = node.name_embedding
 
         entity_data['labels'] = list(set(node.labels + ['Entity']))
         entity_data.update(node.attributes or {})
@@ -150,7 +159,6 @@ async def add_nodes_and_edges_bulk_tx(
             'target_node_uuid': edge.target_node_uuid,
             'name': edge.name,
             'fact': edge.fact,
-            'fact_embedding': edge.fact_embedding,
             'group_id': edge.group_id,
             'episodes': edge.episodes,
             'created_at': edge.created_at,
@@ -159,17 +167,76 @@ async def add_nodes_and_edges_bulk_tx(
             'invalid_at': edge.invalid_at,
         }
 
+        if not bool(driver.aoss_client):
+            edge_data['fact_embedding'] = edge.fact_embedding
+
         edge_data.update(edge.attributes or {})
         edges.append(edge_data)
 
     await tx.run(get_episode_node_save_bulk_query(driver.provider), episodes=episodes)
-    await tx.run(get_entity_node_save_bulk_query(driver.provider, nodes), nodes=nodes)
+    await tx.run(
+        get_entity_node_save_bulk_query(driver.provider, nodes),
+        nodes=nodes,
+    )
     await tx.run(
         get_episodic_edge_save_bulk_query(driver.provider),
         episodic_edges=[edge.model_dump() for edge in episodic_edges],
     )
-    await tx.run(get_entity_edge_save_bulk_query(driver.provider), entity_edges=edges)
+    await tx.run(
+        get_entity_edge_save_bulk_query(driver.provider),
+        entity_edges=edges,
+    )
 
+    # Save to OpenSearch if available
+    if driver.aoss_client:
+        # Prepare data for OpenSearch
+        episode_docs = []
+        for episode in episodes:
+            episode_docs.append({
+                '_index': EPISODE_INDEX_NAME,
+                '_id': episode['uuid'],
+                '_source': episode,
+                '_routing': episode['group_id']
+            })
+
+        node_docs = []
+        for node_data, entity_node in zip(nodes, entity_nodes, strict=True):
+            if node_data.get('uuid') == entity_node.uuid:
+                node_data['name_embedding'] = entity_node.name_embedding
+            node_docs.append({
+                '_index': ENTITY_INDEX_NAME,
+                '_id': node_data['uuid'],
+                '_source': node_data,
+                '_routing': node_data['group_id']
+            })
+
+        edge_docs = []
+        for edge_data, entity_edge in zip(edges, entity_edges, strict=True):
+            if edge_data.get('uuid') == entity_edge.uuid:
+                edge_data['fact_embedding'] = entity_edge.fact_embedding
+            edge_docs.append({
+                '_index': ENTITY_EDGE_INDEX_NAME,
+                '_id': edge_data['uuid'],
+                '_source': edge_data,
+                '_routing': edge_data['group_id']
+            })
+
+        # Bulk index to OpenSearch
+        all_docs = episode_docs + node_docs + edge_docs
+        if all_docs:
+            # Prepare bulk actions for OpenSearch
+            actions = []
+            for doc in all_docs:
+                actions.append({'index': {
+                    '_index': doc['_index'],
+                    '_id': doc['_id'],
+                    'routing': doc['_routing']
+                }})
+                actions.append(doc['_source'])
+
+            if actions:
+                await driver.aoss_client.bulk(body=actions)
+    
 
 async def extract_nodes_and_edges_bulk(
     clients: GraphitiClients,
