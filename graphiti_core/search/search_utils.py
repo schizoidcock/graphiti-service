@@ -72,12 +72,9 @@ MAX_SEARCH_DEPTH = 3
 MAX_QUERY_LENGTH = 128
 
 def fulltext_query(query: str, group_ids: list[str] | None, driver: GraphDriver):
-    # For FalkorDB, we need to use simple search terms only
-    if len(query.split(' ')) > MAX_QUERY_LENGTH:
-        return ''
-    # For FalkorDB compatibility, return simple query without group filters
+    # For FalkorDB, use the specialized fulltext query builder
     if driver.provider == GraphProvider.FALKORDB:
-        return lucene_sanitize(query)
+        return driver.build_fulltext_query(query, group_ids, MAX_QUERY_LENGTH)
     
     group_ids_filter_list = (
         [driver.fulltext_syntax + f'group_id:"{g}"' for g in group_ids]

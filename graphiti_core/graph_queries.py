@@ -61,12 +61,41 @@ def get_range_indices(provider: GraphProvider) -> list[LiteralString]:
 
 def get_fulltext_indices(provider: GraphProvider) -> list[LiteralString]:
     if provider == GraphProvider.FALKORDB:
-        return [
-            """CREATE FULLTEXT INDEX FOR (e:Episodic) ON (e.content, e.source, e.source_description, e.group_id)""",
-            """CREATE FULLTEXT INDEX FOR (n:Entity) ON (n.name, n.summary, n.group_id)""",
-            """CREATE FULLTEXT INDEX FOR (n:Community) ON (n.name, n.group_id)""",
-            """CREATE FULLTEXT INDEX FOR ()-[e:RELATES_TO]-() ON (e.name, e.fact, e.group_id)""",
-        ]
+        from typing import cast
+
+        from graphiti_core.driver.falkordb_driver import STOPWORDS
+
+        # Convert to string representation for embedding in queries
+        stopwords_str = str(STOPWORDS)
+
+        # Use type: ignore to satisfy LiteralString requirement while maintaining single source of truth
+        return cast(
+            list[LiteralString],
+            [
+                f"""CALL db.idx.fulltext.createNodeIndex(
+                                                {{
+                                                    label: 'Episodic',
+                                                    stopwords: {stopwords_str}
+                                                }},
+                                                'content', 'source', 'source_description', 'group_id'
+                                                )""",
+                f"""CALL db.idx.fulltext.createNodeIndex(
+                                                {{
+                                                    label: 'Entity',
+                                                    stopwords: {stopwords_str}
+                                                }},
+                                                'name', 'summary', 'group_id'
+                                                )""",
+                f"""CALL db.idx.fulltext.createNodeIndex(
+                                                {{
+                                                    label: 'Community',
+                                                    stopwords: {stopwords_str}
+                                                }},
+                                                'name', 'group_id'
+                                                )""",
+                """CREATE FULLTEXT INDEX FOR ()-[e:RELATES_TO]-() ON (e.name, e.fact, e.group_id)""",
+            ],
+        )
 
     return [
         """CREATE FULLTEXT INDEX episode_content IF NOT EXISTS
@@ -79,15 +108,6 @@ def get_fulltext_indices(provider: GraphProvider) -> list[LiteralString]:
         FOR ()-[e:RELATES_TO]-() ON EACH [e.name, e.fact, e.group_id]""",
     ]
 
-
-def escape_falkordb_query(query: str) -> str:
-    """Escape special characters in FalkorDB RediSearch queries"""
-    # Escape critical RediSearch special characters that cause syntax errors
-    # Over-escaping is problematic, but these specific characters break queries
-    return (query
-            .replace('@', '\\@')      # Email addresses
-            .replace('$', '\\$')      # Dollar signs (e.g., $7,000,000)
-            .replace('#', '\\#'))     # Hash symbols
 
 
 def get_nodes_query(name: str, query: str, limit: int, provider: GraphProvider) -> str:
