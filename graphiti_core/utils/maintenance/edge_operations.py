@@ -63,31 +63,6 @@ def build_episodic_edges(
     return episodic_edges
 
 
-def build_duplicate_of_edges(
-    episode: EpisodicNode,
-    created_at: datetime,
-    duplicate_nodes: list[tuple[EntityNode, EntityNode]],
-) -> list[EntityEdge]:
-    is_duplicate_of_edges: list[EntityEdge] = []
-    for source_node, target_node in duplicate_nodes:
-        if source_node.uuid == target_node.uuid:
-            continue
-
-        is_duplicate_of_edges.append(
-            EntityEdge(
-                source_node_uuid=source_node.uuid,
-                target_node_uuid=target_node.uuid,
-                name='IS_DUPLICATE_OF',
-                group_id=episode.group_id,
-                fact=f'{source_node.name} is a duplicate of {target_node.name}',
-                episodes=[episode.uuid],
-                created_at=created_at,
-                valid_at=created_at,
-            )
-        )
-
-    return is_duplicate_of_edges
-
 
 def build_community_edges(
     entity_nodes: list[EntityNode],
@@ -501,36 +476,3 @@ async def resolve_extracted_edge(
     return resolved_edge, invalidated_edges, duplicate_edges
 
 
-async def filter_existing_duplicate_of_edges(
-    driver: GraphDriver, duplicates_node_tuples: list[tuple[EntityNode, EntityNode]]
-) -> list[tuple[EntityNode, EntityNode]]:
-    if not duplicates_node_tuples:
-        return []
-
-    duplicate_nodes_map = {
-        (source.uuid, target.uuid): (source, target) for source, target in duplicates_node_tuples
-    }
-
-    if driver.provider == GraphProvider.FALKORDB:
-        query: LiteralString = """
-            UNWIND $duplicate_node_uuids AS duplicate_tuple
-            MATCH (n:Entity {uuid: duplicate_tuple[0]})-[r:RELATES_TO {name: 'IS_DUPLICATE_OF'}]->(m:Entity {uuid: duplicate_tuple[1]})
-            RETURN DISTINCT
-                n.uuid AS source_uuid,
-                m.uuid AS target_uuid
-        """
-        duplicate_node_uuids = list(duplicate_nodes_map.keys())
-
-        records, _, _ = await driver.execute_query(
-            query,
-            duplicate_node_uuids=duplicate_node_uuids,
-            routing_='r',
-        )        
-
-    # Remove duplicates that already have the IS_DUPLICATE_OF edge
-    for record in records:
-        duplicate_tuple = (record.get('source_uuid'), record.get('target_uuid'))
-        if duplicate_nodes_map.get(duplicate_tuple):
-            duplicate_nodes_map.pop(duplicate_tuple)
-
-    return list(duplicate_nodes_map.values())
