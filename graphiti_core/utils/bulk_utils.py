@@ -45,6 +45,12 @@ from graphiti_core.models.nodes.node_db_queries import (
 )
 from graphiti_core.nodes import EntityNode, EpisodeType, EpisodicNode, create_entity_node_embeddings
 from graphiti_core.utils.datetime_utils import convert_datetimes_to_strings
+from graphiti_core.utils.maintenance.dedup_helpers import (
+    DedupResolutionState,
+    _build_candidate_indexes,
+    _normalize_string_exact,
+    _resolve_with_similarity,
+)
 from graphiti_core.utils.maintenance.edge_operations import (
     extract_edges,
     resolve_extracted_edge,
@@ -61,6 +67,38 @@ from graphiti_core.utils.maintenance.node_operations import (
 logger = logging.getLogger(__name__)
 
 CHUNK_SIZE = 10
+
+
+def _build_directed_uuid_map(pairs: list[tuple[str, str]]) -> dict[str, str]:
+    """Collapse alias -> canonical chains while preserving direction.
+
+    The incoming pairs represent directed mappings discovered during node dedupe. We use a simple
+    union-find with iterative path compression to ensure every source UUID resolves to its ultimate
+    canonical target, even if aliases appear lexicographically smaller than the canonical UUID.
+    """
+
+    parent: dict[str, str] = {}
+
+    def find(uuid: str) -> str:
+        """Directed union-find lookup using iterative path compression."""
+        parent.setdefault(uuid, uuid)
+        root = uuid
+        while parent[root] != root:
+            root = parent[root]
+
+        while parent[uuid] != root:
+            next_uuid = parent[uuid]
+            parent[uuid] = root
+            uuid = next_uuid
+
+        return root
+
+    for source_uuid, target_uuid in pairs:
+        parent.setdefault(source_uuid, source_uuid)
+        parent.setdefault(target_uuid, target_uuid)
+        parent[find(source_uuid)] = find(target_uuid)
+
+    return {uuid: find(uuid) for uuid in parent}
 
 
 class RawEpisode(BaseModel):
