@@ -231,7 +231,11 @@ async def _resolve_with_llm(
     previous_episodes: list[EpisodicNode] | None,
     entity_types: dict[str, type[BaseModel]] | None,
 ) -> None:
-    """Escalate unresolved nodes to the dedupe prompt so the LLM can select or reject duplicates."""
+    """Escalate unresolved nodes to the dedupe prompt so the LLM can select or reject duplicates.
+
+    The guardrails below defensively ignore malformed or duplicate LLM responses so the
+    ingestion workflow remains deterministic even when the model misbehaves.
+    """
     if not state.unresolved_indices:
         return
 
@@ -279,24 +283,48 @@ async def _resolve_with_llm(
 
     node_resolutions: list[NodeDuplicate] = NodeResolutions(**llm_response).entity_resolutions
 
+    valid_relative_range = range(len(state.unresolved_indices))
+    processed_relative_ids: set[int] = set()
+
     for resolution in node_resolutions:
-        resolution_id: int = resolution.id
+        relative_id: int = resolution.id
         duplicate_idx: int = resolution.duplicate_idx
 
-        if resolution_id >= len(llm_extracted_nodes):
+        if relative_id not in valid_relative_range:
+            logger.warning(
+                'Skipping invalid LLM dedupe id %s (unresolved indices: %s)',
+                relative_id,
+                state.unresolved_indices,
+            )
             continue
 
-        original_idx = state.unresolved_indices[resolution_id]
-        extracted_node = extracted_nodes[original_idx]
+        if relative_id in processed_relative_ids:
+            logger.warning('Duplicate LLM dedupe id %s received; ignoring.', relative_id)
+            continue
+        processed_relative_ids.add(relative_id)
 
-        resolved_node = (
-            existing_nodes[duplicate_idx]
-            if 0 <= duplicate_idx < len(existing_nodes)
-            else extracted_node
-        )
+        original_index = state.unresolved_indices[relative_id]
+        extracted_node = extracted_nodes[original_index]
 
-        state.resolved_nodes[original_idx] = resolved_node
+        resolved_node: EntityNode
+        if duplicate_idx == -1:
+            resolved_node = extracted_node
+        elif 0 <= duplicate_idx < len(indexes.existing_nodes):
+            resolved_node = indexes.existing_nodes[duplicate_idx]
+        else:
+            logger.warning(
+                'Invalid duplicate_idx %s for extracted node %s; treating as no duplicate.',
+                duplicate_idx,
+                extracted_node.uuid,
+            )
+            resolved_node = extracted_node
+
+        state.resolved_nodes[original_index] = resolved_node
         state.uuid_map[extracted_node.uuid] = resolved_node.uuid
+
+        # Track duplicate pairs when a duplicate is found
+        if resolved_node != extracted_node:
+            state.duplicate_pairs.append((extracted_node, resolved_node))
 
 
 async def resolve_extracted_nodes(
