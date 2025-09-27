@@ -20,7 +20,7 @@ import math
 import re
 from collections import defaultdict
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import lru_cache
 from hashlib import blake2b
 from typing import TYPE_CHECKING
