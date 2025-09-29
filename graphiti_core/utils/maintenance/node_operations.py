@@ -195,11 +195,11 @@ async def _collect_candidate_nodes(
     search_results: list[SearchResults] = await semaphore_gather(
         *[
             search(
-                clients.driver,
+                clients,
                 query=node.name,
+                group_ids=[node.group_id],
                 config=NODE_HYBRID_SEARCH_RRF,
-                search_filters=SearchFilters(group_ids=[node.group_id]),
-                limit=50,
+                search_filter=SearchFilters(),
             )
             for node in extracted_nodes
         ]
