@@ -197,10 +197,12 @@ class FalkorDriver(GraphDriver):
                     logger.info("🔧 Configuring Redis for Railway environment with persistent volume...")
 
                     # Redis commands to ensure persistence works with Railway volume
-                    # DO NOT disable persistence - Railway volume is mounted at /var/lib/falkordb/data
+                    # FalkorDB graph operations don't replay correctly from AOF
+                    # Use RDB snapshots only for reliable persistence
                     redis_commands = [
+                        ('CONFIG', 'SET', 'appendonly', 'no'),  # Disable AOF - causes replay errors with graph operations
+                        ('CONFIG', 'SET', 'save', '60 1 300 10 900 1'),  # Enable aggressive RDB snapshots
                         ('CONFIG', 'SET', 'stop-writes-on-bgsave-error', 'no'),  # Don't block writes on save errors
-                        # Persistence is enabled by default in run-railway.sh - don't override it
                     ]
                     
                     success_count = 0
@@ -224,11 +226,12 @@ class FalkorDriver(GraphDriver):
                             continue
                     
                     if success_count > 0:
-                        logger.info(f"✅ Redis configured for Railway with persistent volume ({success_count}/1 settings applied)")
-                        logger.info("💾 Persistence enabled - data will survive redeployments")
+                        logger.info(f"✅ Redis configured for Railway with persistent volume ({success_count}/3 settings applied)")
+                        logger.info("💾 RDB persistence enabled - AOF disabled due to graph operation incompatibility")
+                        logger.info("💾 Snapshots: 60s/1key, 300s/10keys, 900s/1key")
                     else:
                         logger.info("ℹ️ Using default Redis configuration")
-                        logger.info("💾 Persistence should be enabled by FalkorDB startup configuration")
+                        logger.info("⚠️ Persistence configuration may not be optimal for FalkorDB")
                         
                 except Exception as config_err:
                     logger.warning(f"Redis configuration error: {config_err}")
@@ -279,7 +282,7 @@ class FalkorDriver(GraphDriver):
                 # check if index already exists
                 logger.info(f'Index already exists: {e}')
                 return None
-            
+
             # Check if this is a Redis persistence error
             if 'MISCONF' in str(e) and 'stop-writes-on-bgsave-error' in str(e):
                 logger.warning(f"Redis persistence error detected: {e}")
