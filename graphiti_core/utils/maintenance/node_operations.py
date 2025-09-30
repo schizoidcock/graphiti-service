@@ -260,7 +260,7 @@ async def _resolve_with_llm(
 
     # Prepare context for LLM
     context = {
-        'extracted_entities': [
+        'extracted_nodes': [
             {
                 'id': i,
                 'name': node.name,
@@ -269,7 +269,7 @@ async def _resolve_with_llm(
             }
             for i, node in enumerate(llm_extracted_nodes)
         ],
-        'existing_entities': existing_nodes_context,
+        'existing_nodes': existing_nodes_context,
         'episode_content': episode.content if episode is not None else '',
         'previous_episodes': [ep.content for ep in (previous_episodes or [])],
         'ensure_ascii': ensure_ascii,
