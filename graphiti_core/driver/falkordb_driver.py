@@ -187,20 +187,20 @@ class FalkorDriver(GraphDriver):
         self.fulltext_syntax = '@'  # FalkorDB uses a redisearch-like syntax for fulltext queries see https://redis.io/docs/latest/develop/ai/search-and-query/query/full-text/
 
     def _configure_redis_for_railway(self):
-        """Configure Redis settings to avoid persistence issues on Railway"""
+        """Configure Redis settings for Railway with persistent volume"""
         try:
             import asyncio
-            
+
             async def _config_redis():
                 """Async Redis configuration for Railway environment"""
                 try:
-                    logger.info("🔧 Configuring Redis for Railway environment...")
-                    
-                    # Redis commands to prevent persistence issues on Railway's ephemeral filesystem
+                    logger.info("🔧 Configuring Redis for Railway environment with persistent volume...")
+
+                    # Redis commands to ensure persistence works with Railway volume
+                    # DO NOT disable persistence - Railway volume is mounted at /var/lib/falkordb/data
                     redis_commands = [
-                        ('CONFIG', 'SET', 'save', ''),  # Disable RDB snapshots
                         ('CONFIG', 'SET', 'stop-writes-on-bgsave-error', 'no'),  # Don't block writes on save errors
-                        ('CONFIG', 'SET', 'appendonly', 'no'),  # Disable AOF persistence
+                        # Persistence is enabled by default in run-railway.sh - don't override it
                     ]
                     
                     success_count = 0
@@ -224,10 +224,11 @@ class FalkorDriver(GraphDriver):
                             continue
                     
                     if success_count > 0:
-                        logger.info(f"✅ Redis configured for Railway ({success_count}/3 settings applied)")
+                        logger.info(f"✅ Redis configured for Railway with persistent volume ({success_count}/1 settings applied)")
+                        logger.info("💾 Persistence enabled - data will survive redeployments")
                     else:
-                        logger.warning("⚠️ Could not apply Redis configuration - using default settings")
-                        logger.info("Service may experience persistence issues on Railway")
+                        logger.info("ℹ️ Using default Redis configuration")
+                        logger.info("💾 Persistence should be enabled by FalkorDB startup configuration")
                         
                 except Exception as config_err:
                     logger.warning(f"Redis configuration error: {config_err}")
