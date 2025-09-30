@@ -277,7 +277,7 @@ async def _resolve_with_llm(
 
     # LLM dedupe
     llm_response = await llm_client.generate_response(
-        prompt_library.dedupe_nodes.dedupe_extracted_nodes(context),
+        prompt_library.dedupe_nodes.nodes(context),
         response_model=NodeResolutions,
     )
 
