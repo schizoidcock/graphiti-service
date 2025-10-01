@@ -39,6 +39,7 @@ from graphiti_core.prompts.extract_edges import ExtractedEdges, MissingFacts
 from graphiti_core.search.search_filters import SearchFilters
 from graphiti_core.search.search_utils import get_edge_invalidation_candidates, get_relevant_edges
 from graphiti_core.utils.datetime_utils import ensure_utc, utc_now
+from graphiti_core.utils.maintenance.dedup_helpers import _normalize_string_exact
 
 DEFAULT_EDGE_NAME = 'RELATES_TO'
 
@@ -230,6 +231,22 @@ async def resolve_extracted_edges(
     edge_types: dict[str, type[BaseModel]],
     edge_type_map: dict[tuple[str, str], list[str]],
 ) -> tuple[list[EntityEdge], list[EntityEdge]]:
+    # Fast path: deduplicate exact matches within the extracted edges before parallel processing
+    seen: dict[tuple[str, str, str], EntityEdge] = {}
+    deduplicated_edges: list[EntityEdge] = []
+
+    for edge in extracted_edges:
+        key = (
+            edge.source_node_uuid,
+            edge.target_node_uuid,
+            _normalize_string_exact(edge.fact),
+        )
+        if key not in seen:
+            seen[key] = edge
+            deduplicated_edges.append(edge)
+
+    extracted_edges = deduplicated_edges
+
     driver = clients.driver
     llm_client = clients.llm_client
     embedder = clients.embedder
@@ -418,7 +435,7 @@ async def resolve_extracted_edge(
 
     # Prepare context for LLM
     related_edges_context = [
-        {'id': edge.uuid, 'fact': edge.fact} for i, edge in enumerate(related_edges)
+        {'id': i, 'fact': edge.fact} for i, edge in enumerate(related_edges)
     ]
 
     invalidation_edge_candidates_context = [
