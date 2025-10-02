@@ -15,6 +15,7 @@ limitations under the License.
 """
 
 import logging
+from collections.abc import Awaitable, Callable
 from time import time
 from typing import Any
 
@@ -46,6 +47,8 @@ from graphiti_core.utils.maintenance.dedup_helpers import (
 )
 
 logger = logging.getLogger(__name__)
+
+NodeSummaryFilter = Callable[[EntityNode], Awaitable[bool]]
 
 
 async def extract_nodes_reflexion(
@@ -382,6 +385,7 @@ async def extract_attributes_from_nodes(
     episode: EpisodicNode | None = None,
     previous_episodes: list[EpisodicNode] | None = None,
     entity_types: dict[str, type[BaseModel]] | None = None,
+    should_summarize_node: NodeSummaryFilter | None = None,
 ) -> list[EntityNode]:
     llm_client = clients.llm_client
     embedder = clients.embedder
@@ -396,6 +400,7 @@ async def extract_attributes_from_nodes(
                 if entity_types is not None
                 else None,
                 clients.ensure_ascii,
+                should_summarize_node,
             )
             for node in nodes
         ]
@@ -413,6 +418,7 @@ async def extract_attributes_from_node(
     previous_episodes: list[EpisodicNode] | None = None,
     entity_type: type[BaseModel] | None = None,
     ensure_ascii: bool = False,
+    should_summarize_node: NodeSummaryFilter | None = None,
 ) -> EntityNode:
     node_context: dict[str, Any] = {
         'name': node.name,
@@ -455,16 +461,22 @@ async def extract_attributes_from_node(
         else {}
     )
 
-    summary_response = await llm_client.generate_response(
-        prompt_library.extract_nodes.extract_summary(summary_context),
-        response_model=EntitySummary,
-        model_size=ModelSize.small,
-    )
+    # Determine if summary should be generated
+    generate_summary = True
+    if should_summarize_node is not None:
+        generate_summary = await should_summarize_node(node)
+
+    # Conditionally generate summary
+    if generate_summary:
+        summary_response = await llm_client.generate_response(
+            prompt_library.extract_nodes.extract_summary(summary_context),
+            response_model=EntitySummary,
+            model_size=ModelSize.small,
+        )
+        node.summary = summary_response.get('summary', '')
 
     if has_entity_attributes and entity_type is not None:
         entity_type(**llm_response)
-
-    node.summary = summary_response.get('summary', '')
     node_attributes = {key: value for key, value in llm_response.items()}
 
     node.attributes.update(node_attributes)
