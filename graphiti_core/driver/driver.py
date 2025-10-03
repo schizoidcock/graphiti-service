@@ -14,28 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import asyncio
 import copy
 import logging
-import os
 from abc import ABC, abstractmethod
 from collections.abc import Coroutine
-from datetime import datetime
 from enum import Enum
-from typing import Any, Union
+from typing import Any
 
 from dotenv import load_dotenv
-
-from graphiti_core.embedder.client import EMBEDDING_DIM
-
-try:
-    from opensearchpy import AsyncOpenSearch, helpers
-    _HAS_OPENSEARCH = True
-except ImportError:
-    AsyncOpenSearch = None
-    helpers = None
-    _HAS_OPENSEARCH = False
-
 
 logger = logging.getLogger(__name__)
 
@@ -43,123 +29,9 @@ DEFAULT_SIZE = 10
 
 load_dotenv()
 
-ENTITY_INDEX_NAME = os.environ.get('ENTITY_INDEX_NAME', 'entities')
-EPISODE_INDEX_NAME = os.environ.get('EPISODE_INDEX_NAME', 'episodes')
-COMMUNITY_INDEX_NAME = os.environ.get('COMMUNITY_INDEX_NAME', 'communities')
-ENTITY_EDGE_INDEX_NAME = os.environ.get('ENTITY_EDGE_INDEX_NAME', 'entity_edges')
-
 
 class GraphProvider(Enum):
     FALKORDB = 'falkordb'
-
-
-aoss_indices = [
-    {
-        'index_name': ENTITY_INDEX_NAME,
-        'body': {
-            'settings': {'index': {'knn': True}},
-            'mappings': {
-                'properties': {
-                    'uuid': {'type': 'keyword'},
-                    'name': {'type': 'text'},
-                    'summary': {'type': 'text'},
-                    'group_id': {'type': 'keyword'},
-                    'created_at': {'type': 'date', 'format': 'strict_date_optional_time_nanos'},
-                    'name_embedding': {
-                        'type': 'knn_vector',
-                        'dimension': EMBEDDING_DIM,
-                        'method': {
-                            'name': 'hnsw',
-                            'space_type': 'cosinesimil',
-                            'engine': 'lucene',
-                        },
-                    },
-                    'summary_embedding': {
-                        'type': 'knn_vector',
-                        'dimension': EMBEDDING_DIM,
-                        'method': {
-                            'name': 'hnsw',
-                            'space_type': 'cosinesimil',
-                            'engine': 'lucene',
-                        },
-                    },
-                }
-            },
-        },
-    },
-    {
-        'index_name': EPISODE_INDEX_NAME,
-        'body': {
-            'settings': {'index': {'knn': True}},
-            'mappings': {
-                'properties': {
-                    'uuid': {'type': 'keyword'},
-                    'name': {'type': 'text'},
-                    'summary': {'type': 'text'},
-                    'group_id': {'type': 'keyword'},
-                    'created_at': {'type': 'date', 'format': 'strict_date_optional_time_nanos'},
-                    'valid_at': {'type': 'date', 'format': 'strict_date_optional_time_nanos'},
-                    'invalid_at': {'type': 'date', 'format': 'strict_date_optional_time_nanos'},
-                    'content': {'type': 'text'},
-                    'source_description': {'type': 'text'},
-                    'reference_time': {'type': 'date', 'format': 'strict_date_optional_time_nanos'},
-                    'content_embedding': {
-                        'type': 'knn_vector',
-                        'dimension': EMBEDDING_DIM,
-                        'method': {
-                            'name': 'hnsw',
-                            'space_type': 'cosinesimil',
-                            'engine': 'lucene',
-                        },
-                    },
-                }
-            },
-        },
-    },
-    {
-        'index_name': COMMUNITY_INDEX_NAME,
-        'body': {
-            'settings': {'index': {'knn': True}},
-            'mappings': {
-                'properties': {
-                    'uuid': {'type': 'keyword'},
-                    'name': {'type': 'text'},
-                    'summary': {'type': 'text'},
-                    'group_id': {'type': 'keyword'},
-                    'created_at': {'type': 'date', 'format': 'strict_date_optional_time_nanos'},
-                    'summary_embedding': {
-                        'type': 'knn_vector',
-                        'dimension': EMBEDDING_DIM,
-                        'method': {
-                            'name': 'hnsw',
-                            'space_type': 'cosinesimil',
-                            'engine': 'lucene',
-                        },
-                    },
-                }
-            },
-        },
-    },
-    {
-        'index_name': ENTITY_EDGE_INDEX_NAME,
-        'body': {
-            'mappings': {
-                'properties': {
-                    'uuid': {'type': 'keyword'},
-                    'group_id': {'type': 'keyword'},
-                    'name': {'type': 'keyword'},
-                    'fact': {'type': 'text'},
-                    'source_node_uuid': {'type': 'keyword'},
-                    'target_node_uuid': {'type': 'keyword'},
-                    'created_at': {'type': 'date', 'format': 'strict_date_optional_time_nanos'},
-                    'expired_at': {'type': 'date', 'format': 'strict_date_optional_time_nanos'},
-                    'valid_at': {'type': 'date', 'format': 'strict_date_optional_time_nanos'},
-                    'invalid_at': {'type': 'date', 'format': 'strict_date_optional_time_nanos'},
-                }
-            }
-        },
-    },
-]
 
 
 class GraphDriverSession(ABC):
@@ -188,7 +60,7 @@ class GraphDriver(ABC):
     provider: GraphProvider
     fulltext_syntax: str = '@'  # FalkorDB uses '@' prefix for fulltext queries
     _database: str
-    aoss_client: Union[Any, None] = None
+    aoss_client: Any = None  # type: ignore
 
     @abstractmethod
     def execute_query(self, cypher_query_: str, **kwargs: Any) -> Coroutine:
@@ -216,42 +88,13 @@ class GraphDriver(ABC):
 
         return cloned
 
-    async def setup_aoss_indices(self) -> None:
-        """Setup OpenSearch indices with proper mappings."""
-        if not self.aoss_client:
-            return
+    async def save_to_aoss(self, name: str, data: list[dict]) -> int:
+        """Stub method for AOSS save operation."""
+        return 0
 
-        for index_config in aoss_indices:
-            index_name = index_config['index_name']
-            try:
-                # Check if index exists
-                exists = await self.aoss_client.indices.exists(index=index_name)
-                if not exists:
-                    # Create the index with mappings
-                    await self.aoss_client.indices.create(
-                        index=index_name,
-                        body=index_config['body']
-                    )
-                    logger.info(f"Created OpenSearch index: {index_name}")
-                else:
-                    logger.info(f"OpenSearch index already exists: {index_name}")
-            except Exception as e:
-                logger.error(f"Error setting up OpenSearch index {index_name}: {e}")
-
-    async def delete_aoss_indices(self) -> None:
-        """Delete all OpenSearch indices."""
-        if not self.aoss_client:
-            return
-
-        for index_config in aoss_indices:
-            index_name = index_config['index_name']
-            try:
-                exists = await self.aoss_client.indices.exists(index=index_name)
-                if exists:
-                    await self.aoss_client.indices.delete(index=index_name)
-                    logger.info(f"Deleted OpenSearch index: {index_name}")
-            except Exception as e:
-                logger.error(f"Error deleting OpenSearch index {index_name}: {e}")
+    async def clear_aoss_indices(self) -> int:
+        """Stub method for clearing AOSS indices."""
+        return 1
 
     def build_fulltext_query(
         self, query: str, group_ids: list[str] | None = None, max_query_length: int = 128
