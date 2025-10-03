@@ -29,6 +29,11 @@ DEFAULT_SIZE = 10
 
 load_dotenv()
 
+ENTITY_INDEX_NAME = 'entities'
+EPISODE_INDEX_NAME = 'episodes'
+COMMUNITY_INDEX_NAME = 'communities'
+ENTITY_EDGE_INDEX_NAME = 'entity_edges'
+
 
 class GraphProvider(Enum):
     FALKORDB = 'falkordb'
