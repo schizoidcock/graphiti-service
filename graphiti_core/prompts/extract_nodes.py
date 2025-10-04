@@ -53,7 +53,8 @@ class EntityClassification(BaseModel):
 
 class EntitySummary(BaseModel):
     summary: str = Field(
-        description='Summary containing the important information about the entity. Under 250 words'
+        ...,
+        description='Summary containing the important information about the entity. Under 8 sentences.',
     )
 
 
@@ -296,8 +297,8 @@ def extract_summary(context: dict[str, Any]) -> list[Message]:
         Guidelines:
         1. Do not hallucinate entity summary information if they cannot be found in the current context.
         2. Only use the provided MESSAGES and ENTITY to set attribute values.
-        3. The summary attribute represents a summary of the ENTITY, and should be updated with new information about the Entity from the MESSAGES. 
-            Summaries must be no longer than 250 words.
+        3. The summary attribute represents a summary of the ENTITY, and should be updated with new information about the Entity from the MESSAGES.
+        4. Keep the summary concise and to the point. SUMMARIES MUST BE LESS THAN 8 SENTENCES.
         
         
         <ENTITY>
