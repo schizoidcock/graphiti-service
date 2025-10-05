@@ -20,12 +20,13 @@ from pydantic import BaseModel, Field
 
 from .models import Message, PromptFunction, PromptVersion
 from .prompt_helpers import to_prompt_json
+from .snippets import summary_instructions
 
 
 class Summary(BaseModel):
     summary: str = Field(
         ...,
-        description='Summary containing the important information about the entity. Under 8 sentences',
+        description='Summary containing the important information about the entity. Under 250 characters',
     )
 
 
@@ -56,7 +57,7 @@ def summarize_pair(context: dict[str, Any]) -> list[Message]:
             content=f"""
         Synthesize the information from the following two summaries into a single succinct summary.
 
-        IMPORTANT: Keep the summary concise and to the point. SUMMARIES MUST BE LESS THAN 8 SENTENCES.
+        IMPORTANT: Keep the summary concise and to the point. SUMMARIES MUST BE LESS THAN 250 CHARACTERS.
 
         Summaries:
         {to_prompt_json(context['node_summaries'], indent=2)}
@@ -74,24 +75,20 @@ def summarize_context(context: dict[str, Any]) -> list[Message]:
         Message(
             role='user',
             content=f"""
-            
-        <MESSAGES>
-        {to_prompt_json(context['previous_episodes'], indent=2)}
-        {to_prompt_json(context['episode_content'], indent=2)}
-        </MESSAGES>
-        
-        Given the above MESSAGES and the following ENTITY name, create a summary for the ENTITY. Your summary must only use
+        Given the MESSAGES and the ENTITY name, create a summary for the ENTITY. Your summary must only use
         information from the provided MESSAGES. Your summary should also only contain information relevant to the
         provided ENTITY.
 
         In addition, extract any values for the provided entity properties based on their descriptions.
         If the value of the entity property cannot be found in the current context, set the value of the property to the Python value None.
 
-        Guidelines:
-        1. Do not hallucinate entity property values if they cannot be found in the current context.
-        2. Only use the provided messages, entity, and entity context to set attribute values.
-        3. Keep the summary concise and to the point. SUMMARIES MUST BE LESS THAN 8 SENTENCES.
-        
+        {summary_instructions}
+
+        <MESSAGES>
+        {to_prompt_json(context['previous_episodes'], indent=2)}
+        {to_prompt_json(context['episode_content'], indent=2)}
+        </MESSAGES>
+
         <ENTITY>
         {context['node_name']}
         </ENTITY>
@@ -118,7 +115,7 @@ def summary_description(context: dict[str, Any]) -> list[Message]:
             role='user',
             content=f"""
         Create a short one sentence description of the summary that explains what kind of information is summarized.
-        Summaries must be under 8 sentences.
+        Summaries must be under 250 characters.
 
         Summary:
         {to_prompt_json(context['summary'], indent=2)}

@@ -20,6 +20,7 @@ from pydantic import BaseModel, Field
 
 from .models import Message, PromptFunction, PromptVersion
 from .prompt_helpers import to_prompt_json
+from .snippets import summary_instructions
 
 class ExtractedEntity(BaseModel):
     name: str = Field(..., description='Name of the extracted entity')
@@ -54,7 +55,7 @@ class EntityClassification(BaseModel):
 class EntitySummary(BaseModel):
     summary: str = Field(
         ...,
-        description='Summary containing the important information about the entity. Under 8 sentences.',
+        description='Summary containing the important information about the entity. Under 250 characters.',
     )
 
 
@@ -293,14 +294,9 @@ def extract_summary(context: dict[str, Any]) -> list[Message]:
 
         Given the above MESSAGES and the following ENTITY, update the summary that combines relevant information about the entity
         from the messages and relevant information from the existing summary.
-        
-        Guidelines:
-        1. Do not hallucinate entity summary information if they cannot be found in the current context.
-        2. Only use the provided MESSAGES and ENTITY to set attribute values.
-        3. The summary attribute represents a summary of the ENTITY, and should be updated with new information about the Entity from the MESSAGES.
-        4. Keep the summary concise and to the point. SUMMARIES MUST BE LESS THAN 8 SENTENCES.
-        
-        
+
+        {summary_instructions}
+
         <ENTITY>
         {context['node']}
         </ENTITY>
