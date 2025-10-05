@@ -146,6 +146,7 @@ class LLMClient(ABC):
         max_tokens: int | None = None,
         model_size: ModelSize = ModelSize.medium,
         group_id: str | None = None,
+        prompt_name: str | None = None,
     ) -> dict[str, typing.Any]:
         if max_tokens is None:
             max_tokens = self.max_tokens
