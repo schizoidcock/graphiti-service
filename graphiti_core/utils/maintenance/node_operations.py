@@ -45,6 +45,7 @@ from graphiti_core.utils.maintenance.dedup_helpers import (
     _build_candidate_indexes,
     _resolve_with_similarity,
 )
+from graphiti_core.utils.text_utils import MAX_SUMMARY_CHARS, truncate_at_sentence
 
 logger = logging.getLogger(__name__)
 
@@ -526,7 +527,7 @@ async def _extract_entity_summary(
     summary_context = _build_episode_context(
         node_data={
             'name': node.name,
-            'summary': node.summary,
+            'summary': truncate_at_sentence(node.summary, MAX_SUMMARY_CHARS),
             'entity_types': node.labels,
             'attributes': node.attributes,
         },
@@ -541,7 +542,7 @@ async def _extract_entity_summary(
         group_id=node.group_id,
     )
 
-    node.summary = summary_response.get('summary', '')
+    node.summary = truncate_at_sentence(summary_response.get('summary', ''), MAX_SUMMARY_CHARS)
 
 
 def _build_episode_context(
