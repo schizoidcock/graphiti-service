@@ -57,8 +57,6 @@ from graphiti_core.nodes import (
 )
 from graphiti_core.search.search_filters import (
     SearchFilters,
-    build_aoss_edge_filters,
-    build_aoss_node_filters,
     edge_search_filter_query_constructor,
     node_search_filter_query_constructor,
 )
@@ -96,7 +94,6 @@ def fulltext_query(query: str, group_ids: list[str] | None, driver: GraphDriver)
 
     return full_query
 
-
 async def get_episodes_by_mentions(
     driver: GraphDriver,
     nodes: list[EntityNode],
@@ -110,7 +107,6 @@ async def get_episodes_by_mentions(
     episodes = await EpisodicNode.get_by_uuids(driver, episode_uuids[:limit])
 
     return episodes
-
 
 async def get_mentioned_nodes(
     driver: GraphDriver, episodes: list[EpisodicNode]
@@ -132,7 +128,6 @@ async def get_mentioned_nodes(
 
     return nodes
 
-
 async def get_communities_by_nodes(
     driver: GraphDriver, nodes: list[EntityNode]
 ) -> list[CommunityNode]:
@@ -153,7 +148,6 @@ async def get_communities_by_nodes(
 
     return communities
 
-
 async def edge_fulltext_search(
     driver: GraphDriver,
     query: str,
@@ -161,85 +155,55 @@ async def edge_fulltext_search(
     group_ids: list[str] | None = None,
     limit=RELEVANT_SCHEMA_LIMIT,
 ) -> list[EntityEdge]:
-    if driver.aoss_client:
-        route = group_ids[0] if group_ids else None
-        filters = build_aoss_edge_filters(group_ids or [], search_filter)
-        res = await driver.aoss_client.search(
-            index=ENTITY_EDGE_INDEX_NAME,
-            params={'routing': route},
-            body={
-                'size': limit,
-                '_source': ['uuid'],
-                'query': {
-                    'bool': {
-                        'filter': filters,
-                        'must': [{'match': {'fact': {'query': query, 'operator': 'or'}}}],
-                    }
-                },
-            },
-        )
-        if res['hits']['total']['value'] > 0:
-            input_uuids = {}
-            for r in res['hits']['hits']:
-                input_uuids[r['_source']['uuid']] = r['_score']
+    # fulltext search over facts
+    fuzzy_query = fulltext_query(query, group_ids, driver)
 
-            # Get edges
-            entity_edges = await EntityEdge.get_by_uuids(driver, list(input_uuids.keys()))
-            entity_edges.sort(key=lambda e: input_uuids.get(e.uuid, 0), reverse=True)
-            return entity_edges
-        else:
-            return []
-    else:
-        # fulltext search over facts
-        fuzzy_query = fulltext_query(query, group_ids, driver)
+    if fuzzy_query == '':
+        return []
 
-        if fuzzy_query == '':
-            return []
-
-        match_query = """
+    match_query = """
         YIELD relationship AS rel, score
         MATCH (n:Entity)-[e:RELATES_TO {uuid: rel.uuid}]->(m:Entity)
         """
 
-        filter_queries, filter_params = edge_search_filter_query_constructor(
-            search_filter, driver.provider
-        )
+    filter_queries, filter_params = edge_search_filter_query_constructor(
+        search_filter, driver.provider
+    )
 
-        if group_ids is not None:
-            filter_queries.append('e.group_id IN $group_ids')
-            filter_params['group_ids'] = group_ids
+    if group_ids is not None:
+        filter_queries.append('e.group_id IN $group_ids')
+        filter_params['group_ids'] = group_ids
 
-        filter_query = ''
-        if filter_queries:
-            filter_query = ' WHERE ' + (' AND '.join(filter_queries))
+    filter_query = ''
+    if filter_queries:
+        filter_query = ' WHERE ' + (' AND '.join(filter_queries))
 
-        query = (
-            get_relationships_query('edge_name_and_fact', limit=limit, provider=driver.provider)
-            + match_query
-            + filter_query
-            + """
+    query = (
+        get_relationships_query('edge_name_and_fact', limit=limit, provider=driver.provider)
+        + match_query
+        + filter_query
+        + """
             WITH e, score, n, m
             RETURN
             """
-            + get_entity_edge_return_query(driver.provider)
-            + """
+        + get_entity_edge_return_query(driver.provider)
+        + """
             ORDER BY score DESC
             LIMIT $limit
             """
-        )
+    )
 
-        records, _, _ = await driver.execute_query(
-            query,
-            query=fuzzy_query,
-            limit=limit,
-            routing_='r',
-            **filter_params,
-        )
+    records, _, _ = await driver.execute_query(
+        query,
+        query=fuzzy_query,
+        limit=limit,
+        routing_='r',
+        **filter_params,
+    )
 
-        edges = [get_entity_edge_from_record(record, driver.provider) for record in records]
+    edges = [get_entity_edge_from_record(record, driver.provider) for record in records]
 
-        return edges
-
+    return edges
 
 async def edge_similarity_search(
     driver: GraphDriver,
@@ -251,92 +215,61 @@ async def edge_similarity_search(
     limit: int = RELEVANT_SCHEMA_LIMIT,
     min_score: float = DEFAULT_MIN_SCORE,
 ) -> list[EntityEdge]:
-    if driver.aoss_client:
-        route = group_ids[0] if group_ids else None
-        filters = build_aoss_edge_filters(group_ids or [], search_filter)
-        res = await driver.aoss_client.search(
-            index=ENTITY_EDGE_INDEX_NAME,
-            params={'routing': route},
-            body={
-                '_source': ['uuid'],
-                'knn': {
-                    'field': 'fact_embedding',
-                    'query_vector': search_vector,
-                    'k': limit,
-                    'num_candidates': 1000,
-                },
-                'query': {'bool': {'filter': filters}},
-            },
-        )
-
-        if res['hits']['total']['value'] > 0:
-            input_uuids = {}
-            for r in res['hits']['hits']:
-                input_uuids[r['_source']['uuid']] = r['_score']
-
-            # Get edges
-            entity_edges = await EntityEdge.get_by_uuids(driver, list(input_uuids.keys()))
-            entity_edges.sort(key=lambda e: input_uuids.get(e.uuid, 0), reverse=True)
-            return entity_edges
-        else:
-            return []
-    else:
-        match_query = """
+    match_query = """
             MATCH (n:Entity)-[e:RELATES_TO]->(m:Entity)
         """
 
-        filter_queries, filter_params = edge_search_filter_query_constructor(
-            search_filter, driver.provider
-        )
+    filter_queries, filter_params = edge_search_filter_query_constructor(
+        search_filter, driver.provider
+    )
 
-        if group_ids is not None:
-            filter_queries.append('e.group_id IN $group_ids')
-            filter_params['group_ids'] = group_ids
+    if group_ids is not None:
+        filter_queries.append('e.group_id IN $group_ids')
+        filter_params['group_ids'] = group_ids
 
-            if source_node_uuid is not None:
-                filter_params['source_uuid'] = source_node_uuid
-                filter_queries.append('n.uuid = $source_uuid')
+        if source_node_uuid is not None:
+            filter_params['source_uuid'] = source_node_uuid
+            filter_queries.append('n.uuid = $source_uuid')
 
-            if target_node_uuid is not None:
-                filter_params['target_uuid'] = target_node_uuid
-                filter_queries.append('m.uuid = $target_uuid')
+        if target_node_uuid is not None:
+            filter_params['target_uuid'] = target_node_uuid
+            filter_queries.append('m.uuid = $target_uuid')
 
-        filter_query = ''
-        if filter_queries:
-            filter_query = ' WHERE ' + (' AND '.join(filter_queries))
+    filter_query = ''
+    if filter_queries:
+        filter_query = ' WHERE ' + (' AND '.join(filter_queries))
 
-        search_vector_var = '$search_vector'
+    search_vector_var = '$search_vector'
 
-        query = (
-            match_query
-            + filter_query
-            + """
+    query = (
+        match_query
+        + filter_query
+        + """
             WITH DISTINCT e, n, m, """
-            + get_vector_cosine_func_query('e.fact_embedding', search_vector_var, driver.provider)
-            + """ AS score
+        + get_vector_cosine_func_query('e.fact_embedding', search_vector_var, driver.provider)
+        + """ AS score
             WHERE score > $min_score
             RETURN
             """
-            + get_entity_edge_return_query(driver.provider)
-            + """
+        + get_entity_edge_return_query(driver.provider)
+        + """
             ORDER BY score DESC
             LIMIT $limit
             """
-        )
+    )
 
-        records, _, _ = await driver.execute_query(
-            query,
-            search_vector=search_vector,
-            limit=limit,
-            min_score=min_score,
-            routing_='r',
-            **filter_params,
-        )
+    records, _, _ = await driver.execute_query(
+        query,
+        search_vector=search_vector,
+        limit=limit,
+        min_score=min_score,
+        routing_='r',
+        **filter_params,
+    )
 
-        edges = [get_entity_edge_from_record(record, driver.provider) for record in records]
+    edges = [get_entity_edge_from_record(record, driver.provider) for record in records]
 
-        return edges
-
+    return edges
 
 async def edge_bfs_search(
     driver: GraphDriver,
@@ -392,7 +325,6 @@ async def edge_bfs_search(
 
     return edges
 
-
 async def node_fulltext_search(
     driver: GraphDriver,
     query: str,
@@ -400,90 +332,51 @@ async def node_fulltext_search(
     group_ids: list[str] | None = None,
     limit=RELEVANT_SCHEMA_LIMIT,
 ) -> list[EntityNode]:
-    if driver.aoss_client:
-        route = group_ids[0] if group_ids else None
-        filters = build_aoss_node_filters(group_ids or [], search_filter)
-        res = await driver.aoss_client.search(
-            index=ENTITY_INDEX_NAME,
-            params={'routing': route},
-            body={
-                'size': limit,
-                '_source': ['uuid'],
-                'query': {
-                    'bool': {
-                        'filter': filters,
-                        'must': [
-                            {
-                                'multi_match': {
-                                    'query': query,
-                                    'fields': ['name', 'summary'],
-                                    'operator': 'or',
-                                }
-                            }
-                        ],
-                    }
-                },
-            },
+    # BM25 search to get top nodes
+    fuzzy_query = fulltext_query(query, group_ids, driver)
+    if fuzzy_query == '':
+        return []
+
+    filter_queries, filter_params = node_search_filter_query_constructor(
+        search_filter, driver.provider
+    )
+
+    if group_ids is not None:
+        filter_queries.append('n.group_id IN $group_ids')
+        filter_params['group_ids'] = group_ids
+
+    filter_query = ''
+    if filter_queries:
+        filter_query = ' WHERE ' + (' AND '.join(filter_queries))
+
+    yield_query = 'YIELD node AS n, score'
+
+    query = (
+        get_nodes_query(
+            'node_name_and_summary', '$query', limit=limit, provider=driver.provider
         )
+        + yield_query
+        + filter_query
+        + """
+        WITH n, score
+        ORDER BY score DESC
+        LIMIT $limit
+        RETURN
+        """
+        + get_entity_node_return_query(driver.provider)
+    )
 
-        if res['hits']['total']['value'] > 0:
-            input_uuids = {}
-            for r in res['hits']['hits']:
-                input_uuids[r['_source']['uuid']] = r['_score']
+    records, _, _ = await driver.execute_query(
+        query,
+        query=fuzzy_query,
+        limit=limit,
+        routing_='r',
+        **filter_params,
+    )
 
-            # Get nodes
-            entities = await EntityNode.get_by_uuids(driver, list(input_uuids.keys()))
-            entities.sort(key=lambda e: input_uuids.get(e.uuid, 0), reverse=True)
-            return entities
-        else:
-            return []
-    else:
-        # BM25 search to get top nodes
-        fuzzy_query = fulltext_query(query, group_ids, driver)
-        if fuzzy_query == '':
-            return []
+    nodes = [get_entity_node_from_record(record, driver.provider) for record in records]
 
-        filter_queries, filter_params = node_search_filter_query_constructor(
-            search_filter, driver.provider
-        )
-
-        if group_ids is not None:
-            filter_queries.append('n.group_id IN $group_ids')
-            filter_params['group_ids'] = group_ids
-
-        filter_query = ''
-        if filter_queries:
-            filter_query = ' WHERE ' + (' AND '.join(filter_queries))
-
-        yield_query = 'YIELD node AS n, score'
-
-        query = (
-            get_nodes_query(
-                'node_name_and_summary', '$query', limit=limit, provider=driver.provider
-            )
-            + yield_query
-            + filter_query
-            + """
-            WITH n, score
-            ORDER BY score DESC
-            LIMIT $limit
-            RETURN
-            """
-            + get_entity_node_return_query(driver.provider)
-        )
-
-        records, _, _ = await driver.execute_query(
-            query,
-            query=fuzzy_query,
-            limit=limit,
-            routing_='r',
-            **filter_params,
-        )
-
-        nodes = [get_entity_node_from_record(record, driver.provider) for record in records]
-
-        return nodes
-
+    return nodes
 
 async def node_similarity_search(
     driver: GraphDriver,
@@ -493,82 +386,51 @@ async def node_similarity_search(
     limit=RELEVANT_SCHEMA_LIMIT,
     min_score: float = DEFAULT_MIN_SCORE,
 ) -> list[EntityNode]:
-    if driver.aoss_client:
-        route = group_ids[0] if group_ids else None
-        filters = build_aoss_node_filters(group_ids or [], search_filter)
-        res = await driver.aoss_client.search(
-            index=ENTITY_INDEX_NAME,
-            params={'routing': route},
-            body={
-                '_source': ['uuid'],
-                'knn': {
-                    'field': 'name_embedding',
-                    'query_vector': search_vector,
-                    'k': limit,
-                    'num_candidates': 1000,
-                },
-                'query': {'bool': {'filter': filters}},
-            },
-        )
+    filter_queries, filter_params = node_search_filter_query_constructor(
+        search_filter, driver.provider
+    )
 
-        if res['hits']['total']['value'] > 0:
-            input_uuids = {}
-            for r in res['hits']['hits']:
-                input_uuids[r['_source']['uuid']] = r['_score']
+    if group_ids is not None:
+        filter_queries.append('n.group_id IN $group_ids')
+        filter_params['group_ids'] = group_ids
 
-            # Get edges
-            entity_nodes = await EntityNode.get_by_uuids(driver, list(input_uuids.keys()))
-            entity_nodes.sort(key=lambda e: input_uuids.get(e.uuid, 0), reverse=True)
-            return entity_nodes
-        else:
-            return []
-    else:
-        filter_queries, filter_params = node_search_filter_query_constructor(
-            search_filter, driver.provider
-        )
+    filter_query = ''
+    if filter_queries:
+        filter_query = ' WHERE ' + (' AND '.join(filter_queries))
 
-        if group_ids is not None:
-            filter_queries.append('n.group_id IN $group_ids')
-            filter_params['group_ids'] = group_ids
+    search_vector_var = '$search_vector'
 
-        filter_query = ''
-        if filter_queries:
-            filter_query = ' WHERE ' + (' AND '.join(filter_queries))
+    query = (
+        """
+        MATCH (n:Entity)
+        """
+        + filter_query
+        + """
+        WITH n, """
+        + get_vector_cosine_func_query('n.name_embedding', search_vector_var, driver.provider)
+        + """ AS score
+        WHERE score > $min_score
+        RETURN
+        """
+        + get_entity_node_return_query(driver.provider)
+        + """
+        ORDER BY score DESC
+        LIMIT $limit
+        """
+    )
 
-        search_vector_var = '$search_vector'
+    records, _, _ = await driver.execute_query(
+        query,
+        search_vector=search_vector,
+        limit=limit,
+        min_score=min_score,
+        routing_='r',
+        **filter_params,
+    )
 
-        query = (
-            """
-            MATCH (n:Entity)
-            """
-            + filter_query
-            + """
-            WITH n, """
-            + get_vector_cosine_func_query('n.name_embedding', search_vector_var, driver.provider)
-            + """ AS score
-            WHERE score > $min_score
-            RETURN
-            """
-            + get_entity_node_return_query(driver.provider)
-            + """
-            ORDER BY score DESC
-            LIMIT $limit
-            """
-        )
+    nodes = [get_entity_node_from_record(record, driver.provider) for record in records]
 
-        records, _, _ = await driver.execute_query(
-            query,
-            search_vector=search_vector,
-            limit=limit,
-            min_score=min_score,
-            routing_='r',
-            **filter_params,
-        )
-
-        nodes = [get_entity_node_from_record(record, driver.provider) for record in records]
-
-        return nodes
-
+    return nodes
 
 async def node_bfs_search(
     driver: GraphDriver,
@@ -618,7 +480,6 @@ async def node_bfs_search(
 
     return nodes
 
-
 async def episode_fulltext_search(
     driver: GraphDriver,
     query: str,
@@ -626,85 +487,47 @@ async def episode_fulltext_search(
     group_ids: list[str] | None = None,
     limit=RELEVANT_SCHEMA_LIMIT,
 ) -> list[EpisodicNode]:
-    if driver.aoss_client:
-        route = group_ids[0] if group_ids else None
-        res = await driver.aoss_client.search(
-            index=EPISODE_INDEX_NAME,
-            params={'routing': route},
-            body={
-                'size': limit,
-                '_source': ['uuid'],
-                'query': {
-                    'bool': {
-                        'filter': {'terms': {'group_id': group_ids or []}},
-                        'must': [
-                            {
-                                'multi_match': {
-                                    'query': query,
-                                    'fields': ['name', 'content'],
-                                    'operator': 'or',
-                                }
-                            }
-                        ],
-                    }
-                },
-            },
-        )
+    # BM25 search to get top episodes
+    fuzzy_query = fulltext_query(query, group_ids, driver)
+    if fuzzy_query == '':
+        return []
 
-        if res['hits']['total']['value'] > 0:
-            input_uuids = {}
-            for r in res['hits']['hits']:
-                input_uuids[r['_source']['uuid']] = r['_score']
+    filter_params: dict[str, Any] = {}
+    group_filter_query: LiteralString = ''
+    if group_ids is not None:
+        group_filter_query += 'WHERE e.group_id IN $group_ids'
+        filter_params['group_ids'] = group_ids
 
-            # Get nodes
-            episodes = await EpisodicNode.get_by_uuids(driver, list(input_uuids.keys()))
-            episodes.sort(key=lambda e: input_uuids.get(e.uuid, 0), reverse=True)
-            return episodes
-        else:
-            return []
-    else:
-        # BM25 search to get top episodes
-        fuzzy_query = fulltext_query(query, group_ids, driver)
-        if fuzzy_query == '':
-            return []
+    query = (
+        get_nodes_query('episode_content', '$query', limit=limit, provider=driver.provider)
+        + """
+        YIELD node AS episode, score
+        MATCH (e:Episodic)
+        WHERE e.uuid = episode.uuid
+        AND e.group_id IN $group_ids
+        """
+        + group_filter_query
+        + """
+        RETURN
+        """
+        + EPISODIC_NODE_RETURN
+        + """
+        ORDER BY score DESC
+        LIMIT $limit
+        """
+    )
 
-        filter_params: dict[str, Any] = {}
-        group_filter_query: LiteralString = ''
-        if group_ids is not None:
-            group_filter_query += 'WHERE e.group_id IN $group_ids'
-            filter_params['group_ids'] = group_ids
-        
-        query = (
-            get_nodes_query('episode_content', '$query', limit=limit, provider=driver.provider)
-            + """
-            YIELD node AS episode, score
-            MATCH (e:Episodic)
-            WHERE e.uuid = episode.uuid
-            AND e.group_id IN $group_ids
-            """
-            + group_filter_query
-            + """
-            RETURN
-            """
-            + EPISODIC_NODE_RETURN
-            + """
-            ORDER BY score DESC
-            LIMIT $limit
-            """
-        )
+    records, _, _ = await driver.execute_query(
+        query,
+        query=fuzzy_query,
+        group_ids=group_ids,
+        limit=limit,
+        routing_='r',
+        **filter_params
+    )
+    episodes = [get_episodic_node_from_record(record) for record in records]
 
-        records, _, _ = await driver.execute_query(
-            query,
-            query=fuzzy_query,
-            group_ids=group_ids,
-            limit=limit,
-            routing_='r',
-            **filter_params
-        )
-        episodes = [get_episodic_node_from_record(record) for record in records]
-
-        return episodes
-
+    return episodes
 
 async def community_fulltext_search(
     driver: GraphDriver,
@@ -741,7 +564,6 @@ async def community_fulltext_search(
     communities = [get_community_node_from_record(record) for record in records]
 
     return communities
-
 
 async def community_similarity_search(
     driver: GraphDriver,
@@ -789,7 +611,6 @@ async def community_similarity_search(
     communities = [get_community_node_from_record(record) for record in records]
 
     return communities
-
 
 async def hybrid_node_search(
     queries: list[str],
@@ -863,7 +684,6 @@ async def hybrid_node_search(
     end = time()
     logger.debug(f'Found relevant nodes: {ranked_uuids} in {(end - start) * 1000} ms')
     return relevant_nodes
-
 
 async def get_relevant_nodes(
     driver: GraphDriver,
@@ -961,7 +781,6 @@ async def get_relevant_nodes(
 
     return relevant_nodes
 
-
 async def get_relevant_edges(
     driver: GraphDriver,
     edges: list[EntityEdge],
@@ -1032,7 +851,6 @@ async def get_relevant_edges(
     relevant_edges = [relevant_edges_dict.get(edge.uuid, []) for edge in edges]
 
     return relevant_edges
-
 
 async def get_edge_invalidation_candidates(
     driver: GraphDriver,
@@ -1105,7 +923,6 @@ async def get_edge_invalidation_candidates(
 
     return invalidation_edges
 
-
 # takes in a list of rankings of uuids
 def rrf(
     results: list[list[str]], rank_const=1, min_score: float = 0
@@ -1123,7 +940,6 @@ def rrf(
     return [uuid for uuid in sorted_uuids if scores[uuid] >= min_score], [
         scores[uuid] for uuid in sorted_uuids if scores[uuid] >= min_score
     ]
-
 
 async def node_distance_reranker(
     driver: GraphDriver,
@@ -1170,7 +986,6 @@ async def node_distance_reranker(
         1 / scores[uuid] for uuid in filtered_uuids if (1 / scores[uuid]) >= min_score
     ]
 
-
 async def episode_mentions_reranker(
     driver: GraphDriver, node_uuids: list[list[str]], min_score: float = 0
 ) -> tuple[list[str], list[float]]:
@@ -1202,7 +1017,6 @@ async def episode_mentions_reranker(
     return [uuid for uuid in sorted_uuids if scores[uuid] >= min_score], [
         scores[uuid] for uuid in sorted_uuids if scores[uuid] >= min_score
     ]
-
 
 def maximal_marginal_relevance(
     query_vector: list[float],
@@ -1244,7 +1058,6 @@ def maximal_marginal_relevance(
         mmr_scores[uuid] for uuid in uuids if mmr_scores[uuid] >= min_score
     ]
 
-
 async def get_embeddings_for_nodes(
     driver: GraphDriver, nodes: list[EntityNode]
 ) -> dict[str, list[float]]:
@@ -1269,7 +1082,6 @@ async def get_embeddings_for_nodes(
 
     return embeddings_dict
 
-
 async def get_embeddings_for_communities(
     driver: GraphDriver, communities: list[CommunityNode]
 ) -> dict[str, list[float]]:
@@ -1293,7 +1105,6 @@ async def get_embeddings_for_communities(
             embeddings_dict[uuid] = embedding
 
     return embeddings_dict
-
 
 async def get_embeddings_for_edges(
     driver: GraphDriver, edges: list[EntityEdge]
