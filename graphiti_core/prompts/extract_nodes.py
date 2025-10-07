@@ -91,7 +91,7 @@ def extract_message(context: dict[str, Any]) -> list[Message]:
 </ENTITY TYPES>
 
 <PREVIOUS MESSAGES>
-{to_prompt_json([ep for ep in context['previous_episodes']], indent=2)}
+{to_prompt_json([ep for ep in context['previous_episodes']])}
 </PREVIOUS MESSAGES>
 
 <CURRENT MESSAGE>
@@ -199,7 +199,7 @@ def reflexion(context: dict[str, Any]) -> list[Message]:
 
     user_prompt = f"""
 <PREVIOUS MESSAGES>
-{to_prompt_json([ep for ep in context['previous_episodes']], indent=2)}
+{to_prompt_json([ep for ep in context['previous_episodes']])}
 </PREVIOUS MESSAGES>
 <CURRENT MESSAGE>
 {context['episode_content']}
@@ -222,7 +222,7 @@ def classify_nodes(context: dict[str, Any]) -> list[Message]:
     sys_prompt = """You are an AI assistant that classifies entity nodes given the context from which they were extracted"""
     user_prompt = f"""
     <PREVIOUS MESSAGES>
-    {to_prompt_json([ep for ep in context['previous_episodes']], indent=2)}
+    {to_prompt_json([ep for ep in context['previous_episodes']])}
     </PREVIOUS MESSAGES>
     <CURRENT MESSAGE>
     {context['episode_content']}
@@ -267,8 +267,8 @@ def extract_attributes(context: dict[str, Any]) -> list[Message]:
         2. Only use the provided MESSAGES and ENTITY to set attribute values.
 
         <MESSAGES>
-        {to_prompt_json(context['previous_episodes'], indent=2)}
-        {to_prompt_json(context['episode_content'], indent=2)}
+        {to_prompt_json(context['previous_episodes'])}
+        {to_prompt_json(context['episode_content'])}
         </MESSAGES>
 
         <ENTITY>
@@ -294,8 +294,8 @@ def extract_summary(context: dict[str, Any]) -> list[Message]:
         {summary_instructions}
 
         <MESSAGES>
-        {to_prompt_json(context['previous_episodes'], indent=2)}
-        {to_prompt_json(context['episode_content'], indent=2)}
+        {to_prompt_json(context['previous_episodes'])}
+        {to_prompt_json(context['episode_content'])}
         </MESSAGES>
 
         <ENTITY>
