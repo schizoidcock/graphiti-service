@@ -60,7 +60,7 @@ def summarize_pair(context: dict[str, Any]) -> list[Message]:
         IMPORTANT: Keep the summary concise and to the point. SUMMARIES MUST BE LESS THAN 250 CHARACTERS.
 
         Summaries:
-        {to_prompt_json(context['node_summaries'], indent=2)}
+        {to_prompt_json(context['node_summaries'])}
         """,
         ),
     ]
@@ -85,8 +85,8 @@ def summarize_context(context: dict[str, Any]) -> list[Message]:
         {summary_instructions}
 
         <MESSAGES>
-        {to_prompt_json(context['previous_episodes'], indent=2)}
-        {to_prompt_json(context['episode_content'], indent=2)}
+        {to_prompt_json(context['previous_episodes'])}
+        {to_prompt_json(context['episode_content'])}
         </MESSAGES>
 
         <ENTITY>
@@ -98,7 +98,7 @@ def summarize_context(context: dict[str, Any]) -> list[Message]:
         </ENTITY CONTEXT>
         
         <ATTRIBUTES>
-        {to_prompt_json(context['attributes'], indent=2)}
+        {to_prompt_json(context['attributes'])}
         </ATTRIBUTES>
         """,
         ),
@@ -118,7 +118,7 @@ def summary_description(context: dict[str, Any]) -> list[Message]:
         Summaries must be under 250 characters.
 
         Summary:
-        {to_prompt_json(context['summary'], indent=2)}
+        {to_prompt_json(context['summary'])}
         """,
         ),
     ]
