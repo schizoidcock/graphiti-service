@@ -159,3 +159,6 @@ COMMUNITY_NODE_RETURN = """
     c.name_embedding AS name_embedding,
     c.summary AS summary
 """
+
+
+
