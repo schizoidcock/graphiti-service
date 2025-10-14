@@ -55,12 +55,14 @@ def get_entity_edge_save_query(provider: GraphProvider) -> str:
     match provider:
         case GraphProvider.FALKORDB:
             return """
-                MATCH (source:Entity {uuid: $edge_data.source_uuid})
-                MATCH (target:Entity {uuid: $edge_data.target_uuid})
+                MERGE (source:Entity {uuid: $edge_data.source_uuid})
+                MERGE (target:Entity {uuid: $edge_data.target_uuid})
                 MERGE (source)-[e:RELATES_TO {uuid: $edge_data.uuid}]->(target)
                 SET e.uuid = $edge_data.uuid,
                     e.name = $edge_data.name,
                     e.group_id = $edge_data.group_id,
+                    e.source_node_uuid = $edge_data.source_uuid,
+                    e.target_node_uuid = $edge_data.target_uuid,
                     e.fact = $edge_data.fact,
                     e.episodes = $edge_data.episodes,
                     e.created_at = $edge_data.created_at,
@@ -81,12 +83,14 @@ def get_entity_edge_save_bulk_query(provider: GraphProvider) -> str:
         case GraphProvider.FALKORDB:
             return """
                 UNWIND $entity_edges AS edge
-                MATCH (source:Entity {uuid: edge.source_node_uuid})
-                MATCH (target:Entity {uuid: edge.target_node_uuid})
+                MERGE (source:Entity {uuid: edge.source_node_uuid})
+                MERGE (target:Entity {uuid: edge.target_node_uuid})
                 MERGE (source)-[r:RELATES_TO {uuid: edge.uuid}]->(target)
                 SET r.uuid = edge.uuid,
                     r.name = edge.name,
                     r.group_id = edge.group_id,
+                    r.source_node_uuid = edge.source_node_uuid,
+                    r.target_node_uuid = edge.target_node_uuid,
                     r.fact = edge.fact,
                     r.episodes = edge.episodes,
                     r.created_at = edge.created_at,
