@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
+import datetime
 import asyncio
 import logging
 from typing import TYPE_CHECKING, Any
@@ -380,6 +381,15 @@ class FalkorDriver(GraphDriver):
         cloned = FalkorDriver(falkor_db=self.client, database=database)
 
         return cloned
+
+    async def health_check(self) -> None:
+        """Check FalkorDB connectivity by running a simple query."""
+        try:
+            await self.execute_query("MATCH (n) RETURN 1 LIMIT 1")
+            return None
+        except Exception as e:
+            print(f"FalkorDB health check failed: {e}")
+            raise
 
     def sanitize(self, query: str) -> str:
         """
