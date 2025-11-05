@@ -66,6 +66,7 @@ class GraphDriver(ABC):
     provider: GraphProvider
     fulltext_syntax: str = '@'  # FalkorDB uses '@' prefix for fulltext queries
     _database: str
+    default_group_id: str = ''
     aoss_client: Any = None  # type: ignore
 
     @abstractmethod
@@ -83,6 +84,14 @@ class GraphDriver(ABC):
     @abstractmethod
     def delete_all_indexes(self) -> Coroutine:
         raise NotImplementedError()
+
+    @abstractmethod
+    async def build_indices_and_constraints(self, delete_existing: bool = False):
+        raise NotImplementedError()
+
+    def clone(self, database: str) -> 'GraphDriver':
+        """Clone the driver with a different database or graph name."""
+        return self
 
     def with_database(self, database: str) -> 'GraphDriver':
         """
