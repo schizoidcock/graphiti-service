@@ -47,6 +47,7 @@ else:
         ) from None
 
 from graphiti_core.driver.driver import GraphDriver, GraphDriverSession, GraphProvider
+from graphiti_core.graph_queries import get_fulltext_indices, get_range_indices
 from graphiti_core.utils.datetime_utils import convert_datetimes_to_strings
 
 logger = logging.getLogger(__name__)
@@ -124,6 +125,8 @@ class FalkorDriverSession(GraphDriverSession):
 
 class FalkorDriver(GraphDriver):
     provider = GraphProvider.FALKORDB
+    default_group_id: str = '\\_'
+    fulltext_syntax: str = '@'  # FalkorDB uses a redisearch-like syntax for fulltext queries
     aoss_client: None = None
 
     def __init__(
@@ -167,26 +170,15 @@ class FalkorDriver(GraphDriver):
         # Configure Redis to avoid persistence issues on Railway
         self._configure_redis_for_railway()
 
-        # Initialize OpenSearch client if configured
-        self.aoss_client = None
-        if aoss_host and aoss_port and boto3 is not None:
-            try:
-                session = boto3.Session()
-                self.aoss_client = OpenSearch(  # type: ignore
-                    hosts=[{'host': aoss_host, 'port': aoss_port}],
-                    http_auth=Urllib3AWSV4SignerAuth(  # type: ignore
-                        session.get_credentials(), session.region_name, 'aoss'
-                    ),
-                    use_ssl=True,
-                    verify_certs=True,
-                    connection_class=Urllib3HttpConnection,
-                    pool_maxsize=20,
-                )  # type: ignore
-            except Exception as e:
-                logger.warning(f'Failed to initialize OpenSearch client: {e}')
-                self.aoss_client = None
-
-        self.fulltext_syntax = '@'  # FalkorDB uses a redisearch-like syntax for fulltext queries see https://redis.io/docs/latest/develop/ai/search-and-query/query/full-text/
+        # Schedule the indices and constraints to be built
+        try:
+            # Try to get the current event loop
+            loop = asyncio.get_running_loop()
+            # Schedule the build_indices_and_constraints to run
+            loop.create_task(self.build_indices_and_constraints())
+        except RuntimeError:
+            # No event loop running, this will be handled later
+            pass
 
     def _configure_redis_for_railway(self):
         """Configure Redis settings for Railway with persistent volume"""
@@ -373,12 +365,25 @@ class FalkorDriver(GraphDriver):
         if drop_tasks:
             await asyncio.gather(*drop_tasks)
 
+    async def build_indices_and_constraints(self, delete_existing=False):
+        if delete_existing:
+            await self.delete_all_indexes()
+        index_queries = get_range_indices(self.provider) + get_fulltext_indices(self.provider)
+        for query in index_queries:
+            await self.execute_query(query)
+
     def clone(self, database: str) -> 'GraphDriver':
         """
         Returns a shallow copy of this driver with a different default database.
         Reuses the same connection (e.g. FalkorDB).
         """
-        cloned = FalkorDriver(falkor_db=self.client, database=database)
+        if database == self._database:
+            cloned = self
+        elif database == self.default_group_id:
+            cloned = FalkorDriver(falkor_db=self.client)
+        else:
+            # Create a new instance of FalkorDriver with the same connection but a different database
+            cloned = FalkorDriver(falkor_db=self.client, database=database)
 
         return cloned
 
