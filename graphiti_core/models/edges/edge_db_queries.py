@@ -78,28 +78,17 @@ def get_entity_edge_save_query(provider: GraphProvider) -> str:
 
 def get_entity_edge_save_bulk_query(provider: GraphProvider) -> str:
     # FalkorDB-only implementation - handle vector embedding separately to avoid type conflicts
-    # Don't use bulk assignment for edges since they include fact_embedding as raw list
+    # Use SET r = edge for cleaner property assignment, then handle embedding with vecf32()
     match provider:
         case GraphProvider.FALKORDB:
             return """
                 UNWIND $entity_edges AS edge
-                MERGE (source:Entity {uuid: edge.source_node_uuid})
-                MERGE (target:Entity {uuid: edge.target_node_uuid})
+                MATCH (source:Entity {uuid: edge.source_node_uuid})
+                MATCH (target:Entity {uuid: edge.target_node_uuid})
                 MERGE (source)-[r:RELATES_TO {uuid: edge.uuid}]->(target)
-                SET r.uuid = edge.uuid,
-                    r.name = edge.name,
-                    r.group_id = edge.group_id,
-                    r.source_node_uuid = edge.source_node_uuid,
-                    r.target_node_uuid = edge.target_node_uuid,
-                    r.fact = edge.fact,
-                    r.episodes = edge.episodes,
-                    r.created_at = edge.created_at,
-                    r.expired_at = edge.expired_at,
-                    r.valid_at = edge.valid_at,
-                    r.invalid_at = edge.invalid_at
-                WITH r, edge
-                WHERE edge.fact_embedding IS NOT NULL
+                SET r = edge
                 SET r.fact_embedding = vecf32(edge.fact_embedding)
+                WITH r, edge
                 RETURN edge.uuid AS uuid
             """
 
