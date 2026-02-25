@@ -25,24 +25,19 @@ from uuid import uuid4
 from pydantic import BaseModel, Field
 from typing_extensions import LiteralString
 
-from graphiti_core.driver.driver import (
-    COMMUNITY_INDEX_NAME,
-    ENTITY_EDGE_INDEX_NAME,
-    ENTITY_INDEX_NAME,
-    EPISODE_INDEX_NAME,
-    GraphDriver,
-    GraphProvider,
-)
+from graphiti_core.driver.driver import GraphDriver
 from graphiti_core.embedder import EmbedderClient
 from graphiti_core.errors import NodeNotFoundError
 from graphiti_core.helpers import parse_db_date
 from graphiti_core.models.nodes.node_db_queries import (
     COMMUNITY_NODE_RETURN,
     EPISODIC_NODE_RETURN,
+    SAGA_NODE_RETURN,
     get_community_node_save_query,
     get_entity_node_return_query,
     get_entity_node_save_query,
     get_episode_node_save_query,
+    get_saga_node_save_query,
 )
 from graphiti_core.utils.datetime_utils import utc_now
 
@@ -96,54 +91,20 @@ class Node(BaseModel, ABC):
     async def save(self, driver: GraphDriver): ...
 
     async def delete(self, driver: GraphDriver):
-        match driver.provider:
-            case GraphProvider.FALKORDB:
-                # First collect edge UUIDs that will be deleted
-                edge_uuids: list[str] = []
-                for label in ['Entity', 'Episodic', 'Community']:
-                    # Get edge UUIDs before deletion
-                    records, _, _ = await driver.execute_query(
-                        f"""
-                        MATCH (n:{label} {{uuid: $uuid}})
-                        OPTIONAL MATCH (n)-[r]-()
-                        RETURN collect(r.uuid) AS edge_uuids
-                        """,
-                        uuid=self.uuid,
-                    )
-                    if records:
-                        edge_uuids.extend(records[0].get('edge_uuids', []))
+        if driver.graph_operations_interface:
+            try:
+                return await driver.graph_operations_interface.node_delete(self, driver)
+            except NotImplementedError:
+                pass
 
-                    # Delete the node
-                    await driver.execute_query(
-                        f"""
-                        MATCH (n:{label} {{uuid: $uuid}})
-                        DETACH DELETE n
-                        """,
-                        uuid=self.uuid,
-                    )
-
-                # Delete from OpenSearch indices if available
-                if driver.aoss_client:
-                    # Delete the node from OpenSearch indices
-                    for index in (EPISODE_INDEX_NAME, ENTITY_INDEX_NAME, COMMUNITY_INDEX_NAME):
-                        try:
-                            await driver.aoss_client.delete(
-                                index=index,
-                                id=self.uuid,
-                                params={'routing': self.group_id},
-                            )
-                        except Exception as e:
-                            logger.debug(f"Node {self.uuid} not found in index {index}: {e}")
-
-                    # Bulk delete the detached edges
-                    if edge_uuids:
-                        actions = []
-                        for eid in edge_uuids:
-                            actions.append(
-                                {'delete': {'_index': ENTITY_EDGE_INDEX_NAME, '_id': eid}}
-                            )
-
-                        await driver.aoss_client.bulk(body=actions)
+        for label in ['Entity', 'Episodic', 'Community']:
+            await driver.execute_query(
+                f"""
+                MATCH (n:{label} {{uuid: $uuid}})
+                DETACH DELETE n
+                """,
+                uuid=self.uuid,
+            )
 
         logger.debug(f'Deleted Node: {self.uuid}')
 
@@ -157,90 +118,42 @@ class Node(BaseModel, ABC):
 
     @classmethod
     async def delete_by_group_id(cls, driver: GraphDriver, group_id: str, batch_size: int = 100):
-        match driver.provider:
-            case GraphProvider.FALKORDB:
-                for label in ['Entity', 'Episodic', 'Community']:
-                    await driver.execute_query(
-                        f"""
-                        MATCH (n:{label} {{group_id: $group_id}})
-                        DETACH DELETE n
-                        """,
-                        group_id=group_id,
-                    )
+        if driver.graph_operations_interface:
+            try:
+                return await driver.graph_operations_interface.node_delete_by_group_id(
+                    cls, driver, group_id, batch_size
+                )
+            except NotImplementedError:
+                pass
 
-                # Delete from OpenSearch indices if available
-                if driver.aoss_client:
-                    await driver.aoss_client.delete_by_query(
-                        index=EPISODE_INDEX_NAME,
-                        body={'query': {'term': {'group_id': group_id}}},
-                        params={'routing': group_id},
-                    )
+        for label in ['Entity', 'Episodic', 'Community']:
+            await driver.execute_query(
+                f"""
+                MATCH (n:{label} {{group_id: $group_id}})
+                DETACH DELETE n
+                """,
+                group_id=group_id,
+            )
 
-                    await driver.aoss_client.delete_by_query(
-                        index=ENTITY_INDEX_NAME,
-                        body={'query': {'term': {'group_id': group_id}}},
-                        params={'routing': group_id},
-                    )
-
-                    await driver.aoss_client.delete_by_query(
-                        index=COMMUNITY_INDEX_NAME,
-                        body={'query': {'term': {'group_id': group_id}}},
-                        params={'routing': group_id},
-                    )
-
-                    await driver.aoss_client.delete_by_query(
-                        index=ENTITY_EDGE_INDEX_NAME,
-                        body={'query': {'term': {'group_id': group_id}}},
-                        params={'routing': group_id},
-                    )
-                
     @classmethod
     async def delete_by_uuids(cls, driver: GraphDriver, uuids: list[str], batch_size: int = 100):
-        match driver.provider:
-            case GraphProvider.FALKORDB:
-                # Collect all edge UUIDs before deleting nodes
-                edge_uuids: list[str] = []
-                records, _, _ = await driver.execute_query(
-                    """
-                    MATCH (n:Entity|Episodic|Community)
-                    WHERE n.uuid IN $uuids
-                    OPTIONAL MATCH (n)-[r]-()
-                    RETURN collect(r.uuid) AS edge_uuids
-                    """,
-                    uuids=uuids,
+        if driver.graph_operations_interface:
+            try:
+                return await driver.graph_operations_interface.node_delete_by_uuids(
+                    cls, driver, uuids, group_id=None, batch_size=batch_size
                 )
+            except NotImplementedError:
+                pass
 
-                if records:
-                    edge_uuids = records[0].get('edge_uuids', [])
-
-                # Delete nodes
-                for label in ['Entity', 'Episodic', 'Community']:
-                    await driver.execute_query(
-                        f"""
-                        MATCH (n:{label})
-                        WHERE n.uuid IN $uuids
-                        DETACH DELETE n
-                        """,
-                        uuids=uuids,
-                    )
-
-                # Delete from OpenSearch indices if available
-                if driver.aoss_client and uuids:
-                    # Bulk delete nodes from OpenSearch indices
-                    actions = []
-                    for uuid in uuids:
-                        for index in (EPISODE_INDEX_NAME, ENTITY_INDEX_NAME, COMMUNITY_INDEX_NAME):
-                            actions.append({'delete': {'_index': index, '_id': uuid}})
-
-                    # Bulk delete the detached edges
-                    if edge_uuids:
-                        for eid in edge_uuids:
-                            actions.append(
-                                {'delete': {'_index': ENTITY_EDGE_INDEX_NAME, '_id': eid}}
-                            )
-
-                    if actions:
-                        await driver.aoss_client.bulk(body=actions) 
+        for label in ['Entity', 'Episodic', 'Community']:
+            await driver.execute_query(
+                f"""
+                MATCH (n:{label})
+                WHERE n.uuid IN $uuids
+                DETACH DELETE n
+                """,
+                uuids=uuids,
+            )
 
     @classmethod
     async def get_by_uuid(cls, driver: GraphDriver, uuid: str): ...
@@ -262,6 +175,12 @@ class EpisodicNode(Node):
     )
 
     async def save(self, driver: GraphDriver):
+        if driver.graph_operations_interface:
+            try:
+                return await driver.graph_operations_interface.episodic_node_save(self, driver)
+            except NotImplementedError:
+                pass
+
         episode_args = {
             'uuid': self.uuid,
             'name': self.name,
@@ -275,8 +194,7 @@ class EpisodicNode(Node):
         }
 
         result = await driver.execute_query(
-            get_episode_node_save_query(driver.provider),
-            **episode_args,
+            get_episode_node_save_query(), **episode_args
         )
 
         logger.debug(f'Saved Node to Graph: {self.uuid}')
@@ -285,6 +203,14 @@ class EpisodicNode(Node):
 
     @classmethod
     async def get_by_uuid(cls, driver: GraphDriver, uuid: str):
+        if driver.graph_operations_interface:
+            try:
+                return await driver.graph_operations_interface.episodic_node_get_by_uuid(
+                    cls, driver, uuid
+                )
+            except NotImplementedError:
+                pass
+
         records, _, _ = await driver.execute_query(
             """
             MATCH (e:Episodic {uuid: $uuid})
@@ -304,6 +230,14 @@ class EpisodicNode(Node):
 
     @classmethod
     async def get_by_uuids(cls, driver: GraphDriver, uuids: list[str]):
+        if driver.graph_operations_interface:
+            try:
+                return await driver.graph_operations_interface.episodic_node_get_by_uuids(
+                    cls, driver, uuids
+                )
+            except NotImplementedError:
+                pass
+
         records, _, _ = await driver.execute_query(
             """
             MATCH (e:Episodic)
@@ -327,6 +261,14 @@ class EpisodicNode(Node):
         limit: int | None = None,
         uuid_cursor: str | None = None,
     ):
+        if driver.graph_operations_interface:
+            try:
+                return await driver.graph_operations_interface.episodic_node_get_by_group_ids(
+                    cls, driver, group_ids, limit, uuid_cursor
+                )
+            except NotImplementedError:
+                pass
+
         cursor_query: LiteralString = 'AND e.uuid < $uuid' if uuid_cursor else ''
         limit_query: LiteralString = 'LIMIT $limit' if limit is not None else ''
 
@@ -356,6 +298,16 @@ class EpisodicNode(Node):
 
     @classmethod
     async def get_by_entity_node_uuid(cls, driver: GraphDriver, entity_node_uuid: str):
+        if driver.graph_operations_interface:
+            try:
+                return (
+                    await driver.graph_operations_interface.episodic_node_get_by_entity_node_uuid(
+                        cls, driver, entity_node_uuid
+                    )
+                )
+            except NotImplementedError:
+                pass
+
         records, _, _ = await driver.execute_query(
             """
             MATCH (e:Episodic)-[r:MENTIONS]->(n:Entity {uuid: $entity_node_uuid})
@@ -381,24 +333,19 @@ class EntityNode(Node):
     async def generate_name_embedding(self, embedder: EmbedderClient):
         start = time()
         text = self.name.replace('\n', ' ')
-        embeddings = await embedder.create(input_data=[text])
-        
-        # Handle case where embedder returns list of embeddings vs single embedding
-        if isinstance(embeddings, list) and len(embeddings) > 0:
-            if isinstance(embeddings[0], list):
-                # embeddings is a list of embedding vectors
-                self.name_embedding = embeddings[0]
-            else:
-                # embeddings is already a flat list (single embedding)
-                self.name_embedding = embeddings
-        else:
-            self.name_embedding = embeddings
+        self.name_embedding = await embedder.create(input_data=[text])
         end = time()
-        logger.debug(f'embedded {text} in {end - start} ms')
+        logger.debug(f'embedded entity {self.uuid} name ({len(text)} chars) in {(end - start) * 1000} ms')
 
         return self.name_embedding
 
     async def load_name_embedding(self, driver: GraphDriver):
+        if driver.graph_operations_interface:
+            try:
+                return await driver.graph_operations_interface.node_load_embeddings(self, driver)
+            except NotImplementedError:
+                pass
+
         records, _, _ = await driver.execute_query(
             """
             MATCH (n:Entity {uuid: $uuid})
@@ -414,6 +361,12 @@ class EntityNode(Node):
         self.name_embedding = records[0]['name_embedding']
 
     async def save(self, driver: GraphDriver):
+        if driver.graph_operations_interface:
+            try:
+                return await driver.graph_operations_interface.node_save(self, driver)
+            except NotImplementedError:
+                pass
+
         entity_data: dict[str, Any] = {
             'uuid': self.uuid,
             'name': self.name,
@@ -422,12 +375,12 @@ class EntityNode(Node):
             'summary': self.summary,
             'created_at': self.created_at,
         }
-            
+
         entity_data.update(self.attributes or {})
         labels = ':'.join(self.labels + ['Entity'])
 
         result = await driver.execute_query(
-            get_entity_node_save_query(driver.provider, labels),
+            get_entity_node_save_query(labels),
             entity_data=entity_data,
         )
 
@@ -437,17 +390,23 @@ class EntityNode(Node):
 
     @classmethod
     async def get_by_uuid(cls, driver: GraphDriver, uuid: str):
+        if driver.graph_operations_interface:
+            try:
+                return await driver.graph_operations_interface.node_get_by_uuid(cls, driver, uuid)
+            except NotImplementedError:
+                pass
+
         records, _, _ = await driver.execute_query(
             """
             MATCH (n:Entity {uuid: $uuid})
             RETURN
             """
-            + get_entity_node_return_query(driver.provider),
+            + get_entity_node_return_query(),
             uuid=uuid,
             routing_='r',
         )
 
-        nodes = [get_entity_node_from_record(record, driver.provider) for record in records]
+        nodes = [get_entity_node_from_record(record) for record in records]
 
         if len(nodes) == 0:
             raise NodeNotFoundError(uuid)
@@ -456,18 +415,24 @@ class EntityNode(Node):
 
     @classmethod
     async def get_by_uuids(cls, driver: GraphDriver, uuids: list[str]):
+        if driver.graph_operations_interface:
+            try:
+                return await driver.graph_operations_interface.node_get_by_uuids(cls, driver, uuids)
+            except NotImplementedError:
+                pass
+
         records, _, _ = await driver.execute_query(
             """
             MATCH (n:Entity)
             WHERE n.uuid IN $uuids
             RETURN
             """
-            + get_entity_node_return_query(driver.provider),
+            + get_entity_node_return_query(),
             uuids=uuids,
             routing_='r',
         )
 
-        nodes = [get_entity_node_from_record(record, driver.provider) for record in records]
+        nodes = [get_entity_node_from_record(record) for record in records]
 
         return nodes
 
@@ -480,6 +445,14 @@ class EntityNode(Node):
         uuid_cursor: str | None = None,
         with_embeddings: bool = False,
     ):
+        if driver.graph_operations_interface:
+            try:
+                return await driver.graph_operations_interface.node_get_by_group_ids(
+                    cls, driver, group_ids, limit, uuid_cursor
+                )
+            except NotImplementedError:
+                pass
+
         cursor_query: LiteralString = 'AND n.uuid < $uuid' if uuid_cursor else ''
         limit_query: LiteralString = 'LIMIT $limit' if limit is not None else ''
         with_embeddings_query: LiteralString = (
@@ -499,7 +472,7 @@ class EntityNode(Node):
             + """
             RETURN
             """
-            + get_entity_node_return_query(driver.provider)
+            + get_entity_node_return_query()
             + with_embeddings_query
             + """
             ORDER BY n.uuid DESC
@@ -511,7 +484,7 @@ class EntityNode(Node):
             routing_='r',
         )
 
-        nodes = [get_entity_node_from_record(record, driver.provider) for record in records]
+        nodes = [get_entity_node_from_record(record) for record in records]
 
         return nodes
 
@@ -521,8 +494,14 @@ class CommunityNode(Node):
     summary: str = Field(description='region summary of member nodes', default_factory=str)
 
     async def save(self, driver: GraphDriver):
+        if driver.graph_operations_interface:
+            try:
+                return await driver.graph_operations_interface.community_node_save(self, driver)
+            except NotImplementedError:
+                pass
+
         result = await driver.execute_query(
-            get_community_node_save_query(driver.provider),
+            get_community_node_save_query(),  # type: ignore
             uuid=self.uuid,
             name=self.name,
             group_id=self.group_id,
@@ -538,24 +517,21 @@ class CommunityNode(Node):
     async def generate_name_embedding(self, embedder: EmbedderClient):
         start = time()
         text = self.name.replace('\n', ' ')
-        embeddings = await embedder.create(input_data=[text])
-        
-        # Handle case where embedder returns list of embeddings vs single embedding
-        if isinstance(embeddings, list) and len(embeddings) > 0:
-            if isinstance(embeddings[0], list):
-                # embeddings is a list of embedding vectors
-                self.name_embedding = embeddings[0]
-            else:
-                # embeddings is already a flat list (single embedding)
-                self.name_embedding = embeddings
-        else:
-            self.name_embedding = embeddings
+        self.name_embedding = await embedder.create(input_data=[text])
         end = time()
-        logger.debug(f'embedded {text} in {end - start} ms')
+        logger.debug(f'embedded entity {self.uuid} name ({len(text)} chars) in {(end - start) * 1000} ms')
 
         return self.name_embedding
 
     async def load_name_embedding(self, driver: GraphDriver):
+        if driver.graph_operations_interface:
+            try:
+                return await driver.graph_operations_interface.community_node_load_name_embedding(
+                    self, driver
+                )
+            except NotImplementedError:
+                pass
+
         records, _, _ = await driver.execute_query(
             """
             MATCH (c:Community {uuid: $uuid})
@@ -572,6 +548,14 @@ class CommunityNode(Node):
 
     @classmethod
     async def get_by_uuid(cls, driver: GraphDriver, uuid: str):
+        if driver.graph_operations_interface:
+            try:
+                return await driver.graph_operations_interface.community_node_get_by_uuid(
+                    cls, driver, uuid
+                )
+            except NotImplementedError:
+                pass
+
         records, _, _ = await driver.execute_query(
             """
             MATCH (c:Community {uuid: $uuid})
@@ -591,6 +575,14 @@ class CommunityNode(Node):
 
     @classmethod
     async def get_by_uuids(cls, driver: GraphDriver, uuids: list[str]):
+        if driver.graph_operations_interface:
+            try:
+                return await driver.graph_operations_interface.community_node_get_by_uuids(
+                    cls, driver, uuids
+                )
+            except NotImplementedError:
+                pass
+
         records, _, _ = await driver.execute_query(
             """
             MATCH (c:Community)
@@ -614,6 +606,14 @@ class CommunityNode(Node):
         limit: int | None = None,
         uuid_cursor: str | None = None,
     ):
+        if driver.graph_operations_interface:
+            try:
+                return await driver.graph_operations_interface.community_node_get_by_group_ids(
+                    cls, driver, group_ids, limit, uuid_cursor
+                )
+            except NotImplementedError:
+                pass
+
         cursor_query: LiteralString = 'AND c.uuid < $uuid' if uuid_cursor else ''
         limit_query: LiteralString = 'LIMIT $limit' if limit is not None else ''
 
@@ -642,6 +642,139 @@ class CommunityNode(Node):
         return communities
 
 
+class SagaNode(Node):
+    async def save(self, driver: GraphDriver):
+        if driver.graph_operations_interface:
+            try:
+                return await driver.graph_operations_interface.saga_node_save(self, driver)
+            except NotImplementedError:
+                pass
+
+        result = await driver.execute_query(
+            get_saga_node_save_query(),
+            uuid=self.uuid,
+            name=self.name,
+            group_id=self.group_id,
+            created_at=self.created_at,
+        )
+
+        logger.debug(f'Saved Node to Graph: {self.uuid}')
+
+        return result
+
+    async def delete(self, driver: GraphDriver):
+        if driver.graph_operations_interface:
+            try:
+                return await driver.graph_operations_interface.saga_node_delete(self, driver)
+            except NotImplementedError:
+                pass
+
+        await driver.execute_query(
+            """
+            MATCH (n:Saga {uuid: $uuid})
+            DETACH DELETE n
+            """,
+            uuid=self.uuid,
+        )
+
+        logger.debug(f'Deleted Node: {self.uuid}')
+
+    @classmethod
+    async def get_by_uuid(cls, driver: GraphDriver, uuid: str):
+        if driver.graph_operations_interface:
+            try:
+                return await driver.graph_operations_interface.saga_node_get_by_uuid(
+                    cls, driver, uuid
+                )
+            except NotImplementedError:
+                pass
+
+        records, _, _ = await driver.execute_query(
+            """
+            MATCH (s:Saga {uuid: $uuid})
+            RETURN
+            """
+            + SAGA_NODE_RETURN,
+            uuid=uuid,
+            routing_='r',
+        )
+
+        nodes = [get_saga_node_from_record(record) for record in records]
+
+        if len(nodes) == 0:
+            raise NodeNotFoundError(uuid)
+
+        return nodes[0]
+
+    @classmethod
+    async def get_by_uuids(cls, driver: GraphDriver, uuids: list[str]):
+        if driver.graph_operations_interface:
+            try:
+                return await driver.graph_operations_interface.saga_node_get_by_uuids(
+                    cls, driver, uuids
+                )
+            except NotImplementedError:
+                pass
+
+        records, _, _ = await driver.execute_query(
+            """
+            MATCH (s:Saga)
+            WHERE s.uuid IN $uuids
+            RETURN
+            """
+            + SAGA_NODE_RETURN,
+            uuids=uuids,
+            routing_='r',
+        )
+
+        sagas = [get_saga_node_from_record(record) for record in records]
+
+        return sagas
+
+    @classmethod
+    async def get_by_group_ids(
+        cls,
+        driver: GraphDriver,
+        group_ids: list[str],
+        limit: int | None = None,
+        uuid_cursor: str | None = None,
+    ):
+        if driver.graph_operations_interface:
+            try:
+                return await driver.graph_operations_interface.saga_node_get_by_group_ids(
+                    cls, driver, group_ids, limit, uuid_cursor
+                )
+            except NotImplementedError:
+                pass
+
+        cursor_query: LiteralString = 'AND s.uuid < $uuid' if uuid_cursor else ''
+        limit_query: LiteralString = 'LIMIT $limit' if limit is not None else ''
+
+        records, _, _ = await driver.execute_query(
+            """
+            MATCH (s:Saga)
+            WHERE s.group_id IN $group_ids
+            """
+            + cursor_query
+            + """
+            RETURN
+            """
+            + SAGA_NODE_RETURN
+            + """
+            ORDER BY s.uuid DESC
+            """
+            + limit_query,
+            group_ids=group_ids,
+            uuid=uuid_cursor,
+            limit=limit,
+            routing_='r',
+        )
+
+        sagas = [get_saga_node_from_record(record) for record in records]
+
+        return sagas
+
+
 # Node helpers
 def get_episodic_node_from_record(record: Any) -> EpisodicNode:
     created_at = parse_db_date(record['created_at'])
@@ -665,17 +798,16 @@ def get_episodic_node_from_record(record: Any) -> EpisodicNode:
     )
 
 
-def get_entity_node_from_record(record: Any, provider: GraphProvider) -> EntityNode:
-    if provider == GraphProvider.FALKORDB:
-        attributes = record['attributes']
-        attributes.pop('uuid', None)
-        attributes.pop('name', None)
-        attributes.pop('group_id', None)
-        attributes.pop('name_embedding', None)
-        attributes.pop('summary', None)
-        attributes.pop('created_at', None)
-        attributes.pop('labels', None)
-    
+def get_entity_node_from_record(record: Any) -> EntityNode:
+    attributes = record['attributes']
+    attributes.pop('uuid', None)
+    attributes.pop('name', None)
+    attributes.pop('group_id', None)
+    attributes.pop('name_embedding', None)
+    attributes.pop('summary', None)
+    attributes.pop('created_at', None)
+    attributes.pop('labels', None)
+
     labels = record.get('labels', [])
     group_id = record.get('group_id')
     if 'Entity_' + group_id.replace('-', '') in labels:
@@ -703,6 +835,15 @@ def get_community_node_from_record(record: Any) -> CommunityNode:
         name_embedding=record['name_embedding'],
         created_at=parse_db_date(record['created_at']),  # type: ignore
         summary=record['summary'],
+    )
+
+
+def get_saga_node_from_record(record: Any) -> SagaNode:
+    return SagaNode(
+        uuid=record['uuid'],
+        name=record['name'],
+        group_id=record['group_id'],
+        created_at=parse_db_date(record['created_at']),  # type: ignore
     )
 
 

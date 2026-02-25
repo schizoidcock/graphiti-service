@@ -23,6 +23,7 @@ from typing import Any
 
 import numpy as np
 from dotenv import load_dotenv
+from neo4j import time as neo4j_time
 from numpy._typing import NDArray
 from pydantic import BaseModel
 
@@ -33,17 +34,33 @@ load_dotenv()
 
 USE_PARALLEL_RUNTIME = bool(os.getenv('USE_PARALLEL_RUNTIME', False))
 SEMAPHORE_LIMIT = int(os.getenv('SEMAPHORE_LIMIT', 20))
-MAX_REFLEXION_ITERATIONS = int(os.getenv('MAX_REFLEXION_ITERATIONS', 0))
 DEFAULT_PAGE_LIMIT = 20
 
+# Content chunking configuration for entity extraction
+# Density-based chunking: only chunk high-density content (many entities per token)
+# This targets the failure case (large entity-dense inputs) while preserving
+# context for prose/narrative content
+CHUNK_TOKEN_SIZE = int(os.getenv('CHUNK_TOKEN_SIZE', 3000))
+CHUNK_OVERLAP_TOKENS = int(os.getenv('CHUNK_OVERLAP_TOKENS', 200))
+# Minimum tokens before considering chunking - short content processes fine regardless of density
+CHUNK_MIN_TOKENS = int(os.getenv('CHUNK_MIN_TOKENS', 1000))
+# Entity density threshold: chunk if estimated density > this value
+# For JSON: elements per 1000 tokens > threshold * 1000 (e.g., 0.15 = 150 elements/1000 tokens)
+# For Text: capitalized words per 1000 tokens > threshold * 500 (e.g., 0.15 = 75 caps/1000 tokens)
+# Higher values = more conservative (less chunking), targets P95+ density cases
+# Examples that trigger chunking at 0.15: AWS cost data (12mo), bulk data imports, entity-dense JSON
+# Examples that DON'T chunk at 0.15: meeting transcripts, news articles, documentation
+CHUNK_DENSITY_THRESHOLD = float(os.getenv('CHUNK_DENSITY_THRESHOLD', 0.15))
 
-def parse_db_date(date_value: str | None) -> datetime | None:
-    """Parse database date string into datetime object."""
-    return (
-        datetime.fromisoformat(date_value)
-        if date_value
-        else None
-    )
+
+def parse_db_date(input_date: neo4j_time.DateTime | str | None) -> datetime | None:
+    if isinstance(input_date, neo4j_time.DateTime):
+        return input_date.to_native()
+
+    if isinstance(input_date, str):
+        return datetime.fromisoformat(input_date)
+
+    return input_date
 
 
 def get_default_group_id(provider: GraphProvider) -> str:
@@ -81,7 +98,6 @@ def lucene_sanitize(query: str) -> str:
             ':': r'\:',
             '\\': r'\\',
             '/': r'\/',
-            '$': r'\$',  # Escape dollar sign for RediSearch
             'O': r'\O',
             'R': r'\R',
             'N': r'\N',

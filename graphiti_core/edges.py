@@ -24,11 +24,7 @@ from uuid import uuid4
 from pydantic import BaseModel, Field
 from typing_extensions import LiteralString
 
-from graphiti_core.driver.driver import (
-    ENTITY_EDGE_INDEX_NAME,
-    GraphDriver,
-    GraphProvider,
-)
+from graphiti_core.driver.driver import GraphDriver
 from graphiti_core.embedder import EmbedderClient
 from graphiti_core.errors import EdgeNotFoundError, GroupsEdgesNotFoundError
 from graphiti_core.helpers import parse_db_date
@@ -36,6 +32,10 @@ from graphiti_core.models.edges.edge_db_queries import (
     COMMUNITY_EDGE_RETURN,
     EPISODIC_EDGE_RETURN,
     EPISODIC_EDGE_SAVE,
+    HAS_EPISODE_EDGE_RETURN,
+    HAS_EPISODE_EDGE_SAVE,
+    NEXT_EPISODE_EDGE_RETURN,
+    NEXT_EPISODE_EDGE_SAVE,
     get_community_edge_save_query,
     get_entity_edge_return_query,
     get_entity_edge_save_query,
@@ -56,7 +56,13 @@ class Edge(BaseModel, ABC):
     async def save(self, driver: GraphDriver): ...
 
     async def delete(self, driver: GraphDriver):
-        result = await driver.execute_query(
+        if driver.graph_operations_interface:
+            try:
+                return await driver.graph_operations_interface.edge_delete(self, driver)
+            except NotImplementedError:
+                pass
+
+        await driver.execute_query(
             """
             MATCH (n)-[e:MENTIONS|RELATES_TO|HAS_MEMBER {uuid: $uuid}]->(m)
             DELETE e
@@ -64,24 +70,19 @@ class Edge(BaseModel, ABC):
             uuid=self.uuid,
         )
 
-        # Delete from OpenSearch if available
-        if driver.aoss_client:
-            try:
-                await driver.aoss_client.delete(
-                    index=ENTITY_EDGE_INDEX_NAME,
-                    id=self.uuid,
-                    params={'routing': self.group_id},
-                )
-            except Exception as e:
-                logger.debug(f"Edge {self.uuid} not found in OpenSearch: {e}")
-
         logger.debug(f'Deleted Edge: {self.uuid}')
-
-        return result
 
     @classmethod
     async def delete_by_uuids(cls, driver: GraphDriver, uuids: list[str]):
-        result = await driver.execute_query(
+        if driver.graph_operations_interface:
+            try:
+                return await driver.graph_operations_interface.edge_delete_by_uuids(
+                    cls, driver, uuids
+                )
+            except NotImplementedError:
+                pass
+
+        await driver.execute_query(
             """
             MATCH (n)-[e:MENTIONS|RELATES_TO|HAS_MEMBER]->(m)
             WHERE e.uuid IN $uuids
@@ -90,19 +91,8 @@ class Edge(BaseModel, ABC):
             uuids=uuids,
         )
 
-        # Bulk delete from OpenSearch if available
-        if driver.aoss_client and uuids:
-            actions = []
-            for uuid in uuids:
-                actions.append({'delete': {'_index': ENTITY_EDGE_INDEX_NAME, '_id': uuid}})
-
-            if actions:
-                await driver.aoss_client.bulk(body=actions)
-
         logger.debug(f'Deleted Edges: {uuids}')
 
-        return result
-        
     def __hash__(self):
         return hash(self.uuid)
 
@@ -117,6 +107,12 @@ class Edge(BaseModel, ABC):
 
 class EpisodicEdge(Edge):
     async def save(self, driver: GraphDriver):
+        if driver.graph_operations_interface:
+            try:
+                return await driver.graph_operations_interface.episodic_edge_save(self, driver)
+            except NotImplementedError:
+                pass
+
         result = await driver.execute_query(
             EPISODIC_EDGE_SAVE,
             episode_uuid=self.source_node_uuid,
@@ -132,6 +128,14 @@ class EpisodicEdge(Edge):
 
     @classmethod
     async def get_by_uuid(cls, driver: GraphDriver, uuid: str):
+        if driver.graph_operations_interface:
+            try:
+                return await driver.graph_operations_interface.episodic_edge_get_by_uuid(
+                    cls, driver, uuid
+                )
+            except NotImplementedError:
+                pass
+
         records, _, _ = await driver.execute_query(
             """
             MATCH (n:Episodic)-[e:MENTIONS {uuid: $uuid}]->(m:Entity)
@@ -150,6 +154,14 @@ class EpisodicEdge(Edge):
 
     @classmethod
     async def get_by_uuids(cls, driver: GraphDriver, uuids: list[str]):
+        if driver.graph_operations_interface:
+            try:
+                return await driver.graph_operations_interface.episodic_edge_get_by_uuids(
+                    cls, driver, uuids
+                )
+            except NotImplementedError:
+                pass
+
         records, _, _ = await driver.execute_query(
             """
             MATCH (n:Episodic)-[e:MENTIONS]->(m:Entity)
@@ -175,6 +187,14 @@ class EpisodicEdge(Edge):
         limit: int | None = None,
         uuid_cursor: str | None = None,
     ):
+        if driver.graph_operations_interface:
+            try:
+                return await driver.graph_operations_interface.episodic_edge_get_by_group_ids(
+                    cls, driver, group_ids, limit, uuid_cursor
+                )
+            except NotImplementedError:
+                pass
+
         cursor_query: LiteralString = 'AND e.uuid < $uuid' if uuid_cursor else ''
         limit_query: LiteralString = 'LIMIT $limit' if limit is not None else ''
 
@@ -233,16 +253,24 @@ class EntityEdge(Edge):
         self.fact_embedding = await embedder.create(input_data=[text])
 
         end = time()
-        logger.debug(f'embedded {text} in {end - start} ms')
+        logger.debug(f'embedded edge {self.uuid} fact ({len(text)} chars) in {(end - start) * 1000} ms')
 
         return self.fact_embedding
 
     async def load_fact_embedding(self, driver: GraphDriver):
-        records, _, _ = await driver.execute_query(
-            """
+        if driver.graph_operations_interface:
+            try:
+                return await driver.graph_operations_interface.edge_load_embeddings(self, driver)
+            except NotImplementedError:
+                pass
+
+        query = """
             MATCH (n:Entity)-[e:RELATES_TO {uuid: $uuid}]->(m:Entity)
             RETURN e.fact_embedding AS fact_embedding
-            """,
+        """
+
+        records, _, _ = await driver.execute_query(
+            query,
             uuid=self.uuid,
             routing_='r',
         )
@@ -253,6 +281,12 @@ class EntityEdge(Edge):
         self.fact_embedding = records[0]['fact_embedding']
 
     async def save(self, driver: GraphDriver):
+        if driver.graph_operations_interface:
+            try:
+                return await driver.graph_operations_interface.edge_save(self, driver)
+            except NotImplementedError:
+                pass
+
         edge_data: dict[str, Any] = {
             'source_uuid': self.source_node_uuid,
             'target_uuid': self.target_node_uuid,
@@ -269,9 +303,8 @@ class EntityEdge(Edge):
         }
 
         edge_data.update(self.attributes or {})
-
         result = await driver.execute_query(
-            get_entity_edge_save_query(driver.provider),
+            get_entity_edge_save_query(),
             edge_data=edge_data,
         )
 
@@ -281,24 +314,63 @@ class EntityEdge(Edge):
 
     @classmethod
     async def get_by_uuid(cls, driver: GraphDriver, uuid: str):
+        if driver.graph_operations_interface:
+            try:
+                return await driver.graph_operations_interface.edge_get_by_uuid(cls, driver, uuid)
+            except NotImplementedError:
+                pass
+
         records, _, _ = await driver.execute_query(
             """
             MATCH (n:Entity)-[e:RELATES_TO {uuid: $uuid}]->(m:Entity)
             RETURN
             """
-            + get_entity_edge_return_query(driver.provider),
+            + get_entity_edge_return_query(),
             uuid=uuid,
             routing_='r',
         )
 
-        edges = [get_entity_edge_from_record(record, driver.provider) for record in records]
+        edges = [get_entity_edge_from_record(record) for record in records]
 
         if len(edges) == 0:
             raise EdgeNotFoundError(uuid)
         return edges[0]
 
     @classmethod
+    async def get_between_nodes(
+        cls, driver: GraphDriver, source_node_uuid: str, target_node_uuid: str
+    ):
+        if driver.graph_operations_interface:
+            try:
+                return await driver.graph_operations_interface.edge_get_between_nodes(
+                    cls, driver, source_node_uuid, target_node_uuid
+                )
+            except NotImplementedError:
+                pass
+
+        records, _, _ = await driver.execute_query(
+            """
+            MATCH (n:Entity {uuid: $source_node_uuid})-[e:RELATES_TO]->(m:Entity {uuid: $target_node_uuid})
+            RETURN
+            """
+            + get_entity_edge_return_query(),
+            source_node_uuid=source_node_uuid,
+            target_node_uuid=target_node_uuid,
+            routing_='r',
+        )
+
+        edges = [get_entity_edge_from_record(record) for record in records]
+
+        return edges
+
+    @classmethod
     async def get_by_uuids(cls, driver: GraphDriver, uuids: list[str]):
+        if driver.graph_operations_interface:
+            try:
+                return await driver.graph_operations_interface.edge_get_by_uuids(cls, driver, uuids)
+            except NotImplementedError:
+                pass
+
         if len(uuids) == 0:
             return []
 
@@ -308,12 +380,12 @@ class EntityEdge(Edge):
             WHERE e.uuid IN $uuids
             RETURN
             """
-            + get_entity_edge_return_query(driver.provider),
+            + get_entity_edge_return_query(),
             uuids=uuids,
             routing_='r',
         )
 
-        edges = [get_entity_edge_from_record(record, driver.provider) for record in records]
+        edges = [get_entity_edge_from_record(record) for record in records]
 
         return edges
 
@@ -326,6 +398,14 @@ class EntityEdge(Edge):
         uuid_cursor: str | None = None,
         with_embeddings: bool = False,
     ):
+        if driver.graph_operations_interface:
+            try:
+                return await driver.graph_operations_interface.edge_get_by_group_ids(
+                    cls, driver, group_ids, limit, uuid_cursor
+                )
+            except NotImplementedError:
+                pass
+
         cursor_query: LiteralString = 'AND e.uuid < $uuid' if uuid_cursor else ''
         limit_query: LiteralString = 'LIMIT $limit' if limit is not None else ''
         with_embeddings_query: LiteralString = (
@@ -345,10 +425,10 @@ class EntityEdge(Edge):
             + """
             RETURN
             """
-            + get_entity_edge_return_query(driver.provider)
+            + get_entity_edge_return_query()
             + with_embeddings_query
             + """
-            ORDER BY e.uuid DESC 
+            ORDER BY e.uuid DESC
             """
             + limit_query,
             group_ids=group_ids,
@@ -357,7 +437,7 @@ class EntityEdge(Edge):
             routing_='r',
         )
 
-        edges = [get_entity_edge_from_record(record, driver.provider) for record in records]
+        edges = [get_entity_edge_from_record(record) for record in records]
 
         if len(edges) == 0:
             raise GroupsEdgesNotFoundError(group_ids)
@@ -365,25 +445,39 @@ class EntityEdge(Edge):
 
     @classmethod
     async def get_by_node_uuid(cls, driver: GraphDriver, node_uuid: str):
+        if driver.graph_operations_interface:
+            try:
+                return await driver.graph_operations_interface.edge_get_by_node_uuid(
+                    cls, driver, node_uuid
+                )
+            except NotImplementedError:
+                pass
+
         records, _, _ = await driver.execute_query(
             """
             MATCH (n:Entity {uuid: $node_uuid})-[e:RELATES_TO]-(m:Entity)
             RETURN
             """
-            + get_entity_edge_return_query(driver.provider),
+            + get_entity_edge_return_query(),
             node_uuid=node_uuid,
             routing_='r',
         )
 
-        edges = [get_entity_edge_from_record(record, driver.provider) for record in records]
+        edges = [get_entity_edge_from_record(record) for record in records]
 
         return edges
 
 
 class CommunityEdge(Edge):
     async def save(self, driver: GraphDriver):
+        if driver.graph_operations_interface:
+            try:
+                return await driver.graph_operations_interface.community_edge_save(self, driver)
+            except NotImplementedError:
+                pass
+
         result = await driver.execute_query(
-            get_community_edge_save_query(driver.provider),
+            get_community_edge_save_query(),
             community_uuid=self.source_node_uuid,
             entity_uuid=self.target_node_uuid,
             uuid=self.uuid,
@@ -397,6 +491,14 @@ class CommunityEdge(Edge):
 
     @classmethod
     async def get_by_uuid(cls, driver: GraphDriver, uuid: str):
+        if driver.graph_operations_interface:
+            try:
+                return await driver.graph_operations_interface.community_edge_get_by_uuid(
+                    cls, driver, uuid
+                )
+            except NotImplementedError:
+                pass
+
         records, _, _ = await driver.execute_query(
             """
             MATCH (n:Community)-[e:HAS_MEMBER {uuid: $uuid}]->(m)
@@ -413,6 +515,14 @@ class CommunityEdge(Edge):
 
     @classmethod
     async def get_by_uuids(cls, driver: GraphDriver, uuids: list[str]):
+        if driver.graph_operations_interface:
+            try:
+                return await driver.graph_operations_interface.community_edge_get_by_uuids(
+                    cls, driver, uuids
+                )
+            except NotImplementedError:
+                pass
+
         records, _, _ = await driver.execute_query(
             """
             MATCH (n:Community)-[e:HAS_MEMBER]->(m)
@@ -436,6 +546,14 @@ class CommunityEdge(Edge):
         limit: int | None = None,
         uuid_cursor: str | None = None,
     ):
+        if driver.graph_operations_interface:
+            try:
+                return await driver.graph_operations_interface.community_edge_get_by_group_ids(
+                    cls, driver, group_ids, limit, uuid_cursor
+                )
+            except NotImplementedError:
+                pass
+
         cursor_query: LiteralString = 'AND e.uuid < $uuid' if uuid_cursor else ''
         limit_query: LiteralString = 'LIMIT $limit' if limit is not None else ''
 
@@ -464,6 +582,274 @@ class CommunityEdge(Edge):
         return edges
 
 
+class HasEpisodeEdge(Edge):
+    async def save(self, driver: GraphDriver):
+        if driver.graph_operations_interface:
+            try:
+                return await driver.graph_operations_interface.has_episode_edge_save(self, driver)
+            except NotImplementedError:
+                pass
+
+        result = await driver.execute_query(
+            HAS_EPISODE_EDGE_SAVE,
+            saga_uuid=self.source_node_uuid,
+            episode_uuid=self.target_node_uuid,
+            uuid=self.uuid,
+            group_id=self.group_id,
+            created_at=self.created_at,
+        )
+
+        logger.debug(f'Saved edge to Graph: {self.uuid}')
+
+        return result
+
+    async def delete(self, driver: GraphDriver):
+        if driver.graph_operations_interface:
+            try:
+                return await driver.graph_operations_interface.has_episode_edge_delete(self, driver)
+            except NotImplementedError:
+                pass
+
+        await driver.execute_query(
+            """
+            MATCH (n:Saga)-[e:HAS_EPISODE {uuid: $uuid}]->(m:Episodic)
+            DELETE e
+            """,
+            uuid=self.uuid,
+        )
+
+        logger.debug(f'Deleted Edge: {self.uuid}')
+
+    @classmethod
+    async def get_by_uuid(cls, driver: GraphDriver, uuid: str):
+        if driver.graph_operations_interface:
+            try:
+                return await driver.graph_operations_interface.has_episode_edge_get_by_uuid(
+                    cls, driver, uuid
+                )
+            except NotImplementedError:
+                pass
+
+        records, _, _ = await driver.execute_query(
+            """
+            MATCH (n:Saga)-[e:HAS_EPISODE {uuid: $uuid}]->(m:Episodic)
+            RETURN
+            """
+            + HAS_EPISODE_EDGE_RETURN,
+            uuid=uuid,
+            routing_='r',
+        )
+
+        edges = [get_has_episode_edge_from_record(record) for record in records]
+
+        if len(edges) == 0:
+            raise EdgeNotFoundError(uuid)
+        return edges[0]
+
+    @classmethod
+    async def get_by_uuids(cls, driver: GraphDriver, uuids: list[str]):
+        if driver.graph_operations_interface:
+            try:
+                return await driver.graph_operations_interface.has_episode_edge_get_by_uuids(
+                    cls, driver, uuids
+                )
+            except NotImplementedError:
+                pass
+
+        records, _, _ = await driver.execute_query(
+            """
+            MATCH (n:Saga)-[e:HAS_EPISODE]->(m:Episodic)
+            WHERE e.uuid IN $uuids
+            RETURN
+            """
+            + HAS_EPISODE_EDGE_RETURN,
+            uuids=uuids,
+            routing_='r',
+        )
+
+        edges = [get_has_episode_edge_from_record(record) for record in records]
+
+        return edges
+
+    @classmethod
+    async def get_by_group_ids(
+        cls,
+        driver: GraphDriver,
+        group_ids: list[str],
+        limit: int | None = None,
+        uuid_cursor: str | None = None,
+    ):
+        if driver.graph_operations_interface:
+            try:
+                return await driver.graph_operations_interface.has_episode_edge_get_by_group_ids(
+                    cls, driver, group_ids, limit, uuid_cursor
+                )
+            except NotImplementedError:
+                pass
+
+        cursor_query: LiteralString = 'AND e.uuid < $uuid' if uuid_cursor else ''
+        limit_query: LiteralString = 'LIMIT $limit' if limit is not None else ''
+
+        records, _, _ = await driver.execute_query(
+            """
+            MATCH (n:Saga)-[e:HAS_EPISODE]->(m:Episodic)
+            WHERE e.group_id IN $group_ids
+            """
+            + cursor_query
+            + """
+            RETURN
+            """
+            + HAS_EPISODE_EDGE_RETURN
+            + """
+            ORDER BY e.uuid DESC
+            """
+            + limit_query,
+            group_ids=group_ids,
+            uuid=uuid_cursor,
+            limit=limit,
+            routing_='r',
+        )
+
+        edges = [get_has_episode_edge_from_record(record) for record in records]
+
+        return edges
+
+
+class NextEpisodeEdge(Edge):
+    async def save(self, driver: GraphDriver):
+        if driver.graph_operations_interface:
+            try:
+                return await driver.graph_operations_interface.next_episode_edge_save(self, driver)
+            except NotImplementedError:
+                pass
+
+        result = await driver.execute_query(
+            NEXT_EPISODE_EDGE_SAVE,
+            source_episode_uuid=self.source_node_uuid,
+            target_episode_uuid=self.target_node_uuid,
+            uuid=self.uuid,
+            group_id=self.group_id,
+            created_at=self.created_at,
+        )
+
+        logger.debug(f'Saved edge to Graph: {self.uuid}')
+
+        return result
+
+    async def delete(self, driver: GraphDriver):
+        if driver.graph_operations_interface:
+            try:
+                return await driver.graph_operations_interface.next_episode_edge_delete(
+                    self, driver
+                )
+            except NotImplementedError:
+                pass
+
+        await driver.execute_query(
+            """
+            MATCH (n:Episodic)-[e:NEXT_EPISODE {uuid: $uuid}]->(m:Episodic)
+            DELETE e
+            """,
+            uuid=self.uuid,
+        )
+
+        logger.debug(f'Deleted Edge: {self.uuid}')
+
+    @classmethod
+    async def get_by_uuid(cls, driver: GraphDriver, uuid: str):
+        if driver.graph_operations_interface:
+            try:
+                return await driver.graph_operations_interface.next_episode_edge_get_by_uuid(
+                    cls, driver, uuid
+                )
+            except NotImplementedError:
+                pass
+
+        records, _, _ = await driver.execute_query(
+            """
+            MATCH (n:Episodic)-[e:NEXT_EPISODE {uuid: $uuid}]->(m:Episodic)
+            RETURN
+            """
+            + NEXT_EPISODE_EDGE_RETURN,
+            uuid=uuid,
+            routing_='r',
+        )
+
+        edges = [get_next_episode_edge_from_record(record) for record in records]
+
+        if len(edges) == 0:
+            raise EdgeNotFoundError(uuid)
+        return edges[0]
+
+    @classmethod
+    async def get_by_uuids(cls, driver: GraphDriver, uuids: list[str]):
+        if driver.graph_operations_interface:
+            try:
+                return await driver.graph_operations_interface.next_episode_edge_get_by_uuids(
+                    cls, driver, uuids
+                )
+            except NotImplementedError:
+                pass
+
+        records, _, _ = await driver.execute_query(
+            """
+            MATCH (n:Episodic)-[e:NEXT_EPISODE]->(m:Episodic)
+            WHERE e.uuid IN $uuids
+            RETURN
+            """
+            + NEXT_EPISODE_EDGE_RETURN,
+            uuids=uuids,
+            routing_='r',
+        )
+
+        edges = [get_next_episode_edge_from_record(record) for record in records]
+
+        return edges
+
+    @classmethod
+    async def get_by_group_ids(
+        cls,
+        driver: GraphDriver,
+        group_ids: list[str],
+        limit: int | None = None,
+        uuid_cursor: str | None = None,
+    ):
+        if driver.graph_operations_interface:
+            try:
+                return await driver.graph_operations_interface.next_episode_edge_get_by_group_ids(
+                    cls, driver, group_ids, limit, uuid_cursor
+                )
+            except NotImplementedError:
+                pass
+
+        cursor_query: LiteralString = 'AND e.uuid < $uuid' if uuid_cursor else ''
+        limit_query: LiteralString = 'LIMIT $limit' if limit is not None else ''
+
+        records, _, _ = await driver.execute_query(
+            """
+            MATCH (n:Episodic)-[e:NEXT_EPISODE]->(m:Episodic)
+            WHERE e.group_id IN $group_ids
+            """
+            + cursor_query
+            + """
+            RETURN
+            """
+            + NEXT_EPISODE_EDGE_RETURN
+            + """
+            ORDER BY e.uuid DESC
+            """
+            + limit_query,
+            group_ids=group_ids,
+            uuid=uuid_cursor,
+            limit=limit,
+            routing_='r',
+        )
+
+        edges = [get_next_episode_edge_from_record(record) for record in records]
+
+        return edges
+
+
 # Edge helpers
 def get_episodic_edge_from_record(record: Any) -> EpisodicEdge:
     return EpisodicEdge(
@@ -475,22 +861,21 @@ def get_episodic_edge_from_record(record: Any) -> EpisodicEdge:
     )
 
 
-def get_entity_edge_from_record(record: Any, provider: GraphProvider) -> EntityEdge:
+def get_entity_edge_from_record(record: Any) -> EntityEdge:
     episodes = record['episodes']
-    if provider == GraphProvider.FALKORDB:
-        attributes = record['attributes']
-        attributes.pop('uuid', None)
-        attributes.pop('source_node_uuid', None)
-        attributes.pop('target_node_uuid', None)
-        attributes.pop('fact', None)
-        attributes.pop('fact_embedding', None)
-        attributes.pop('name', None)
-        attributes.pop('group_id', None)
-        attributes.pop('episodes', None)
-        attributes.pop('created_at', None)
-        attributes.pop('expired_at', None)
-        attributes.pop('valid_at', None)
-        attributes.pop('invalid_at', None)
+    attributes = record['attributes']
+    attributes.pop('uuid', None)
+    attributes.pop('source_node_uuid', None)
+    attributes.pop('target_node_uuid', None)
+    attributes.pop('fact', None)
+    attributes.pop('fact_embedding', None)
+    attributes.pop('name', None)
+    attributes.pop('group_id', None)
+    attributes.pop('episodes', None)
+    attributes.pop('created_at', None)
+    attributes.pop('expired_at', None)
+    attributes.pop('valid_at', None)
+    attributes.pop('invalid_at', None)
 
     edge = EntityEdge(
         uuid=record['uuid'],
@@ -513,6 +898,26 @@ def get_entity_edge_from_record(record: Any, provider: GraphProvider) -> EntityE
 
 def get_community_edge_from_record(record: Any):
     return CommunityEdge(
+        uuid=record['uuid'],
+        group_id=record['group_id'],
+        source_node_uuid=record['source_node_uuid'],
+        target_node_uuid=record['target_node_uuid'],
+        created_at=parse_db_date(record['created_at']),  # type: ignore
+    )
+
+
+def get_has_episode_edge_from_record(record: Any) -> HasEpisodeEdge:
+    return HasEpisodeEdge(
+        uuid=record['uuid'],
+        group_id=record['group_id'],
+        source_node_uuid=record['source_node_uuid'],
+        target_node_uuid=record['target_node_uuid'],
+        created_at=parse_db_date(record['created_at']),  # type: ignore
+    )
+
+
+def get_next_episode_edge_from_record(record: Any) -> NextEpisodeEdge:
+    return NextEpisodeEdge(
         uuid=record['uuid'],
         group_id=record['group_id'],
         source_node_uuid=record['source_node_uuid'],

@@ -17,6 +17,7 @@ limitations under the License.
 import logging
 from datetime import datetime
 from time import time
+from uuid import uuid4
 
 from dotenv import load_dotenv
 from pydantic import BaseModel
@@ -26,6 +27,7 @@ from graphiti_core.cross_encoder.client import CrossEncoderClient
 from graphiti_core.cross_encoder.openai_reranker_client import OpenAIRerankerClient
 from graphiti_core.driver.driver import GraphDriver
 from graphiti_core.driver.falkordb_driver import FalkorDriver
+from graphiti_core.errors import EdgeNotFoundError
 from graphiti_core.edges import (
     CommunityEdge,
     Edge,
@@ -388,6 +390,7 @@ class Graphiti:
         previous_episode_uuids: list[str] | None = None,
         edge_types: dict[str, type[BaseModel]] | None = None,
         edge_type_map: dict[tuple[str, str], list[str]] | None = None,
+        custom_extraction_instructions: str | None = None,
     ) -> AddEpisodeResults:
         """
         Process an episode and update the graph.
@@ -496,7 +499,8 @@ class Graphiti:
             # Extract entities as nodes
 
             extracted_nodes = await extract_nodes(
-                self.clients, episode, previous_episodes, entity_types, excluded_entity_types
+                self.clients, episode, previous_episodes, entity_types, excluded_entity_types,
+                custom_extraction_instructions,
             )
 
             # Extract edges and resolve nodes
@@ -516,25 +520,28 @@ class Graphiti:
                     edge_type_map or edge_type_map_default,
                     group_id,
                     edge_types,
+                    custom_extraction_instructions,
                 ),
                 max_coroutines=self.max_coroutines,
             )
 
             edges = resolve_edge_pointers(extracted_edges, uuid_map)
 
-            (resolved_edges, invalidated_edges), hydrated_nodes = await semaphore_gather(
-                resolve_extracted_edges(
-                    self.clients,
-                    edges,
-                    episode,
-                    nodes,
-                    edge_types or {},
-                    edge_type_map or edge_type_map_default,
-                ),
-                extract_attributes_from_nodes(
-                    self.clients, nodes, episode, previous_episodes, entity_types
-                ),
-                max_coroutines=self.max_coroutines,
+            # Resolve edges first to get new_edges for summary generation
+            resolved_edges, invalidated_edges, new_edges = await resolve_extracted_edges(
+                self.clients,
+                edges,
+                episode,
+                nodes,
+                edge_types or {},
+                edge_type_map or edge_type_map_default,
+            )
+
+            # Extract node attributes - only pass new edges for summary generation
+            # to avoid duplicating facts that already exist in the graph
+            hydrated_nodes = await extract_attributes_from_nodes(
+                self.clients, nodes, episode, previous_episodes, entity_types,
+                edges=new_edges,
             )
 
             entity_edges = resolved_edges + invalidated_edges
@@ -1036,6 +1043,23 @@ class Graphiti:
         )
 
         updated_edge = resolve_edge_pointers([edge], uuid_map)[0]
+
+        # Check if an edge with this UUID already exists with different source/target nodes.
+        # If so, generate a new UUID to create a new edge instead of overwriting.
+        try:
+            existing_edge = await EntityEdge.get_by_uuid(self.driver, updated_edge.uuid)
+            if (
+                existing_edge.source_node_uuid != updated_edge.source_node_uuid
+                or existing_edge.target_node_uuid != updated_edge.target_node_uuid
+            ):
+                old_uuid = updated_edge.uuid
+                updated_edge.uuid = str(uuid4())
+                logger.info(
+                    f'Edge UUID {old_uuid} already exists with different source/target nodes. '
+                    f'Generated new UUID {updated_edge.uuid} to avoid overwriting.'
+                )
+        except EdgeNotFoundError:
+            pass
 
         related_edges = (await get_relevant_edges(self.driver, [updated_edge], SearchFilters()))[0]
         existing_edges = (
