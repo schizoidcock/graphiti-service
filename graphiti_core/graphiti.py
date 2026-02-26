@@ -25,6 +25,7 @@ from typing_extensions import LiteralString
 
 from graphiti_core.cross_encoder.client import CrossEncoderClient
 from graphiti_core.cross_encoder.openai_reranker_client import OpenAIRerankerClient
+from graphiti_core.decorators import handle_multiple_group_ids
 from graphiti_core.driver.driver import GraphDriver
 from graphiti_core.driver.falkordb_driver import FalkorDriver
 from graphiti_core.errors import EdgeNotFoundError
@@ -391,6 +392,7 @@ class Graphiti:
         """
         await self.driver.build_indices_and_constraints(delete_existing)
 
+    @handle_multiple_group_ids
     async def retrieve_episodes(
         self,
         reference_time: datetime,
@@ -1058,6 +1060,7 @@ class Graphiti:
         except Exception as e:
             raise e
 
+    @handle_multiple_group_ids
     async def build_communities(
         self, group_ids: list[str] | None = None
     ) -> tuple[list[CommunityNode], list[CommunityEdge]]:
@@ -1091,6 +1094,7 @@ class Graphiti:
 
         return community_nodes, community_edges
 
+    @handle_multiple_group_ids
     async def search(
         self,
         query: str,
@@ -1164,6 +1168,7 @@ class Graphiti:
             query, config, group_ids, center_node_uuid, bfs_origin_node_uuids, search_filter
         )
 
+    @handle_multiple_group_ids
     async def search_(
         self,
         query: str,
