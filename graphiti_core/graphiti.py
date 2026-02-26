@@ -33,12 +33,15 @@ from graphiti_core.edges import (
     Edge,
     EntityEdge,
     EpisodicEdge,
+    HasEpisodeEdge,
+    NextEpisodeEdge,
     create_entity_edge_embeddings,
 )
 from graphiti_core.embedder import EmbedderClient, OpenAIEmbedder
 from graphiti_core.graphiti_types import GraphitiClients
 from graphiti_core.helpers import (
     get_default_group_id,
+    parse_db_date,
     semaphore_gather,
     validate_excluded_entity_types,
     validate_group_id,
@@ -50,6 +53,7 @@ from graphiti_core.nodes import (
     EpisodeType,
     EpisodicNode,
     Node,
+    SagaNode,
     create_entity_node_embeddings,
 )
 from graphiti_core.search.search import SearchConfig, search
@@ -305,6 +309,53 @@ class Graphiti:
         """
         await self.driver.close()
 
+    async def _get_or_create_saga(self, saga_name: str, group_id: str, now: datetime) -> SagaNode:
+        """
+        Get an existing saga by name or create a new one.
+
+        Parameters
+        ----------
+        saga_name : str
+            The name of the saga.
+        group_id : str
+            The group id for the saga.
+        now : datetime
+            The current timestamp for creation.
+
+        Returns
+        -------
+        SagaNode
+            The existing or newly created saga node.
+        """
+        # Query for existing saga with this name in the group
+        records, _, _ = await self.driver.execute_query(
+            """
+            MATCH (s:Saga {name: $name, group_id: $group_id})
+            RETURN s.uuid AS uuid, s.name AS name, s.group_id AS group_id, s.created_at AS created_at
+            """,
+            name=saga_name,
+            group_id=group_id,
+        )
+
+        if records:
+            # Saga exists, return it
+            record = records[0]
+            return SagaNode(
+                uuid=record['uuid'],
+                name=record['name'],
+                group_id=record['group_id'],
+                created_at=parse_db_date(record['created_at']),  # type: ignore
+            )
+
+        # Create new saga
+        saga = SagaNode(
+            name=saga_name,
+            group_id=group_id,
+            created_at=now,
+        )
+        await saga.save(self.driver)
+        return saga
+
     async def build_indices_and_constraints(self, delete_existing: bool = False):
         """
         Build indices and constraints in the FalkorDB database.
@@ -390,6 +441,8 @@ class Graphiti:
         edge_types: dict[str, type[BaseModel]] | None = None,
         edge_type_map: dict[tuple[str, str], list[str]] | None = None,
         custom_extraction_instructions: str | None = None,
+        saga: str | SagaNode | None = None,
+        saga_previous_episode_uuid: str | None = None,
     ) -> AddEpisodeResults:
         """
         Process an episode and update the graph.
@@ -424,6 +477,14 @@ class Graphiti:
         previous_episode_uuids : list[str] | None
             Optional.  list of episode uuids to use as the previous episodes. If this is not provided,
             the most recent episodes by created_at date will be used.
+        saga : str | SagaNode | None
+            Optional. Either a saga name (str) or a SagaNode object to associate
+            this episode with. If a string is provided, the saga will be looked up
+            by name or created if it doesn't exist.
+        saga_previous_episode_uuid : str | None
+            Optional. UUID of the previous episode in the saga. If provided, skips
+            the database query to find the most recent episode. Useful for efficiently
+            adding multiple episodes to the same saga in sequence.
 
         Returns
         -------
@@ -555,6 +616,51 @@ class Graphiti:
             await add_nodes_and_edges_bulk(
                 self.driver, [episode], episodic_edges, hydrated_nodes, entity_edges, self.embedder
             )
+
+            # Handle saga association if provided
+            if saga is not None:
+                # Get or create saga node based on input type
+                if isinstance(saga, str):
+                    saga_node = await self._get_or_create_saga(saga, group_id, now)
+                else:
+                    saga_node = saga
+
+                # Use provided previous episode UUID or query for it
+                previous_episode_uuid: str | None = saga_previous_episode_uuid
+                if previous_episode_uuid is None:
+                    # Find the most recent episode in the saga (excluding the current one)
+                    previous_episode_records, _, _ = await self.driver.execute_query(
+                        """
+                        MATCH (s:Saga {uuid: $saga_uuid})-[:HAS_EPISODE]->(e:Episodic)
+                        WHERE e.uuid <> $current_episode_uuid
+                        RETURN e.uuid AS uuid
+                        ORDER BY e.valid_at DESC, e.created_at DESC
+                        LIMIT 1
+                        """,
+                        saga_uuid=saga_node.uuid,
+                        current_episode_uuid=episode.uuid,
+                    )
+                    if previous_episode_records:
+                        previous_episode_uuid = previous_episode_records[0]['uuid']
+
+                # Create NEXT_EPISODE edge from the previous episode to the new one
+                if previous_episode_uuid is not None:
+                    next_episode_edge = NextEpisodeEdge(
+                        source_node_uuid=previous_episode_uuid,
+                        target_node_uuid=episode.uuid,
+                        group_id=group_id,
+                        created_at=now,
+                    )
+                    await next_episode_edge.save(self.driver)
+
+                # Create HAS_EPISODE edge from saga to the new episode
+                has_episode_edge = HasEpisodeEdge(
+                    source_node_uuid=saga_node.uuid,
+                    target_node_uuid=episode.uuid,
+                    group_id=group_id,
+                    created_at=now,
+                )
+                await has_episode_edge.save(self.driver)
 
             communities = []
             community_edges = []
