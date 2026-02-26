@@ -219,16 +219,16 @@ class FalkorDriver(GraphDriver):
                     logger.info('Proceeding with default Redis configuration')
 
             # Handle async execution properly without blocking
+            # IMPORTANT: Never use asyncio.run() here - it creates a new event loop
+            # and corrupts connections when running under Hypercorn/Gunicorn
             try:
                 loop = asyncio.get_running_loop()
-                asyncio.create_task(_config_redis())
+                loop.create_task(_config_redis())
                 logger.debug('Redis configuration scheduled as async task')
             except RuntimeError:
-                try:
-                    asyncio.run(_config_redis())
-                    logger.debug('Redis configuration completed synchronously')
-                except Exception as run_err:
-                    logger.warning(f'Could not run Redis configuration: {run_err}')
+                # No event loop running yet - skip configuration
+                # It will be handled when the service starts
+                logger.debug('No event loop available, skipping Redis configuration')
 
         except Exception as e:
             logger.warning(f'Redis configuration setup failed: {e}')
