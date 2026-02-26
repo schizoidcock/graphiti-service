@@ -1,26 +1,41 @@
+# FastAPI and web framework
 fastapi>=0.104.0
 uvicorn[standard]>=0.24.0
-pydantic>=2.4.0
+pydantic>=2.11.5
 pydantic-settings>=2.0.0
 python-multipart>=0.0.6
+
+# Database and Redis
 redis>=5.0.0
-falkordb>=1.2.0
-diskcache>=5.6.3
-openai>=1.0.0
-anthropic>=0.7.0
-google-generativeai>=0.3.0
-groq>=0.4.0
-voyageai>=0.2.0
-numpy>=1.24.0
+falkordb>=1.1.2,<2.0.0
+
+# AI and ML
+openai>=1.91.0
+anthropic>=0.49.0
+google-genai>=1.62.0
+groq>=0.2.0
+voyageai>=0.2.3
+
+# Data processing
+numpy>=1.0.0
 scikit-learn>=1.3.0
-sentence-transformers>=2.2.0
+sentence-transformers>=3.2.1
+
+# HTTP and networking
 httpx>=0.25.0
 aiohttp>=3.8.0
 requests>=2.31.0
-tenacity>=8.2.0
+
+# Performance and async
+tenacity>=9.0.0
 asyncio-throttle>=1.0.2
 async-timeout>=4.0.0
+
+# Configuration and environment
 python-dotenv>=1.0.0
+
+# Utilities
 python-dateutil>=2.8.0
 pytz>=2023.3
+uuid>=1.30
 posthog>=3.0.0
