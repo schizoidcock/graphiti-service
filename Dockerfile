@@ -41,6 +41,6 @@ ENV PYTHONPATH=/app
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:${PORT}/healthcheck || exit 1
 
-# Start with Gunicorn + Uvicorn workers for dual-stack binding (IPv4 + IPv6)
+# Start with Hypercorn for dual-stack binding (IPv4 + IPv6)
 # This enables both public access AND Railway private networking
-CMD ["sh", "-c", "echo '🚀 Starting gunicorn with uvicorn workers...' && gunicorn -w 2 -k uvicorn.workers.UvicornWorker -b [::]:${PORT} --access-logfile - --error-logfile - graph_service.main:app"]
+CMD ["sh", "-c", "echo '🚀 Starting hypercorn server...' && hypercorn -b [::]:${PORT} graph_service.main:app"]
