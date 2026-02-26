@@ -189,8 +189,47 @@ Removed all Neo4j/Neptune/Kuzu provider references:
 
 ---
 
+## Railway Networking Configuration
+
+### Important: IPv6 vs IPv4 Binding
+
+Railway's networking has different behavior depending on uvicorn's host binding:
+
+| Binding | Public Access | Internal Network | FalkorDB Connection |
+|---------|---------------|------------------|---------------------|
+| `--host ::` (IPv6) | ❌ 502 errors | ✅ Works | Use `falkordb.railway.internal:PORT` |
+| `--host 0.0.0.0` (IPv4) | ✅ Works | ❌ Fails | Use `caboose.proxy.rlwy.net:PORT` (public proxy) |
+
+### Configuration Options
+
+**Option 1: Internal Network Only (IPv6)**
+```dockerfile
+CMD ["uvicorn", "...", "--host", "::", "--port", "${PORT}"]
+```
+- FalkorDB: `FALKORDB_HOST=falkordb.railway.internal`
+- zep-server connects via: `graphiti-service.railway.internal:8080`
+- Public access: Not available
+
+**Option 2: Public Access (IPv4)**
+```dockerfile
+CMD ["uvicorn", "...", "--host", "0.0.0.0", "--port", "${PORT}"]
+```
+- FalkorDB: `FALKORDB_HOST=caboose.proxy.rlwy.net` (public proxy)
+- Public URL: `https://graphiti-service-xxx.up.railway.app`
+- Internal network: Requires public proxy for all connections
+
+### Current Configuration
+
+As of v0.28.1, the service uses **IPv4 binding** (`0.0.0.0`) for public access.
+FalkorDB must be configured with the **public proxy URL**, not the internal Railway domain.
+
+---
+
 ## Commits
 
+- d0a7ffe Fix uvicorn binding: use 0.0.0.0 instead of :: (IPv6)
+- c1a3104 Add ARCHITECTURE.md documenting service extension
+- 37c61ef Sync requirements.txt with pyproject.toml v0.28.1
 - a813c8c Integrate graphiti-core updates Oct 2025 - Feb 2026 (v0.28.1)
 - cdc83b9 Remove neo4j import from helpers.py
 - b33d0c3 Fix circular import in helpers.py
