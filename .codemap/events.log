@@ -1,0 +1,360 @@
+2026-02-25 18:25:19 | CREATE | graphiti_core\driver\query_executor.py   |   41 |    +41 | 
+2026-02-25 18:25:23 | CREATE | graphiti_core\driver\record_parsers.py   |  118 |   +118 | 
+2026-02-25 18:25:28 | CREATE | graphiti_core\driver\graph_operations\graph_operations.py |  835 |   +835 | 
+2026-02-25 18:32:57 | CREATE | graphiti_core\driver\operations\__init__.py |   41 |    +41 | 
+2026-02-25 18:32:57 | CREATE | graphiti_core\driver\operations\community_edge_ops.py |   69 |    +69 | 
+2026-02-25 18:32:57 | CREATE | graphiti_core\driver\operations\community_node_ops.py |   95 |    +95 | 
+2026-02-25 18:32:57 | CREATE | graphiti_core\driver\operations\entity_edge_ops.py |  108 |   +108 | 
+2026-02-25 18:32:57 | CREATE | graphiti_core\driver\operations\entity_node_ops.py |  103 |   +103 | 
+2026-02-25 18:32:57 | CREATE | graphiti_core\driver\operations\episode_node_ops.py |  107 |   +107 | 
+2026-02-25 18:32:57 | CREATE | graphiti_core\driver\operations\episodic_edge_ops.py |   78 |    +78 | 
+2026-02-25 18:32:58 | CREATE | graphiti_core\driver\operations\graph_ops.py |   77 |    +77 | 
+2026-02-25 18:32:58 | CREATE | graphiti_core\driver\operations\graph_utils.py |   65 |    +65 | 
+2026-02-25 18:32:58 | CREATE | graphiti_core\driver\operations\has_episode_edge_ops.py |   78 |    +78 | 
+2026-02-25 18:32:58 | CREATE | graphiti_core\driver\operations\next_episode_edge_ops.py |   78 |    +78 | 
+2026-02-25 18:32:58 | CREATE | graphiti_core\driver\operations\saga_node_ops.py |   88 |    +88 | 
+2026-02-25 18:32:58 | CREATE | graphiti_core\driver\operations\search_ops.py |  165 |   +165 | 
+2026-02-25 18:33:05 | CREATE | graphiti_core\driver\falkordb\__init__.py |    0 |        | 
+2026-02-25 18:33:37 | CREATE | graphiti_core\driver\falkordb\operations\__init__.py |    0 |        | 
+2026-02-25 18:33:37 | CREATE | graphiti_core\driver\falkordb\operations\community_edge_ops.py |  163 |   +163 | 
+2026-02-25 18:33:37 | CREATE | graphiti_core\driver\falkordb\operations\community_node_ops.py |  199 |   +199 | 
+2026-02-25 18:33:37 | CREATE | graphiti_core\driver\falkordb\operations\entity_edge_ops.py |  252 |   +252 | 
+2026-02-25 18:33:37 | CREATE | graphiti_core\driver\falkordb\operations\entity_node_ops.py |  238 |   +238 | 
+2026-02-25 18:33:37 | CREATE | graphiti_core\driver\falkordb\operations\episode_node_ops.py |  278 |   +278 | 
+2026-02-25 18:33:37 | CREATE | graphiti_core\driver\falkordb\operations\episodic_edge_ops.py |  177 |   +177 | 
+2026-02-25 18:33:37 | CREATE | graphiti_core\driver\falkordb\operations\graph_ops.py |  253 |   +253 | 
+2026-02-25 18:33:37 | CREATE | graphiti_core\driver\falkordb\operations\has_episode_edge_ops.py |  171 |   +171 | 
+2026-02-25 18:33:37 | CREATE | graphiti_core\driver\falkordb\operations\next_episode_edge_ops.py |  171 |   +171 | 
+2026-02-25 18:33:37 | CREATE | graphiti_core\driver\falkordb\operations\saga_node_ops.py |  185 |   +185 | 
+2026-02-25 18:33:37 | CREATE | graphiti_core\driver\falkordb\operations\search_ops.py |  696 |   +696 | 
+2026-02-25 18:33:41 | CREATE | graphiti_core\driver\graph_operations\__init__.py |    0 |        | 
+2026-02-25 18:34:17 | REMOVE | graphiti_core\driver\driver.py           |    0 |   -121 | 
+2026-02-25 18:35:31 | REMOVE | graphiti_core\driver\falkordb_driver.py  |    0 |   -472 | 
+2026-02-25 18:38:42 | WRITE  | graphiti_core\edges.py                   | 1036 |   +504 | dirty
+2026-02-25 18:38:44 | WRITE  | graphiti_core\edges.py                   | 1036 |        | dirty
+2026-02-25 18:38:46 | WRITE  | graphiti_core\nodes.py                   | 1073 |   +355 | dirty
+2026-02-25 18:39:03 | REMOVE | graphiti_core\driver\driver.py           |    0 |        | 
+2026-02-25 18:39:14 | WRITE  | graphiti_core\models\nodes\node_db_queries.py |  365 |   +204 | dirty
+2026-02-25 18:39:18 | WRITE  | graphiti_core\models\edges\edge_db_queries.py |  318 |   +188 | dirty
+2026-02-25 18:39:22 | WRITE  | graphiti_core\helpers.py                 |  191 |    +16 | dirty
+2026-02-25 18:39:26 | WRITE  | graphiti_core\graph_queries.py           |    0 |   -137 | dirty
+2026-02-25 18:39:55 | REMOVE | graphiti_core\driver\driver.py           |    0 |        | 
+2026-02-25 18:40:23 | REMOVE | graphiti_core\nodes.py                   |    0 |  -1073 | 
+2026-02-25 18:40:23 | REMOVE | graphiti_core\edges.py                   |    0 |  -1036 | 
+2026-02-25 18:40:26 | REMOVE | graphiti_core\nodes.py                   |    0 |        | 
+2026-02-25 18:40:30 | REMOVE | graphiti_core\edges.py                   |    0 |        | 
+2026-02-25 18:40:36 | REMOVE | graphiti_core\nodes.py                   |    0 |        | 
+2026-02-25 18:40:36 | REMOVE | graphiti_core\edges.py                   |    0 |        | 
+2026-02-25 18:40:43 | REMOVE | graphiti_core\nodes.py                   |    0 |        | 
+2026-02-25 18:40:46 | REMOVE | graphiti_core\edges.py                   |    0 |        | 
+2026-02-25 18:40:51 | REMOVE | graphiti_core\nodes.py                   |    0 |        | 
+2026-02-25 18:40:57 | REMOVE | graphiti_core\edges.py                   |    0 |        | 
+2026-02-25 18:41:04 | REMOVE | graphiti_core\edges.py                   |    0 |        | 
+2026-02-25 18:41:07 | REMOVE | graphiti_core\nodes.py                   |    0 |        | 
+2026-02-25 18:41:13 | REMOVE | graphiti_core\edges.py                   |    0 |        | 
+2026-02-25 18:41:14 | REMOVE | graphiti_core\nodes.py                   |    0 |        | 
+2026-02-25 18:41:18 | REMOVE | graphiti_core\nodes.py                   |    0 |        | 
+2026-02-25 18:41:20 | REMOVE | graphiti_core\edges.py                   |    0 |        | 
+2026-02-25 18:41:31 | REMOVE | graphiti_core\edges.py                   |    0 |        | 
+2026-02-25 18:41:32 | REMOVE | graphiti_core\nodes.py                   |    0 |        | 
+2026-02-25 18:41:37 | REMOVE | graphiti_core\edges.py                   |    0 |        | 
+2026-02-25 18:41:41 | REMOVE | graphiti_core\nodes.py                   |    0 |        | 
+2026-02-25 18:41:46 | REMOVE | graphiti_core\edges.py                   |    0 |        | 
+2026-02-25 18:41:48 | REMOVE | graphiti_core\nodes.py                   |    0 |        | 
+2026-02-25 18:41:50 | REMOVE | graphiti_core\nodes.py                   |    0 |        | 
+2026-02-25 18:41:53 | REMOVE | graphiti_core\edges.py                   |    0 |        | 
+2026-02-25 18:42:02 | REMOVE | graphiti_core\models\edges\edge_db_queries.py |    0 |   -318 | 
+2026-02-25 18:42:08 | REMOVE | graphiti_core\nodes.py                   |    0 |        | 
+2026-02-25 18:42:14 | REMOVE | graphiti_core\models\edges\edge_db_queries.py |    0 |        | 
+2026-02-25 18:42:18 | REMOVE | graphiti_core\nodes.py                   |    0 |        | 
+2026-02-25 18:42:24 | REMOVE | graphiti_core\models\edges\edge_db_queries.py |    0 |        | 
+2026-02-25 18:42:25 | REMOVE | graphiti_core\nodes.py                   |    0 |        | 
+2026-02-25 18:42:29 | REMOVE | graphiti_core\nodes.py                   |    0 |        | 
+2026-02-25 18:42:31 | REMOVE | graphiti_core\models\edges\edge_db_queries.py |    0 |        | 
+2026-02-25 18:42:35 | REMOVE | graphiti_core\nodes.py                   |    0 |        | 
+2026-02-25 18:42:41 | REMOVE | graphiti_core\nodes.py                   |    0 |        | 
+2026-02-25 18:42:41 | REMOVE | graphiti_core\models\edges\edge_db_queries.py |    0 |        | 
+2026-02-25 18:48:30 | REMOVE | graphiti_core\graph_queries.py           |    0 |        | 
+2026-02-25 18:48:43 | REMOVE | graphiti_core\models\nodes\node_db_queries.py |    0 |   -365 | 
+2026-02-25 18:49:14 | REMOVE | graphiti_core\driver\falkordb\operations\graph_ops.py |    0 |   -253 | 
+2026-02-25 18:49:16 | REMOVE | graphiti_core\driver\falkordb\operations\graph_ops.py |    0 |        | 
+2026-02-25 18:49:19 | REMOVE | graphiti_core\driver\falkordb\operations\graph_ops.py |    0 |        | 
+2026-02-25 18:49:20 | REMOVE | graphiti_core\driver\falkordb\operations\graph_ops.py |    0 |        | 
+2026-02-25 18:49:31 | REMOVE | graphiti_core\driver\falkordb\operations\graph_ops.py |    0 |        | 
+2026-02-25 18:49:43 | REMOVE | graphiti_core\driver\falkordb\operations\search_ops.py |    0 |   -696 | 
+2026-02-25 18:49:47 | REMOVE | graphiti_core\driver\falkordb\operations\search_ops.py |    0 |        | 
+2026-02-25 18:49:48 | REMOVE | graphiti_core\driver\falkordb\operations\search_ops.py |    0 |        | 
+2026-02-25 18:49:51 | REMOVE | graphiti_core\driver\falkordb\operations\search_ops.py |    0 |        | 
+2026-02-25 18:49:53 | REMOVE | graphiti_core\driver\falkordb\operations\search_ops.py |    0 |        | 
+2026-02-25 18:49:54 | REMOVE | graphiti_core\driver\falkordb\operations\search_ops.py |    0 |        | 
+2026-02-25 18:49:55 | REMOVE | graphiti_core\driver\falkordb\operations\search_ops.py |    0 |        | 
+2026-02-25 18:49:56 | REMOVE | graphiti_core\driver\falkordb\operations\search_ops.py |    0 |        | 
+2026-02-25 18:49:58 | REMOVE | graphiti_core\driver\falkordb\operations\search_ops.py |    0 |        | 
+2026-02-25 18:49:59 | REMOVE | graphiti_core\driver\falkordb\operations\search_ops.py |    0 |        | 
+2026-02-25 18:50:00 | REMOVE | graphiti_core\driver\falkordb\operations\search_ops.py |    0 |        | 
+2026-02-25 18:50:01 | REMOVE | graphiti_core\driver\falkordb\operations\search_ops.py |    0 |        | 
+2026-02-25 18:50:12 | REMOVE | graphiti_core\driver\falkordb\operations\search_ops.py |    0 |        | 
+2026-02-25 18:50:16 | REMOVE | graphiti_core\driver\falkordb\operations\entity_node_ops.py |    0 |   -238 | 
+2026-02-25 18:50:17 | REMOVE | graphiti_core\driver\falkordb\operations\entity_node_ops.py |    0 |        | 
+2026-02-25 18:50:18 | REMOVE | graphiti_core\driver\falkordb\operations\entity_node_ops.py |    0 |        | 
+2026-02-25 18:50:19 | REMOVE | graphiti_core\driver\falkordb\operations\entity_node_ops.py |    0 |        | 
+2026-02-25 18:50:22 | REMOVE | graphiti_core\driver\falkordb\operations\episode_node_ops.py |    0 |   -278 | 
+2026-02-25 18:50:23 | REMOVE | graphiti_core\driver\falkordb\operations\episode_node_ops.py |    0 |        | 
+2026-02-25 18:50:25 | REMOVE | graphiti_core\driver\falkordb\operations\episode_node_ops.py |    0 |        | 
+2026-02-25 18:50:27 | REMOVE | graphiti_core\driver\falkordb\operations\community_node_ops.py |    0 |   -199 | 
+2026-02-25 18:50:29 | REMOVE | graphiti_core\driver\falkordb\operations\community_node_ops.py |    0 |        | 
+2026-02-25 18:50:31 | REMOVE | graphiti_core\driver\falkordb\operations\saga_node_ops.py |    0 |   -185 | 
+2026-02-25 18:50:32 | REMOVE | graphiti_core\driver\falkordb\operations\saga_node_ops.py |    0 |        | 
+2026-02-25 18:50:36 | REMOVE | graphiti_core\driver\falkordb_driver.py  |    0 |        | 
+2026-02-25 18:50:39 | REMOVE | graphiti_core\utils\bulk_utils.py        |    0 |   -544 | 
+2026-02-25 18:50:40 | REMOVE | graphiti_core\utils\bulk_utils.py        |    0 |        | 
+2026-02-25 18:50:42 | REMOVE | graphiti_core\utils\bulk_utils.py        |    0 |        | 
+2026-02-25 18:50:42 | REMOVE | graphiti_core\utils\bulk_utils.py        |    0 |        | 
+2026-02-25 18:50:45 | REMOVE | graphiti_core\nodes.py                   |    0 |        | 
+2026-02-25 18:50:46 | REMOVE | graphiti_core\nodes.py                   |    0 |        | 
+2026-02-25 18:50:47 | REMOVE | graphiti_core\nodes.py                   |    0 |        | 
+2026-02-25 18:50:48 | REMOVE | graphiti_core\nodes.py                   |    0 |        | 
+2026-02-25 18:50:49 | REMOVE | graphiti_core\nodes.py                   |    0 |        | 
+2026-02-25 18:50:56 | REMOVE | graphiti_core\search\search_filters.py   |    0 |   -243 | 
+2026-02-25 18:50:57 | REMOVE | graphiti_core\search\search_filters.py   |    0 |        | 
+2026-02-25 18:50:59 | REMOVE | graphiti_core\search\search_filters.py   |    0 |        | 
+2026-02-25 18:51:04 | REMOVE | graphiti_core\search\search_utils.py     |    0 |  -1131 | 
+2026-02-25 18:51:05 | REMOVE | graphiti_core\search\search_utils.py     |    0 |        | 
+2026-02-25 18:51:06 | REMOVE | graphiti_core\search\search_utils.py     |    0 |        | 
+2026-02-25 18:51:08 | REMOVE | graphiti_core\search\search_utils.py     |    0 |        | 
+2026-02-25 18:51:10 | REMOVE | graphiti_core\search\search_utils.py     |    0 |        | 
+2026-02-25 18:51:11 | REMOVE | graphiti_core\search\search_utils.py     |    0 |        | 
+2026-02-25 18:51:12 | REMOVE | graphiti_core\search\search_utils.py     |    0 |        | 
+2026-02-25 18:51:13 | REMOVE | graphiti_core\search\search_utils.py     |    0 |        | 
+2026-02-25 18:51:14 | REMOVE | graphiti_core\search\search_utils.py     |    0 |        | 
+2026-02-25 18:51:16 | REMOVE | graphiti_core\search\search_utils.py     |    0 |        | 
+2026-02-25 18:51:17 | REMOVE | graphiti_core\search\search_utils.py     |    0 |        | 
+2026-02-25 18:51:18 | REMOVE | graphiti_core\search\search_utils.py     |    0 |        | 
+2026-02-25 18:51:19 | REMOVE | graphiti_core\search\search_utils.py     |    0 |        | 
+2026-02-25 18:51:23 | REMOVE | graphiti_core\search\search_utils.py     |    0 |        | 
+2026-02-25 18:51:24 | REMOVE | graphiti_core\search\search_utils.py     |    0 |        | 
+2026-02-25 18:51:25 | REMOVE | graphiti_core\search\search_utils.py     |    0 |        | 
+2026-02-25 18:51:35 | REMOVE | graphiti_core\search\search_utils.py     |    0 |        | 
+2026-02-25 18:51:36 | REMOVE | graphiti_core\search\search_utils.py     |    0 |        | 
+2026-02-25 18:51:39 | REMOVE | graphiti_core\search\search_utils.py     |    0 |        | 
+2026-02-25 18:51:51 | REMOVE | graphiti_core\search\search_utils.py     |    0 |        | 
+2026-02-25 18:51:53 | REMOVE | graphiti_core\search\search_utils.py     |    0 |        | 
+2026-02-25 18:52:16 | REMOVE | graphiti_core\models\edges\edge_db_queries.py |    0 |        | 
+2026-02-25 18:52:31 | REMOVE | graphiti_core\edges.py                   |    0 |        | 
+2026-02-25 18:52:32 | REMOVE | graphiti_core\edges.py                   |    0 |        | 
+2026-02-25 18:52:33 | REMOVE | graphiti_core\edges.py                   |    0 |        | 
+2026-02-25 18:52:40 | REMOVE | graphiti_core\driver\falkordb\operations\entity_edge_ops.py |    0 |   -252 | 
+2026-02-25 18:52:41 | REMOVE | graphiti_core\driver\falkordb\operations\entity_edge_ops.py |    0 |        | 
+2026-02-25 18:52:42 | REMOVE | graphiti_core\driver\falkordb\operations\entity_edge_ops.py |    0 |        | 
+2026-02-25 18:52:43 | REMOVE | graphiti_core\driver\falkordb\operations\entity_edge_ops.py |    0 |        | 
+2026-02-25 18:52:51 | REMOVE | graphiti_core\driver\falkordb\operations\community_edge_ops.py |    0 |   -163 | 
+2026-02-25 18:52:52 | REMOVE | graphiti_core\driver\falkordb\operations\community_edge_ops.py |    0 |        | 
+2026-02-25 18:52:53 | REMOVE | graphiti_core\driver\falkordb\operations\episodic_edge_ops.py |    0 |   -177 | 
+2026-02-25 18:52:54 | REMOVE | graphiti_core\driver\falkordb\operations\episodic_edge_ops.py |    0 |        | 
+2026-02-25 18:56:24 | REMOVE | graphiti_core\graph_queries.py           |    0 |        | 
+2026-02-25 19:14:14 | CREATE | graphiti_core\llm_client\cache.py        |    0 |        | 
+2026-02-25 19:14:18 | REMOVE | graphiti_core\llm_client\client.py       |    0 |   -199 | 
+2026-02-25 19:14:22 | REMOVE | graphiti_core\llm_client\client.py       |    0 |        | 
+2026-02-25 19:14:45 | WRITE  | graphiti_core\utils\maintenance\node_operations.py |  684 |   +116 | dirty
+2026-02-25 19:14:49 | WRITE  | graphiti_core\utils\maintenance\edge_operations.py |  725 |   +124 | dirty
+2026-02-25 19:15:11 | REMOVE | graphiti_core\llm_client\openai_base_client.py |    0 |   -239 | 
+2026-02-25 19:15:25 | REMOVE | graphiti_core\utils\text_utils.py        |    0 |    -53 | 
+2026-02-25 19:15:40 | REMOVE | graphiti_core\llm_client\client.py       |    0 |        | 
+2026-02-25 19:25:34 | CREATE | graphiti_core\llm_client\token_tracker.py |  152 |   +152 | 
+2026-02-25 19:25:43 | REMOVE | graphiti_core\search\search_filters.py   |    0 |        | 
+2026-02-25 19:25:48 | REMOVE | graphiti_core\search\search_filters.py   |    0 |        | 
+2026-02-25 19:26:23 | REMOVE | graphiti_core\graphiti.py                |    0 |  -1098 | 
+2026-02-25 19:26:43 | REMOVE | graphiti_core\graphiti.py                |    0 |        | 
+2026-02-25 19:27:17 | REMOVE | graphiti_core\graphiti.py                |    0 |        | 
+2026-02-25 19:27:23 | REMOVE | graphiti_core\graphiti.py                |    0 |        | 
+2026-02-25 19:28:10 | REMOVE | graphiti_core\graphiti.py                |    0 |        | 
+2026-02-25 19:28:21 | REMOVE | graphiti_core\graphiti.py                |    0 |        | 
+2026-02-25 19:28:36 | REMOVE | graphiti_core\graphiti.py                |    0 |        | 
+2026-02-25 19:53:29 | REMOVE | graphiti_core\search\search.py           |    0 |   -517 | 
+2026-02-25 19:53:29 | REMOVE | graphiti_core\search\search.py           |    0 |   -517 | 
+2026-02-25 19:53:29 | REMOVE | graphiti_core\utils\maintenance\community_operations.py |    0 |   -328 | 
+2026-02-25 19:53:29 | REMOVE | graphiti_core\utils\maintenance\community_operations.py |    0 |   -328 | 
+2026-02-25 19:53:34 | REMOVE | graphiti_core\llm_client\client.py       |    0 |        | 
+2026-02-25 19:53:34 | REMOVE | graphiti_core\llm_client\client.py       |    0 |   -205 | 
+2026-02-25 19:53:43 | REMOVE | graphiti_core\llm_client\__init__.py     |    0 |    -22 | 
+2026-02-25 19:53:43 | REMOVE | graphiti_core\llm_client\__init__.py     |    0 |    -22 | 
+2026-02-25 20:03:25 | REMOVE | graphiti_core\driver\falkordb\__init__.py |    0 |    -51 | 
+2026-02-25 20:03:25 | REMOVE | graphiti_core\driver\falkordb\__init__.py |    0 |        | 
+2026-02-25 20:03:25 | REMOVE | graphiti_core\driver\falkordb\operations\__init__.py |    0 |    -49 | 
+2026-02-25 20:03:25 | REMOVE | graphiti_core\driver\falkordb\operations\__init__.py |    0 |        | 
+2026-02-25 20:03:25 | REMOVE | graphiti_core\driver\falkordb\operations\community_edge_ops.py |    0 |        | 
+2026-02-25 20:03:25 | REMOVE | graphiti_core\driver\falkordb\operations\community_node_ops.py |    0 |        | 
+2026-02-25 20:03:25 | REMOVE | graphiti_core\driver\falkordb\operations\entity_edge_ops.py |    0 |        | 
+2026-02-25 20:03:25 | REMOVE | graphiti_core\driver\falkordb\operations\community_edge_ops.py |    0 |   -162 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\falkordb\operations\entity_node_ops.py |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\falkordb\operations\community_node_ops.py |    0 |   -198 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\falkordb\operations\episode_node_ops.py |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\falkordb\operations\entity_edge_ops.py |    0 |   -251 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\falkordb\operations\entity_node_ops.py |    0 |   -235 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\falkordb\operations\episodic_edge_ops.py |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\falkordb\operations\graph_ops.py |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\falkordb\operations\episode_node_ops.py |    0 |   -277 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\falkordb\operations\episodic_edge_ops.py |    0 |   -176 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\falkordb\operations\has_episode_edge_ops.py |    0 |   -171 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\falkordb\operations\graph_ops.py |    0 |   -252 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\falkordb\operations\next_episode_edge_ops.py |    0 |   -171 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\falkordb\operations\has_episode_edge_ops.py |    0 |   -171 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\falkordb\operations\saga_node_ops.py |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\falkordb\operations\next_episode_edge_ops.py |    0 |   -171 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\falkordb\operations\search_ops.py |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\graph_operations\__init__.py |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\falkordb\operations\saga_node_ops.py |    0 |   -184 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\falkordb\operations\search_ops.py |    0 |   -665 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\graph_operations\graph_operations.py |    0 |   -835 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\graph_operations\__init__.py |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\operations\__init__.py |    0 |    -41 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\graph_operations\graph_operations.py |    0 |   -835 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\operations\community_edge_ops.py |    0 |    -69 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\operations\__init__.py |    0 |    -41 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\operations\community_node_ops.py |    0 |    -95 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\operations\community_edge_ops.py |    0 |    -69 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\operations\entity_edge_ops.py |    0 |   -108 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\operations\community_node_ops.py |    0 |    -95 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\operations\entity_node_ops.py |    0 |   -103 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\operations\episode_node_ops.py |    0 |   -107 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\operations\episodic_edge_ops.py |    0 |    -78 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\operations\entity_edge_ops.py |    0 |   -108 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\operations\graph_ops.py |    0 |    -77 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\operations\graph_utils.py |    0 |    -65 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\operations\entity_node_ops.py |    0 |   -103 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\operations\has_episode_edge_ops.py |    0 |    -78 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\operations\episode_node_ops.py |    0 |   -107 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\operations\next_episode_edge_ops.py |    0 |    -78 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\operations\episodic_edge_ops.py |    0 |    -78 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\operations\graph_ops.py |    0 |    -77 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\operations\saga_node_ops.py |    0 |    -88 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\operations\graph_utils.py |    0 |    -65 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\operations\search_ops.py |    0 |   -165 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\query_executor.py   |    0 |    -41 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\operations\has_episode_edge_ops.py |    0 |    -78 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\record_parsers.py   |    0 |   -118 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\operations\next_episode_edge_ops.py |    0 |    -78 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\operations\saga_node_ops.py |    0 |    -88 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\llm_client\cache.py        |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\llm_client\token_tracker.py |    0 |   -152 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\operations\search_ops.py |    0 |   -165 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\query_executor.py   |    0 |    -41 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\driver.py           |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\record_parsers.py   |    0 |   -118 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\falkordb_driver.py  |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\llm_client\cache.py        |    0 |    -68 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\edges.py                   |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\llm_client\token_tracker.py |    0 |   -152 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\graph_queries.py           |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\graphiti.py                |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\driver.py           |    0 |   -211 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\helpers.py                 |    0 |   -191 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\falkordb_driver.py  |    0 |   -490 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\edges.py                   |    0 |   -937 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\llm_client\__init__.py     |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\models\edges\edge_db_queries.py |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\graph_queries.py           |    0 |    -92 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\graphiti.py                |    0 |  -1122 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\models\nodes\node_db_queries.py |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\llm_client\__init__.py     |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\search\search.py           |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\models\edges\edge_db_queries.py |    0 |   -146 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\utils\bulk_utils.py        |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\utils\maintenance\community_operations.py |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\models\nodes\node_db_queries.py |    0 |   -127 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\search\search.py           |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\nodes.py                   |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\llm_client\client.py       |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\utils\bulk_utils.py        |    0 |   -544 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\utils\maintenance\community_operations.py |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\llm_client\openai_base_client.py |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\helpers.py                 |    0 |   -191 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\search\search_filters.py   |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\nodes.py                   |    0 |   -859 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\search\search_utils.py     |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\llm_client\client.py       |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\utils\text_utils.py        |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\llm_client\openai_base_client.py |    0 |   -239 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\utils\maintenance\edge_operations.py |    0 |   -725 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\search\search_filters.py   |    0 |   -250 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\utils\maintenance\node_operations.py |    0 |   -684 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\search\search_utils.py     |    0 |  -1097 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\driver.py           |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\utils\text_utils.py        |    0 |    -53 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\utils\maintenance\edge_operations.py |    0 |   -725 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\utils\maintenance\node_operations.py |    0 |   -684 | 
+2026-02-25 20:03:27 | CREATE | graphiti_core\driver\falkordb\__init__.py |   51 |    +51 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\driver.py           |    0 |        | 
+2026-02-25 20:03:27 | CREATE | graphiti_core\driver\falkordb\__init__.py |   51 |    +51 | 
+2026-02-25 20:03:27 | CREATE | graphiti_core\driver\falkordb\operations\__init__.py |   49 |    +49 | 
+2026-02-25 20:03:27 | CREATE | graphiti_core\driver\falkordb\operations\__init__.py |   49 |    +49 | 
+2026-02-25 20:03:27 | CREATE | graphiti_core\driver\operations\__init__.py |   41 |    +41 | 
+2026-02-25 20:03:27 | CREATE | graphiti_core\driver\operations\__init__.py |   41 |    +41 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\edges.py                   |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\edges.py                   |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\graph_queries.py           |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\graph_queries.py           |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\graphiti.py                |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\graphiti.py                |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\helpers.py                 |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\nodes.py                   |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\helpers.py                 |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\nodes.py                   |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\llm_client\__init__.py     |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\llm_client\__init__.py     |    0 |        | 
+2026-02-25 20:03:27 | CREATE | graphiti_core\llm_client\cache.py        |   68 |    +68 | 
+2026-02-25 20:03:27 | CREATE | graphiti_core\llm_client\cache.py        |   68 |    +68 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\llm_client\client.py       |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\llm_client\client.py       |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\llm_client\openai_base_client.py |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\llm_client\openai_base_client.py |    0 |        | 
+2026-02-25 20:03:27 | CREATE | graphiti_core\llm_client\token_tracker.py |  152 |   +152 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\models\edges\edge_db_queries.py |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\models\nodes\node_db_queries.py |    0 |        | 
+2026-02-25 20:03:27 | CREATE | graphiti_core\llm_client\token_tracker.py |  152 |   +152 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\models\edges\edge_db_queries.py |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\search\search.py           |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\models\nodes\node_db_queries.py |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\search\search_filters.py   |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\search\search.py           |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\search\search_utils.py     |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\search\search_filters.py   |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\utils\bulk_utils.py        |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\search\search_utils.py     |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\utils\text_utils.py        |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\utils\maintenance\community_operations.py |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\utils\bulk_utils.py        |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\utils\text_utils.py        |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\utils\maintenance\edge_operations.py |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\utils\maintenance\community_operations.py |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\utils\maintenance\node_operations.py |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\utils\maintenance\edge_operations.py |    0 |        | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\utils\maintenance\node_operations.py |    0 |        | 
+2026-02-25 20:03:27 | CREATE | graphiti_core\driver\driver.py           |  211 |   +211 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\falkordb_driver.py  |    0 |        | 
+2026-02-25 20:03:27 | CREATE | graphiti_core\driver\driver.py           |  211 |   +211 | 
+2026-02-25 20:03:27 | REMOVE | graphiti_core\driver\falkordb_driver.py  |    0 |        | 
+2026-02-25 23:44:14 | REMOVE | graphiti_core\driver\falkordb_driver.py  |    0 |   -490 | 
+2026-02-25 23:44:14 | REMOVE | graphiti_core\driver\falkordb_driver.py  |    0 |   -490 | 
+2026-02-25 23:44:14 | REMOVE | graphiti_core\driver\falkordb_driver.py  |    0 |   -490 | 
+2026-02-25 23:44:44 | REMOVE | graphiti_core\driver\falkordb_driver.py  |    0 |        | 
+2026-02-25 23:44:44 | REMOVE | graphiti_core\driver\falkordb_driver.py  |    0 |        | 
+2026-02-25 23:44:44 | REMOVE | graphiti_core\driver\falkordb_driver.py  |    0 |        | 
+2026-02-25 23:58:44 | REMOVE | graph_service\main.py                    |    0 |   -477 | 
+2026-02-25 23:58:44 | REMOVE | graph_service\main.py                    |    0 |   -477 | 
+2026-02-25 23:58:44 | REMOVE | graph_service\main.py                    |    0 |   -477 | 
+2026-02-25 23:59:04 | REMOVE | graph_service\main.py                    |    0 |        | 
+2026-02-25 23:59:04 | REMOVE | graph_service\main.py                    |    0 |        | 
+2026-02-25 23:59:04 | REMOVE | graph_service\main.py                    |    0 |        | 
+2026-02-26 00:59:11 | REMOVE | graphiti_core\utils\maintenance\node_operations.py |    0 |   -684 | 
+2026-02-26 00:59:11 | REMOVE | graphiti_core\utils\maintenance\node_operations.py |    0 |   -684 | 
+2026-02-26 00:59:11 | REMOVE | graphiti_core\utils\maintenance\node_operations.py |    0 |   -684 | 
+2026-02-26 00:59:39 | REMOVE | graphiti_core\prompts\extract_nodes.py   |    0 |   -331 | 
+2026-02-26 00:59:39 | REMOVE | graphiti_core\prompts\extract_nodes.py   |    0 |   -331 | 
+2026-02-26 00:59:39 | REMOVE | graphiti_core\prompts\extract_nodes.py   |    0 |   -331 | 
+2026-02-26 00:59:44 | REMOVE | graphiti_core\prompts\extract_edges.py   |    0 |   -203 | 
+2026-02-26 00:59:44 | REMOVE | graphiti_core\prompts\extract_edges.py   |    0 |   -203 | 
+2026-02-26 00:59:44 | REMOVE | graphiti_core\prompts\extract_edges.py   |    0 |   -203 | 
+2026-02-26 00:59:51 | REMOVE | graphiti_core\utils\maintenance\node_operations.py |    0 |        | 
+2026-02-26 00:59:51 | REMOVE | graphiti_core\utils\maintenance\node_operations.py |    0 |        | 
+2026-02-26 00:59:51 | REMOVE | graphiti_core\utils\maintenance\node_operations.py |    0 |        | 

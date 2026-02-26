@@ -1,0 +1,1085 @@
+{
+  "updated_at": "2026-02-26T00:59:51.6414597-04:00",
+  "file_count": 144,
+  "hubs": [
+    "graphiti_core\\driver\\query_executor.py",
+    "graphiti_core\\driver\\operations\\entity_node_ops.py",
+    "graphiti_core\\driver\\falkordb_driver.py",
+    "graphiti_core\\search\\search_config_recipes.py",
+    "graphiti_core\\search\\search_config.py",
+    "graphiti_core\\utils\\datetime_utils.py",
+    "graphiti_core\\driver\\operations\\saga_node_ops.py",
+    "graphiti_core\\utils\\maintenance\\edge_operations.py",
+    "graphiti_core\\driver\\record_parsers.py",
+    "graphiti_core\\search\\search_filters.py",
+    "graphiti_core\\graph_queries.py",
+    "graphiti_core\\search\\search.py",
+    "graphiti_core\\utils\\maintenance\\graph_data_operations.py",
+    "graph_service\\routers\\sessions.py",
+    "graphiti_core\\edges.py",
+    "graphiti_core\\models\\nodes\\node_db_queries.py",
+    "graphiti_core\\nodes.py",
+    "graphiti_core\\driver\\operations\\community_node_ops.py",
+    "graphiti_core\\llm_client\\config.py",
+    "graphiti_core\\driver\\operations\\entity_edge_ops.py",
+    "graphiti_core\\driver\\operations\\episodic_edge_ops.py",
+    "graph_service\\config.py",
+    "graphiti_core\\models\\edges\\edge_db_queries.py",
+    "graphiti_core\\graphiti_types.py",
+    "graph_service\\dto\\graph.py",
+    "graphiti_core\\embedder\\openai.py",
+    "graphiti_core\\driver\\operations\\search_ops.py",
+    "graphiti_core\\driver\\operations\\next_episode_edge_ops.py",
+    "graphiti_core\\driver\\operations\\graph_ops.py",
+    "graphiti_core\\driver\\driver.py",
+    "graphiti_core\\driver\\operations\\episode_node_ops.py",
+    "graphiti_core\\driver\\operations\\has_episode_edge_ops.py",
+    "graphiti_core\\errors.py",
+    "graphiti_core\\driver\\operations\\community_edge_ops.py",
+    "graph_service\\zep_graphiti.py",
+    "graphiti_core\\cross_encoder\\client.py",
+    "graphiti_core\\search\\search_utils.py",
+    "graphiti_core\\helpers.py",
+    "graph_service\\dto\\session.py",
+    "graphiti_core\\utils\\maintenance\\dedup_helpers.py"
+  ],
+  "importers": {
+    "graph_service\\config.py": [
+      "graph_service\\routers\\episodes.py",
+      "graph_service\\main.py",
+      "graph_service\\routers\\users.py",
+      "graph_service\\routers\\ingest.py",
+      "graph_service\\routers\\retrieve.py",
+      "graph_service\\routers\\graph.py",
+      "graph_service\\zep_graphiti.py"
+    ],
+    "graph_service\\dto\\common.py": [
+      "graph_service\\dto\\ingest.py",
+      "graph_service\\dto\\retrieve.py"
+    ],
+    "graph_service\\dto\\graph.py": [
+      "graph_service\\routers\\episodes.py",
+      "graph_service\\main.py",
+      "graph_service\\routers\\graph.py"
+    ],
+    "graph_service\\dto\\session.py": [
+      "graph_service\\routers\\sessions.py",
+      "graph_service\\routers\\users.py",
+      "graph_service\\routers\\ingest.py"
+    ],
+    "graph_service\\response_cache.py": [
+      "graph_service\\zep_graphiti.py"
+    ],
+    "graph_service\\routers\\episodes.py": [
+      "graph_service\\routers\\graph.py"
+    ],
+    "graph_service\\routers\\graph.py": [
+      "graph_service\\main.py"
+    ],
+    "graph_service\\routers\\sessions.py": [
+      "graph_service\\routers\\users.py",
+      "graph_service\\routers\\ingest.py",
+      "graph_service\\zep_graphiti.py"
+    ],
+    "graph_service\\search_cache.py": [
+      "graph_service\\routers\\sessions.py",
+      "graph_service\\routers\\graph.py"
+    ],
+    "graph_service\\zep_graphiti.py": [
+      "graph_service\\routers\\sessions.py",
+      "graph_service\\routers\\episodes.py",
+      "graph_service\\main.py",
+      "graph_service\\routers\\users.py",
+      "graph_service\\routers\\ingest.py",
+      "graph_service\\routers\\retrieve.py",
+      "graph_service\\routers\\graph.py"
+    ],
+    "graphiti_core\\cross_encoder\\client.py": [
+      "graphiti_core\\graphiti.py",
+      "graphiti_core\\cross_encoder\\bge_reranker_client.py",
+      "graphiti_core\\search\\search.py"
+    ],
+    "graphiti_core\\cross_encoder\\openai_reranker_client.py": [
+      "graphiti_core\\graphiti.py"
+    ],
+    "graphiti_core\\driver\\driver.py": [
+      "graphiti_core\\driver\\falkordb_driver.py",
+      "graphiti_core\\graphiti.py",
+      "graphiti_core\\graphiti_types.py",
+      "graphiti_core\\edges.py",
+      "graphiti_core\\utils\\maintenance\\edge_operations.py",
+      "graphiti_core\\helpers.py",
+      "graphiti_core\\search\\search_utils.py",
+      "graphiti_core\\utils\\bulk_utils.py",
+      "graphiti_core\\search\\search.py",
+      "graphiti_core\\utils\\maintenance\\graph_data_operations.py",
+      "graphiti_core\\nodes.py",
+      "graphiti_core\\decorators.py",
+      "graphiti_core\\utils\\maintenance\\community_operations.py"
+    ],
+    "graphiti_core\\driver\\falkordb\\__init__.py": [
+      "graphiti_core\\driver\\falkordb_driver.py"
+    ],
+    "graphiti_core\\driver\\falkordb\\operations\\community_edge_ops.py": [
+      "graphiti_core\\driver\\falkordb_driver.py",
+      "graphiti_core\\driver\\falkordb\\operations\\__init__.py"
+    ],
+    "graphiti_core\\driver\\falkordb\\operations\\community_node_ops.py": [
+      "graphiti_core\\driver\\falkordb_driver.py",
+      "graphiti_core\\driver\\falkordb\\operations\\__init__.py"
+    ],
+    "graphiti_core\\driver\\falkordb\\operations\\entity_edge_ops.py": [
+      "graphiti_core\\driver\\falkordb_driver.py",
+      "graphiti_core\\driver\\falkordb\\operations\\__init__.py"
+    ],
+    "graphiti_core\\driver\\falkordb\\operations\\entity_node_ops.py": [
+      "graphiti_core\\driver\\falkordb_driver.py",
+      "graphiti_core\\driver\\falkordb\\operations\\__init__.py"
+    ],
+    "graphiti_core\\driver\\falkordb\\operations\\episode_node_ops.py": [
+      "graphiti_core\\driver\\falkordb_driver.py",
+      "graphiti_core\\driver\\falkordb\\operations\\__init__.py"
+    ],
+    "graphiti_core\\driver\\falkordb\\operations\\episodic_edge_ops.py": [
+      "graphiti_core\\driver\\falkordb_driver.py",
+      "graphiti_core\\driver\\falkordb\\operations\\__init__.py"
+    ],
+    "graphiti_core\\driver\\falkordb\\operations\\graph_ops.py": [
+      "graphiti_core\\driver\\falkordb_driver.py",
+      "graphiti_core\\driver\\falkordb\\operations\\__init__.py"
+    ],
+    "graphiti_core\\driver\\falkordb\\operations\\has_episode_edge_ops.py": [
+      "graphiti_core\\driver\\falkordb_driver.py",
+      "graphiti_core\\driver\\falkordb\\operations\\__init__.py"
+    ],
+    "graphiti_core\\driver\\falkordb\\operations\\next_episode_edge_ops.py": [
+      "graphiti_core\\driver\\falkordb_driver.py",
+      "graphiti_core\\driver\\falkordb\\operations\\__init__.py"
+    ],
+    "graphiti_core\\driver\\falkordb\\operations\\saga_node_ops.py": [
+      "graphiti_core\\driver\\falkordb_driver.py",
+      "graphiti_core\\driver\\falkordb\\operations\\__init__.py"
+    ],
+    "graphiti_core\\driver\\falkordb\\operations\\search_ops.py": [
+      "graphiti_core\\driver\\falkordb_driver.py",
+      "graphiti_core\\driver\\falkordb\\operations\\__init__.py"
+    ],
+    "graphiti_core\\driver\\falkordb_driver.py": [
+      "graphiti_core\\graphiti.py",
+      "graph_service\\routers\\ingest.py",
+      "graph_service\\zep_graphiti.py"
+    ],
+    "graphiti_core\\driver\\operations\\community_edge_ops.py": [
+      "graphiti_core\\driver\\falkordb_driver.py",
+      "graphiti_core\\driver\\falkordb\\operations\\community_edge_ops.py",
+      "graphiti_core\\driver\\operations\\__init__.py",
+      "graphiti_core\\driver\\driver.py"
+    ],
+    "graphiti_core\\driver\\operations\\community_node_ops.py": [
+      "graphiti_core\\driver\\falkordb_driver.py",
+      "graphiti_core\\driver\\falkordb\\operations\\community_node_ops.py",
+      "graphiti_core\\driver\\operations\\__init__.py",
+      "graphiti_core\\driver\\driver.py"
+    ],
+    "graphiti_core\\driver\\operations\\entity_edge_ops.py": [
+      "graphiti_core\\driver\\falkordb_driver.py",
+      "graphiti_core\\driver\\falkordb\\operations\\entity_edge_ops.py",
+      "graphiti_core\\driver\\operations\\__init__.py",
+      "graphiti_core\\driver\\driver.py"
+    ],
+    "graphiti_core\\driver\\operations\\entity_node_ops.py": [
+      "graphiti_core\\driver\\falkordb_driver.py",
+      "graphiti_core\\driver\\falkordb\\operations\\entity_node_ops.py",
+      "graphiti_core\\driver\\operations\\__init__.py",
+      "graphiti_core\\driver\\driver.py"
+    ],
+    "graphiti_core\\driver\\operations\\episode_node_ops.py": [
+      "graphiti_core\\driver\\falkordb_driver.py",
+      "graphiti_core\\driver\\falkordb\\operations\\episode_node_ops.py",
+      "graphiti_core\\driver\\operations\\__init__.py",
+      "graphiti_core\\driver\\driver.py"
+    ],
+    "graphiti_core\\driver\\operations\\episodic_edge_ops.py": [
+      "graphiti_core\\driver\\falkordb_driver.py",
+      "graphiti_core\\driver\\falkordb\\operations\\episodic_edge_ops.py",
+      "graphiti_core\\driver\\operations\\__init__.py",
+      "graphiti_core\\driver\\driver.py"
+    ],
+    "graphiti_core\\driver\\operations\\graph_ops.py": [
+      "graphiti_core\\driver\\falkordb_driver.py",
+      "graphiti_core\\driver\\operations\\__init__.py",
+      "graphiti_core\\driver\\falkordb\\operations\\graph_ops.py",
+      "graphiti_core\\driver\\driver.py"
+    ],
+    "graphiti_core\\driver\\operations\\graph_utils.py": [
+      "graphiti_core\\driver\\falkordb\\operations\\graph_ops.py"
+    ],
+    "graphiti_core\\driver\\operations\\has_episode_edge_ops.py": [
+      "graphiti_core\\driver\\falkordb_driver.py",
+      "graphiti_core\\driver\\falkordb\\operations\\has_episode_edge_ops.py",
+      "graphiti_core\\driver\\operations\\__init__.py",
+      "graphiti_core\\driver\\driver.py"
+    ],
+    "graphiti_core\\driver\\operations\\next_episode_edge_ops.py": [
+      "graphiti_core\\driver\\falkordb_driver.py",
+      "graphiti_core\\driver\\falkordb\\operations\\next_episode_edge_ops.py",
+      "graphiti_core\\driver\\operations\\__init__.py",
+      "graphiti_core\\driver\\driver.py"
+    ],
+    "graphiti_core\\driver\\operations\\saga_node_ops.py": [
+      "graphiti_core\\driver\\falkordb_driver.py",
+      "graphiti_core\\driver\\falkordb\\operations\\saga_node_ops.py",
+      "graphiti_core\\driver\\operations\\__init__.py",
+      "graphiti_core\\driver\\driver.py"
+    ],
+    "graphiti_core\\driver\\operations\\search_ops.py": [
+      "graphiti_core\\driver\\falkordb\\operations\\search_ops.py",
+      "graphiti_core\\driver\\falkordb_driver.py",
+      "graphiti_core\\driver\\operations\\__init__.py",
+      "graphiti_core\\driver\\driver.py"
+    ],
+    "graphiti_core\\driver\\query_executor.py": [
+      "graphiti_core\\driver\\operations\\entity_edge_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\search_ops.py",
+      "graphiti_core\\driver\\operations\\episodic_edge_ops.py",
+      "graphiti_core\\driver\\operations\\next_episode_edge_ops.py",
+      "graphiti_core\\driver\\operations\\has_episode_edge_ops.py",
+      "graphiti_core\\driver\\operations\\community_node_ops.py",
+      "graphiti_core\\driver\\operations\\saga_node_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\community_edge_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\entity_node_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\entity_edge_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\episodic_edge_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\next_episode_edge_ops.py",
+      "graphiti_core\\driver\\operations\\graph_ops.py",
+      "graphiti_core\\driver\\operations\\entity_node_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\community_node_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\episode_node_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\has_episode_edge_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\saga_node_ops.py",
+      "graphiti_core\\driver\\operations\\search_ops.py",
+      "graphiti_core\\driver\\operations\\episode_node_ops.py",
+      "graphiti_core\\driver\\operations\\community_edge_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\graph_ops.py",
+      "graphiti_core\\driver\\driver.py"
+    ],
+    "graphiti_core\\driver\\record_parsers.py": [
+      "graphiti_core\\driver\\falkordb\\operations\\search_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\entity_node_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\entity_edge_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\community_node_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\episode_node_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\graph_ops.py"
+    ],
+    "graphiti_core\\edges.py": [
+      "graphiti_core\\driver\\operations\\entity_edge_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\search_ops.py",
+      "graphiti_core\\driver\\operations\\episodic_edge_ops.py",
+      "graphiti_core\\graphiti.py",
+      "graphiti_core\\driver\\operations\\next_episode_edge_ops.py",
+      "graphiti_core\\utils\\maintenance\\temporal_operations.py",
+      "graphiti_core\\driver\\operations\\has_episode_edge_ops.py",
+      "graphiti_core\\utils\\maintenance\\edge_operations.py",
+      "graphiti_core\\driver\\falkordb\\operations\\community_edge_ops.py",
+      "graphiti_core\\search\\search_utils.py",
+      "graphiti_core\\driver\\falkordb\\operations\\entity_edge_ops.py",
+      "graphiti_core\\utils\\bulk_utils.py",
+      "graphiti_core\\search\\search.py",
+      "graphiti_core\\driver\\falkordb\\operations\\episodic_edge_ops.py",
+      "graphiti_core\\search\\search_config.py",
+      "graphiti_core\\driver\\falkordb\\operations\\next_episode_edge_ops.py",
+      "graphiti_core\\utils\\maintenance\\node_operations.py",
+      "graphiti_core\\driver\\record_parsers.py",
+      "graphiti_core\\driver\\falkordb\\operations\\has_episode_edge_ops.py",
+      "graph_service\\zep_graphiti.py",
+      "graphiti_core\\utils\\maintenance\\community_operations.py",
+      "graphiti_core\\search\\search_helpers.py",
+      "graphiti_core\\driver\\operations\\search_ops.py",
+      "graphiti_core\\driver\\operations\\community_edge_ops.py"
+    ],
+    "graphiti_core\\embedder\\client.py": [
+      "graphiti_core\\search\\search.py",
+      "graphiti_core\\llm_client\\utils.py"
+    ],
+    "graphiti_core\\embedder\\openai.py": [
+      "graphiti_core\\cross_encoder\\openai_reranker_client.py",
+      "graphiti_core\\embedder\\openai.py",
+      "graphiti_core\\llm_client\\azure_openai_client.py",
+      "graphiti_core\\llm_client\\openai_client.py",
+      "graphiti_core\\embedder\\azure_openai.py",
+      "graphiti_core\\llm_client\\openai_generic_client.py",
+      "graphiti_core\\llm_client\\openai_base_client.py"
+    ],
+    "graphiti_core\\errors.py": [
+      "graphiti_core\\graphiti.py",
+      "graphiti_core\\edges.py",
+      "graphiti_core\\utils\\ontology_utils\\entity_types_utils.py",
+      "graphiti_core\\helpers.py",
+      "graphiti_core\\driver\\falkordb\\operations\\community_edge_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\entity_node_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\entity_edge_ops.py",
+      "graphiti_core\\search\\search.py",
+      "graphiti_core\\driver\\falkordb\\operations\\episodic_edge_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\next_episode_edge_ops.py",
+      "graphiti_core\\nodes.py",
+      "graphiti_core\\driver\\falkordb\\operations\\community_node_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\episode_node_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\has_episode_edge_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\saga_node_ops.py",
+      "graph_service\\zep_graphiti.py"
+    ],
+    "graphiti_core\\graph_queries.py": [
+      "graphiti_core\\driver\\falkordb\\operations\\search_ops.py",
+      "graphiti_core\\driver\\falkordb_driver.py",
+      "graphiti_core\\search\\search_utils.py",
+      "graphiti_core\\driver\\falkordb\\operations\\graph_ops.py"
+    ],
+    "graphiti_core\\graphiti_types.py": [
+      "graphiti_core\\graphiti.py",
+      "graphiti_core\\utils\\maintenance\\edge_operations.py",
+      "graphiti_core\\utils\\bulk_utils.py",
+      "graphiti_core\\search\\search.py",
+      "graphiti_core\\utils\\maintenance\\node_operations.py"
+    ],
+    "graphiti_core\\helpers.py": [
+      "graphiti_core\\graphiti.py",
+      "graphiti_core\\edges.py",
+      "graphiti_core\\utils\\maintenance\\edge_operations.py",
+      "graphiti_core\\driver\\falkordb\\operations\\community_edge_ops.py",
+      "graphiti_core\\search\\search_utils.py",
+      "graphiti_core\\utils\\bulk_utils.py",
+      "graphiti_core\\search\\search.py",
+      "graphiti_core\\driver\\falkordb\\operations\\episodic_edge_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\next_episode_edge_ops.py",
+      "graphiti_core\\utils\\maintenance\\node_operations.py",
+      "graphiti_core\\driver\\record_parsers.py",
+      "graphiti_core\\nodes.py",
+      "graphiti_core\\driver\\falkordb\\operations\\has_episode_edge_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\saga_node_ops.py",
+      "graphiti_core\\decorators.py",
+      "graphiti_core\\utils\\maintenance\\community_operations.py"
+    ],
+    "graphiti_core\\llm_client\\cache.py": [
+      "graphiti_core\\llm_client\\client.py"
+    ],
+    "graphiti_core\\llm_client\\config.py": [
+      "graphiti_core\\utils\\maintenance\\temporal_operations.py",
+      "graphiti_core\\utils\\maintenance\\edge_operations.py",
+      "graphiti_core\\utils\\maintenance\\node_operations.py"
+    ],
+    "graphiti_core\\models\\edges\\edge_db_queries.py": [
+      "graphiti_core\\driver\\falkordb\\operations\\search_ops.py",
+      "graphiti_core\\edges.py",
+      "graphiti_core\\driver\\falkordb\\operations\\community_edge_ops.py",
+      "graphiti_core\\search\\search_utils.py",
+      "graphiti_core\\driver\\falkordb\\operations\\entity_edge_ops.py",
+      "graphiti_core\\utils\\bulk_utils.py",
+      "graphiti_core\\driver\\falkordb\\operations\\episodic_edge_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\next_episode_edge_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\has_episode_edge_ops.py"
+    ],
+    "graphiti_core\\models\\nodes\\node_db_queries.py": [
+      "graphiti_core\\driver\\falkordb\\operations\\search_ops.py",
+      "graphiti_core\\search\\search_utils.py",
+      "graphiti_core\\driver\\falkordb\\operations\\entity_node_ops.py",
+      "graphiti_core\\utils\\bulk_utils.py",
+      "graphiti_core\\utils\\maintenance\\graph_data_operations.py",
+      "graphiti_core\\nodes.py",
+      "graphiti_core\\driver\\falkordb\\operations\\community_node_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\episode_node_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\saga_node_ops.py",
+      "graphiti_core\\utils\\maintenance\\community_operations.py",
+      "graphiti_core\\driver\\falkordb\\operations\\graph_ops.py"
+    ],
+    "graphiti_core\\nodes.py": [
+      "graphiti_core\\driver\\falkordb\\operations\\search_ops.py",
+      "graphiti_core\\graphiti.py",
+      "graph_service\\routers\\sessions.py",
+      "graphiti_core\\utils\\maintenance\\temporal_operations.py",
+      "graphiti_core\\edges.py",
+      "graphiti_core\\utils\\ontology_utils\\entity_types_utils.py",
+      "graphiti_core\\utils\\maintenance\\edge_operations.py",
+      "graphiti_core\\driver\\operations\\community_node_ops.py",
+      "graphiti_core\\driver\\operations\\saga_node_ops.py",
+      "graphiti_core\\search\\search_utils.py",
+      "graphiti_core\\driver\\falkordb\\operations\\entity_node_ops.py",
+      "graphiti_core\\utils\\bulk_utils.py",
+      "graphiti_core\\search\\search.py",
+      "graphiti_core\\search\\search_config.py",
+      "graphiti_core\\driver\\operations\\graph_ops.py",
+      "graph_service\\routers\\ingest.py",
+      "graphiti_core\\driver\\operations\\entity_node_ops.py",
+      "graphiti_core\\utils\\maintenance\\node_operations.py",
+      "graphiti_core\\utils\\maintenance\\graph_data_operations.py",
+      "graph_service\\routers\\graph.py",
+      "graphiti_core\\driver\\record_parsers.py",
+      "graphiti_core\\utils\\maintenance\\dedup_helpers.py",
+      "graphiti_core\\driver\\falkordb\\operations\\community_node_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\episode_node_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\saga_node_ops.py",
+      "graph_service\\zep_graphiti.py",
+      "graphiti_core\\utils\\maintenance\\community_operations.py",
+      "graphiti_core\\driver\\operations\\search_ops.py",
+      "graphiti_core\\driver\\operations\\episode_node_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\graph_ops.py"
+    ],
+    "graphiti_core\\prompts\\dedupe_edges.py": [
+      "graphiti_core\\utils\\maintenance\\edge_operations.py"
+    ],
+    "graphiti_core\\prompts\\dedupe_nodes.py": [
+      "graphiti_core\\utils\\maintenance\\node_operations.py"
+    ],
+    "graphiti_core\\prompts\\extract_edge_dates.py": [
+      "graphiti_core\\utils\\maintenance\\temporal_operations.py"
+    ],
+    "graphiti_core\\prompts\\extract_edges.py": [
+      "graphiti_core\\utils\\maintenance\\edge_operations.py"
+    ],
+    "graphiti_core\\prompts\\extract_nodes.py": [
+      "graphiti_core\\utils\\maintenance\\node_operations.py"
+    ],
+    "graphiti_core\\prompts\\invalidate_edges.py": [
+      "graphiti_core\\utils\\maintenance\\temporal_operations.py"
+    ],
+    "graphiti_core\\prompts\\models.py": [
+      "graph_service\\zep_graphiti.py"
+    ],
+    "graphiti_core\\prompts\\prompt_helpers.py": [
+      "graphiti_core\\search\\search_helpers.py"
+    ],
+    "graphiti_core\\prompts\\summarize_nodes.py": [
+      "graphiti_core\\utils\\maintenance\\community_operations.py"
+    ],
+    "graphiti_core\\search\\search.py": [
+      "graphiti_core\\graphiti.py",
+      "graphiti_core\\utils\\maintenance\\edge_operations.py",
+      "graphiti_core\\utils\\maintenance\\node_operations.py"
+    ],
+    "graphiti_core\\search\\search_config.py": [
+      "graphiti_core\\graphiti.py",
+      "graphiti_core\\utils\\maintenance\\edge_operations.py",
+      "graphiti_core\\search\\search_config_recipes.py",
+      "graphiti_core\\search\\search.py",
+      "graphiti_core\\utils\\maintenance\\node_operations.py",
+      "graphiti_core\\decorators.py",
+      "graphiti_core\\search\\search_helpers.py"
+    ],
+    "graphiti_core\\search\\search_config_recipes.py": [
+      "graphiti_core\\graphiti.py",
+      "graphiti_core\\utils\\maintenance\\edge_operations.py",
+      "graphiti_core\\utils\\maintenance\\node_operations.py"
+    ],
+    "graphiti_core\\search\\search_filters.py": [
+      "graphiti_core\\driver\\falkordb\\operations\\search_ops.py",
+      "graphiti_core\\graphiti.py",
+      "graphiti_core\\utils\\maintenance\\edge_operations.py",
+      "graphiti_core\\search\\search_utils.py",
+      "graphiti_core\\search\\search.py",
+      "graphiti_core\\utils\\maintenance\\node_operations.py",
+      "graphiti_core\\driver\\operations\\search_ops.py"
+    ],
+    "graphiti_core\\search\\search_utils.py": [
+      "graphiti_core\\graphiti.py",
+      "graphiti_core\\search\\search.py",
+      "graphiti_core\\search\\search_config.py"
+    ],
+    "graphiti_core\\utils\\bulk_utils.py": [
+      "graphiti_core\\graphiti.py"
+    ],
+    "graphiti_core\\utils\\datetime_utils.py": [
+      "graph_service\\dto\\common.py",
+      "graphiti_core\\driver\\falkordb_driver.py",
+      "graphiti_core\\graphiti.py",
+      "graphiti_core\\utils\\maintenance\\temporal_operations.py",
+      "graphiti_core\\utils\\maintenance\\edge_operations.py",
+      "graph_service\\dto\\graph.py",
+      "graphiti_core\\utils\\bulk_utils.py",
+      "graph_service\\dto\\session.py",
+      "graph_service\\routers\\ingest.py",
+      "graphiti_core\\utils\\maintenance\\node_operations.py",
+      "graphiti_core\\nodes.py",
+      "graphiti_core\\utils\\maintenance\\community_operations.py"
+    ],
+    "graphiti_core\\utils\\maintenance\\community_operations.py": [
+      "graphiti_core\\graphiti.py"
+    ],
+    "graphiti_core\\utils\\maintenance\\dedup_helpers.py": [
+      "graphiti_core\\utils\\maintenance\\edge_operations.py",
+      "graphiti_core\\utils\\bulk_utils.py",
+      "graphiti_core\\utils\\maintenance\\node_operations.py"
+    ],
+    "graphiti_core\\utils\\maintenance\\edge_operations.py": [
+      "graphiti_core\\graphiti.py",
+      "graphiti_core\\utils\\bulk_utils.py",
+      "graphiti_core\\utils\\maintenance\\community_operations.py"
+    ],
+    "graphiti_core\\utils\\maintenance\\graph_data_operations.py": [
+      "graphiti_core\\graphiti.py",
+      "graphiti_core\\utils\\bulk_utils.py",
+      "graph_service\\routers\\ingest.py"
+    ],
+    "graphiti_core\\utils\\maintenance\\node_operations.py": [
+      "graphiti_core\\graphiti.py",
+      "graphiti_core\\utils\\bulk_utils.py"
+    ],
+    "graphiti_core\\utils\\ontology_utils\\entity_types_utils.py": [
+      "graphiti_core\\graphiti.py"
+    ],
+    "graphiti_core\\utils\\text_utils.py": [
+      "graphiti_core\\prompts\\extract_nodes.py",
+      "graphiti_core\\utils\\maintenance\\node_operations.py"
+    ]
+  },
+  "imports": {
+    "graph_service\\dto\\common.py": [
+      "graphiti_core\\utils\\datetime_utils.py"
+    ],
+    "graph_service\\dto\\graph.py": [
+      "graphiti_core\\utils\\datetime_utils.py"
+    ],
+    "graph_service\\dto\\ingest.py": [
+      "graph_service\\dto\\common.py"
+    ],
+    "graph_service\\dto\\retrieve.py": [
+      "graph_service\\dto\\common.py"
+    ],
+    "graph_service\\dto\\session.py": [
+      "graphiti_core\\utils\\datetime_utils.py"
+    ],
+    "graph_service\\main.py": [
+      "graph_service\\config.py",
+      "graph_service\\zep_graphiti.py",
+      "graph_service\\routers\\graph.py",
+      "graph_service\\dto\\graph.py"
+    ],
+    "graph_service\\routers\\episodes.py": [
+      "graph_service\\dto\\graph.py",
+      "graph_service\\zep_graphiti.py",
+      "graph_service\\config.py"
+    ],
+    "graph_service\\routers\\graph.py": [
+      "graph_service\\config.py",
+      "graph_service\\zep_graphiti.py",
+      "graph_service\\dto\\graph.py",
+      "graph_service\\routers\\episodes.py",
+      "graph_service\\search_cache.py",
+      "graphiti_core\\nodes.py"
+    ],
+    "graph_service\\routers\\ingest.py": [
+      "graphiti_core\\nodes.py",
+      "graphiti_core\\utils\\maintenance\\graph_data_operations.py",
+      "graph_service\\config.py",
+      "graph_service\\zep_graphiti.py",
+      "graph_service\\routers\\sessions.py",
+      "graph_service\\dto\\session.py",
+      "graphiti_core\\utils\\datetime_utils.py",
+      "graphiti_core\\driver\\falkordb_driver.py"
+    ],
+    "graph_service\\routers\\retrieve.py": [
+      "graph_service\\config.py",
+      "graph_service\\zep_graphiti.py"
+    ],
+    "graph_service\\routers\\sessions.py": [
+      "graphiti_core\\nodes.py",
+      "graph_service\\dto\\session.py",
+      "graph_service\\zep_graphiti.py",
+      "graph_service\\search_cache.py"
+    ],
+    "graph_service\\routers\\users.py": [
+      "graph_service\\config.py",
+      "graph_service\\routers\\sessions.py",
+      "graph_service\\dto\\session.py",
+      "graph_service\\zep_graphiti.py"
+    ],
+    "graph_service\\zep_graphiti.py": [
+      "graphiti_core\\driver\\falkordb_driver.py",
+      "graphiti_core\\edges.py",
+      "graphiti_core\\errors.py",
+      "graphiti_core\\nodes.py",
+      "graph_service\\config.py",
+      "graph_service\\response_cache.py",
+      "graph_service\\routers\\sessions.py",
+      "graphiti_core\\prompts\\models.py"
+    ],
+    "graphiti_core\\cross_encoder\\bge_reranker_client.py": [
+      "graphiti_core\\cross_encoder\\client.py"
+    ],
+    "graphiti_core\\cross_encoder\\openai_reranker_client.py": [
+      "graphiti_core\\embedder\\openai.py"
+    ],
+    "graphiti_core\\decorators.py": [
+      "graphiti_core\\driver\\driver.py",
+      "graphiti_core\\helpers.py",
+      "graphiti_core\\search\\search_config.py"
+    ],
+    "graphiti_core\\driver\\driver.py": [
+      "graphiti_core\\driver\\query_executor.py",
+      "graphiti_core\\driver\\operations\\community_edge_ops.py",
+      "graphiti_core\\driver\\operations\\community_node_ops.py",
+      "graphiti_core\\driver\\operations\\entity_edge_ops.py",
+      "graphiti_core\\driver\\operations\\entity_node_ops.py",
+      "graphiti_core\\driver\\operations\\episode_node_ops.py",
+      "graphiti_core\\driver\\operations\\episodic_edge_ops.py",
+      "graphiti_core\\driver\\operations\\graph_ops.py",
+      "graphiti_core\\driver\\operations\\has_episode_edge_ops.py",
+      "graphiti_core\\driver\\operations\\next_episode_edge_ops.py",
+      "graphiti_core\\driver\\operations\\saga_node_ops.py",
+      "graphiti_core\\driver\\operations\\search_ops.py"
+    ],
+    "graphiti_core\\driver\\falkordb\\operations\\__init__.py": [
+      "graphiti_core\\driver\\falkordb\\operations\\community_edge_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\community_node_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\entity_edge_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\entity_node_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\episode_node_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\episodic_edge_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\graph_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\has_episode_edge_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\next_episode_edge_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\saga_node_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\search_ops.py"
+    ],
+    "graphiti_core\\driver\\falkordb\\operations\\community_edge_ops.py": [
+      "graphiti_core\\driver\\operations\\community_edge_ops.py",
+      "graphiti_core\\driver\\query_executor.py",
+      "graphiti_core\\edges.py",
+      "graphiti_core\\errors.py",
+      "graphiti_core\\helpers.py",
+      "graphiti_core\\models\\edges\\edge_db_queries.py"
+    ],
+    "graphiti_core\\driver\\falkordb\\operations\\community_node_ops.py": [
+      "graphiti_core\\driver\\operations\\community_node_ops.py",
+      "graphiti_core\\driver\\query_executor.py",
+      "graphiti_core\\driver\\record_parsers.py",
+      "graphiti_core\\errors.py",
+      "graphiti_core\\models\\nodes\\node_db_queries.py",
+      "graphiti_core\\nodes.py"
+    ],
+    "graphiti_core\\driver\\falkordb\\operations\\entity_edge_ops.py": [
+      "graphiti_core\\driver\\operations\\entity_edge_ops.py",
+      "graphiti_core\\driver\\query_executor.py",
+      "graphiti_core\\driver\\record_parsers.py",
+      "graphiti_core\\edges.py",
+      "graphiti_core\\errors.py",
+      "graphiti_core\\models\\edges\\edge_db_queries.py"
+    ],
+    "graphiti_core\\driver\\falkordb\\operations\\entity_node_ops.py": [
+      "graphiti_core\\driver\\operations\\entity_node_ops.py",
+      "graphiti_core\\driver\\query_executor.py",
+      "graphiti_core\\driver\\record_parsers.py",
+      "graphiti_core\\errors.py",
+      "graphiti_core\\models\\nodes\\node_db_queries.py",
+      "graphiti_core\\nodes.py"
+    ],
+    "graphiti_core\\driver\\falkordb\\operations\\episode_node_ops.py": [
+      "graphiti_core\\driver\\operations\\episode_node_ops.py",
+      "graphiti_core\\driver\\query_executor.py",
+      "graphiti_core\\driver\\record_parsers.py",
+      "graphiti_core\\errors.py",
+      "graphiti_core\\models\\nodes\\node_db_queries.py",
+      "graphiti_core\\nodes.py"
+    ],
+    "graphiti_core\\driver\\falkordb\\operations\\episodic_edge_ops.py": [
+      "graphiti_core\\driver\\operations\\episodic_edge_ops.py",
+      "graphiti_core\\driver\\query_executor.py",
+      "graphiti_core\\edges.py",
+      "graphiti_core\\errors.py",
+      "graphiti_core\\helpers.py",
+      "graphiti_core\\models\\edges\\edge_db_queries.py"
+    ],
+    "graphiti_core\\driver\\falkordb\\operations\\graph_ops.py": [
+      "graphiti_core\\driver\\operations\\graph_ops.py",
+      "graphiti_core\\driver\\operations\\graph_utils.py",
+      "graphiti_core\\driver\\query_executor.py",
+      "graphiti_core\\driver\\record_parsers.py",
+      "graphiti_core\\graph_queries.py",
+      "graphiti_core\\models\\nodes\\node_db_queries.py",
+      "graphiti_core\\nodes.py"
+    ],
+    "graphiti_core\\driver\\falkordb\\operations\\has_episode_edge_ops.py": [
+      "graphiti_core\\driver\\operations\\has_episode_edge_ops.py",
+      "graphiti_core\\driver\\query_executor.py",
+      "graphiti_core\\edges.py",
+      "graphiti_core\\errors.py",
+      "graphiti_core\\helpers.py",
+      "graphiti_core\\models\\edges\\edge_db_queries.py"
+    ],
+    "graphiti_core\\driver\\falkordb\\operations\\next_episode_edge_ops.py": [
+      "graphiti_core\\driver\\operations\\next_episode_edge_ops.py",
+      "graphiti_core\\driver\\query_executor.py",
+      "graphiti_core\\edges.py",
+      "graphiti_core\\errors.py",
+      "graphiti_core\\helpers.py",
+      "graphiti_core\\models\\edges\\edge_db_queries.py"
+    ],
+    "graphiti_core\\driver\\falkordb\\operations\\saga_node_ops.py": [
+      "graphiti_core\\driver\\operations\\saga_node_ops.py",
+      "graphiti_core\\driver\\query_executor.py",
+      "graphiti_core\\errors.py",
+      "graphiti_core\\helpers.py",
+      "graphiti_core\\models\\nodes\\node_db_queries.py",
+      "graphiti_core\\nodes.py"
+    ],
+    "graphiti_core\\driver\\falkordb\\operations\\search_ops.py": [
+      "graphiti_core\\driver\\operations\\search_ops.py",
+      "graphiti_core\\driver\\query_executor.py",
+      "graphiti_core\\driver\\record_parsers.py",
+      "graphiti_core\\edges.py",
+      "graphiti_core\\graph_queries.py",
+      "graphiti_core\\models\\edges\\edge_db_queries.py",
+      "graphiti_core\\models\\nodes\\node_db_queries.py",
+      "graphiti_core\\nodes.py",
+      "graphiti_core\\search\\search_filters.py"
+    ],
+    "graphiti_core\\driver\\falkordb_driver.py": [
+      "graphiti_core\\driver\\falkordb\\__init__.py",
+      "graphiti_core\\driver\\driver.py",
+      "graphiti_core\\driver\\falkordb\\operations\\community_edge_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\community_node_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\entity_edge_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\entity_node_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\episode_node_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\episodic_edge_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\graph_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\has_episode_edge_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\next_episode_edge_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\saga_node_ops.py",
+      "graphiti_core\\driver\\falkordb\\operations\\search_ops.py",
+      "graphiti_core\\driver\\operations\\community_edge_ops.py",
+      "graphiti_core\\driver\\operations\\community_node_ops.py",
+      "graphiti_core\\driver\\operations\\entity_edge_ops.py",
+      "graphiti_core\\driver\\operations\\entity_node_ops.py",
+      "graphiti_core\\driver\\operations\\episode_node_ops.py",
+      "graphiti_core\\driver\\operations\\episodic_edge_ops.py",
+      "graphiti_core\\driver\\operations\\graph_ops.py",
+      "graphiti_core\\driver\\operations\\has_episode_edge_ops.py",
+      "graphiti_core\\driver\\operations\\next_episode_edge_ops.py",
+      "graphiti_core\\driver\\operations\\saga_node_ops.py",
+      "graphiti_core\\driver\\operations\\search_ops.py",
+      "graphiti_core\\graph_queries.py",
+      "graphiti_core\\utils\\datetime_utils.py"
+    ],
+    "graphiti_core\\driver\\operations\\__init__.py": [
+      "graphiti_core\\driver\\operations\\community_edge_ops.py",
+      "graphiti_core\\driver\\operations\\community_node_ops.py",
+      "graphiti_core\\driver\\operations\\entity_edge_ops.py",
+      "graphiti_core\\driver\\operations\\entity_node_ops.py",
+      "graphiti_core\\driver\\operations\\episode_node_ops.py",
+      "graphiti_core\\driver\\operations\\episodic_edge_ops.py",
+      "graphiti_core\\driver\\operations\\graph_ops.py",
+      "graphiti_core\\driver\\operations\\has_episode_edge_ops.py",
+      "graphiti_core\\driver\\operations\\next_episode_edge_ops.py",
+      "graphiti_core\\driver\\operations\\saga_node_ops.py",
+      "graphiti_core\\driver\\operations\\search_ops.py"
+    ],
+    "graphiti_core\\driver\\operations\\community_edge_ops.py": [
+      "graphiti_core\\driver\\query_executor.py",
+      "graphiti_core\\edges.py"
+    ],
+    "graphiti_core\\driver\\operations\\community_node_ops.py": [
+      "graphiti_core\\driver\\query_executor.py",
+      "graphiti_core\\nodes.py"
+    ],
+    "graphiti_core\\driver\\operations\\entity_edge_ops.py": [
+      "graphiti_core\\driver\\query_executor.py",
+      "graphiti_core\\edges.py"
+    ],
+    "graphiti_core\\driver\\operations\\entity_node_ops.py": [
+      "graphiti_core\\driver\\query_executor.py",
+      "graphiti_core\\nodes.py"
+    ],
+    "graphiti_core\\driver\\operations\\episode_node_ops.py": [
+      "graphiti_core\\driver\\query_executor.py",
+      "graphiti_core\\nodes.py"
+    ],
+    "graphiti_core\\driver\\operations\\episodic_edge_ops.py": [
+      "graphiti_core\\driver\\query_executor.py",
+      "graphiti_core\\edges.py"
+    ],
+    "graphiti_core\\driver\\operations\\graph_ops.py": [
+      "graphiti_core\\driver\\query_executor.py",
+      "graphiti_core\\nodes.py"
+    ],
+    "graphiti_core\\driver\\operations\\has_episode_edge_ops.py": [
+      "graphiti_core\\driver\\query_executor.py",
+      "graphiti_core\\edges.py"
+    ],
+    "graphiti_core\\driver\\operations\\next_episode_edge_ops.py": [
+      "graphiti_core\\driver\\query_executor.py",
+      "graphiti_core\\edges.py"
+    ],
+    "graphiti_core\\driver\\operations\\saga_node_ops.py": [
+      "graphiti_core\\driver\\query_executor.py",
+      "graphiti_core\\nodes.py"
+    ],
+    "graphiti_core\\driver\\operations\\search_ops.py": [
+      "graphiti_core\\driver\\query_executor.py",
+      "graphiti_core\\edges.py",
+      "graphiti_core\\nodes.py",
+      "graphiti_core\\search\\search_filters.py"
+    ],
+    "graphiti_core\\driver\\record_parsers.py": [
+      "graphiti_core\\edges.py",
+      "graphiti_core\\helpers.py",
+      "graphiti_core\\nodes.py"
+    ],
+    "graphiti_core\\edges.py": [
+      "graphiti_core\\driver\\driver.py",
+      "graphiti_core\\errors.py",
+      "graphiti_core\\helpers.py",
+      "graphiti_core\\models\\edges\\edge_db_queries.py",
+      "graphiti_core\\nodes.py"
+    ],
+    "graphiti_core\\embedder\\azure_openai.py": [
+      "graphiti_core\\embedder\\openai.py"
+    ],
+    "graphiti_core\\embedder\\openai.py": [
+      "graphiti_core\\embedder\\openai.py"
+    ],
+    "graphiti_core\\graphiti.py": [
+      "graphiti_core\\cross_encoder\\client.py",
+      "graphiti_core\\cross_encoder\\openai_reranker_client.py",
+      "graphiti_core\\driver\\driver.py",
+      "graphiti_core\\driver\\falkordb_driver.py",
+      "graphiti_core\\errors.py",
+      "graphiti_core\\edges.py",
+      "graphiti_core\\graphiti_types.py",
+      "graphiti_core\\helpers.py",
+      "graphiti_core\\nodes.py",
+      "graphiti_core\\search\\search.py",
+      "graphiti_core\\search\\search_config.py",
+      "graphiti_core\\search\\search_config_recipes.py",
+      "graphiti_core\\search\\search_filters.py",
+      "graphiti_core\\search\\search_utils.py",
+      "graphiti_core\\utils\\bulk_utils.py",
+      "graphiti_core\\utils\\datetime_utils.py",
+      "graphiti_core\\utils\\maintenance\\community_operations.py",
+      "graphiti_core\\utils\\maintenance\\edge_operations.py",
+      "graphiti_core\\utils\\maintenance\\graph_data_operations.py",
+      "graphiti_core\\utils\\maintenance\\node_operations.py",
+      "graphiti_core\\utils\\ontology_utils\\entity_types_utils.py"
+    ],
+    "graphiti_core\\graphiti_types.py": [
+      "graphiti_core\\driver\\driver.py"
+    ],
+    "graphiti_core\\helpers.py": [
+      "graphiti_core\\driver\\driver.py",
+      "graphiti_core\\errors.py"
+    ],
+    "graphiti_core\\llm_client\\azure_openai_client.py": [
+      "graphiti_core\\embedder\\openai.py"
+    ],
+    "graphiti_core\\llm_client\\client.py": [
+      "graphiti_core\\llm_client\\cache.py"
+    ],
+    "graphiti_core\\llm_client\\openai_base_client.py": [
+      "graphiti_core\\embedder\\openai.py"
+    ],
+    "graphiti_core\\llm_client\\openai_client.py": [
+      "graphiti_core\\embedder\\openai.py"
+    ],
+    "graphiti_core\\llm_client\\openai_generic_client.py": [
+      "graphiti_core\\embedder\\openai.py"
+    ],
+    "graphiti_core\\llm_client\\utils.py": [
+      "graphiti_core\\embedder\\client.py"
+    ],
+    "graphiti_core\\nodes.py": [
+      "graphiti_core\\driver\\driver.py",
+      "graphiti_core\\errors.py",
+      "graphiti_core\\helpers.py",
+      "graphiti_core\\models\\nodes\\node_db_queries.py",
+      "graphiti_core\\utils\\datetime_utils.py"
+    ],
+    "graphiti_core\\prompts\\extract_nodes.py": [
+      "graphiti_core\\utils\\text_utils.py"
+    ],
+    "graphiti_core\\search\\search.py": [
+      "graphiti_core\\cross_encoder\\client.py",
+      "graphiti_core\\driver\\driver.py",
+      "graphiti_core\\edges.py",
+      "graphiti_core\\embedder\\client.py",
+      "graphiti_core\\errors.py",
+      "graphiti_core\\graphiti_types.py",
+      "graphiti_core\\helpers.py",
+      "graphiti_core\\nodes.py",
+      "graphiti_core\\search\\search_config.py",
+      "graphiti_core\\search\\search_filters.py",
+      "graphiti_core\\search\\search_utils.py"
+    ],
+    "graphiti_core\\search\\search_config.py": [
+      "graphiti_core\\edges.py",
+      "graphiti_core\\nodes.py",
+      "graphiti_core\\search\\search_utils.py"
+    ],
+    "graphiti_core\\search\\search_config_recipes.py": [
+      "graphiti_core\\search\\search_config.py"
+    ],
+    "graphiti_core\\search\\search_helpers.py": [
+      "graphiti_core\\edges.py",
+      "graphiti_core\\prompts\\prompt_helpers.py",
+      "graphiti_core\\search\\search_config.py"
+    ],
+    "graphiti_core\\search\\search_utils.py": [
+      "graphiti_core\\driver\\driver.py",
+      "graphiti_core\\edges.py",
+      "graphiti_core\\graph_queries.py",
+      "graphiti_core\\helpers.py",
+      "graphiti_core\\models\\edges\\edge_db_queries.py",
+      "graphiti_core\\models\\nodes\\node_db_queries.py",
+      "graphiti_core\\nodes.py",
+      "graphiti_core\\search\\search_filters.py"
+    ],
+    "graphiti_core\\utils\\bulk_utils.py": [
+      "graphiti_core\\driver\\driver.py",
+      "graphiti_core\\edges.py",
+      "graphiti_core\\graphiti_types.py",
+      "graphiti_core\\helpers.py",
+      "graphiti_core\\models\\edges\\edge_db_queries.py",
+      "graphiti_core\\models\\nodes\\node_db_queries.py",
+      "graphiti_core\\nodes.py",
+      "graphiti_core\\utils\\datetime_utils.py",
+      "graphiti_core\\utils\\maintenance\\dedup_helpers.py",
+      "graphiti_core\\utils\\maintenance\\edge_operations.py",
+      "graphiti_core\\utils\\maintenance\\graph_data_operations.py",
+      "graphiti_core\\utils\\maintenance\\node_operations.py"
+    ],
+    "graphiti_core\\utils\\maintenance\\community_operations.py": [
+      "graphiti_core\\driver\\driver.py",
+      "graphiti_core\\edges.py",
+      "graphiti_core\\helpers.py",
+      "graphiti_core\\models\\nodes\\node_db_queries.py",
+      "graphiti_core\\nodes.py",
+      "graphiti_core\\prompts\\summarize_nodes.py",
+      "graphiti_core\\utils\\datetime_utils.py",
+      "graphiti_core\\utils\\maintenance\\edge_operations.py"
+    ],
+    "graphiti_core\\utils\\maintenance\\dedup_helpers.py": [
+      "graphiti_core\\nodes.py"
+    ],
+    "graphiti_core\\utils\\maintenance\\edge_operations.py": [
+      "graphiti_core\\driver\\driver.py",
+      "graphiti_core\\edges.py",
+      "graphiti_core\\graphiti_types.py",
+      "graphiti_core\\helpers.py",
+      "graphiti_core\\llm_client\\config.py",
+      "graphiti_core\\nodes.py",
+      "graphiti_core\\prompts\\dedupe_edges.py",
+      "graphiti_core\\prompts\\extract_edges.py",
+      "graphiti_core\\search\\search.py",
+      "graphiti_core\\search\\search_config.py",
+      "graphiti_core\\search\\search_config_recipes.py",
+      "graphiti_core\\search\\search_filters.py",
+      "graphiti_core\\utils\\datetime_utils.py",
+      "graphiti_core\\utils\\maintenance\\dedup_helpers.py"
+    ],
+    "graphiti_core\\utils\\maintenance\\graph_data_operations.py": [
+      "graphiti_core\\driver\\driver.py",
+      "graphiti_core\\models\\nodes\\node_db_queries.py",
+      "graphiti_core\\nodes.py"
+    ],
+    "graphiti_core\\utils\\maintenance\\node_operations.py": [
+      "graphiti_core\\edges.py",
+      "graphiti_core\\graphiti_types.py",
+      "graphiti_core\\helpers.py",
+      "graphiti_core\\llm_client\\config.py",
+      "graphiti_core\\nodes.py",
+      "graphiti_core\\prompts\\dedupe_nodes.py",
+      "graphiti_core\\prompts\\extract_nodes.py",
+      "graphiti_core\\search\\search.py",
+      "graphiti_core\\search\\search_config.py",
+      "graphiti_core\\search\\search_config_recipes.py",
+      "graphiti_core\\search\\search_filters.py",
+      "graphiti_core\\utils\\datetime_utils.py",
+      "graphiti_core\\utils\\maintenance\\dedup_helpers.py",
+      "graphiti_core\\utils\\text_utils.py"
+    ],
+    "graphiti_core\\utils\\maintenance\\temporal_operations.py": [
+      "graphiti_core\\edges.py",
+      "graphiti_core\\llm_client\\config.py",
+      "graphiti_core\\nodes.py",
+      "graphiti_core\\prompts\\extract_edge_dates.py",
+      "graphiti_core\\prompts\\invalidate_edges.py",
+      "graphiti_core\\utils\\datetime_utils.py"
+    ],
+    "graphiti_core\\utils\\ontology_utils\\entity_types_utils.py": [
+      "graphiti_core\\errors.py",
+      "graphiti_core\\nodes.py"
+    ]
+  },
+  "recent_events": [
+    {
+      "time": "2026-02-25T23:44:14.5352956-04:00",
+      "op": "REMOVE",
+      "path": "graphiti_core\\driver\\falkordb_driver.py",
+      "lang": "python",
+      "delta": -490,
+      "size_delta": -20603,
+      "importers": 3,
+      "imports": 26,
+      "is_hub": true
+    },
+    {
+      "time": "2026-02-25T23:44:44.231367-04:00",
+      "op": "REMOVE",
+      "path": "graphiti_core\\driver\\falkordb_driver.py",
+      "lang": "python",
+      "importers": 3,
+      "imports": 26,
+      "is_hub": true
+    },
+    {
+      "time": "2026-02-25T23:58:44.2992559-04:00",
+      "op": "REMOVE",
+      "path": "graph_service\\main.py",
+      "lang": "python",
+      "delta": -477,
+      "size_delta": -17436,
+      "imports": 4
+    },
+    {
+      "time": "2026-02-25T23:59:04.0307129-04:00",
+      "op": "REMOVE",
+      "path": "graph_service\\main.py",
+      "lang": "python",
+      "imports": 4
+    },
+    {
+      "time": "2026-02-26T00:59:11.7526928-04:00",
+      "op": "REMOVE",
+      "path": "graphiti_core\\utils\\maintenance\\node_operations.py",
+      "lang": "python",
+      "delta": -684,
+      "size_delta": -24193,
+      "importers": 2,
+      "imports": 14
+    },
+    {
+      "time": "2026-02-26T00:59:39.5793392-04:00",
+      "op": "REMOVE",
+      "path": "graphiti_core\\prompts\\extract_nodes.py",
+      "lang": "python",
+      "delta": -331,
+      "size_delta": -11680,
+      "importers": 1,
+      "imports": 1
+    },
+    {
+      "time": "2026-02-26T00:59:44.3340846-04:00",
+      "op": "REMOVE",
+      "path": "graphiti_core\\prompts\\extract_edges.py",
+      "lang": "python",
+      "delta": -203,
+      "size_delta": -7278,
+      "importers": 1
+    },
+    {
+      "time": "2026-02-26T00:59:51.6414597-04:00",
+      "op": "REMOVE",
+      "path": "graphiti_core\\utils\\maintenance\\node_operations.py",
+      "lang": "python",
+      "importers": 2,
+      "imports": 14
+    }
+  ]
+}
