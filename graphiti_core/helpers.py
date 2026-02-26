@@ -19,14 +19,16 @@ import os
 import re
 from collections.abc import Coroutine
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from graphiti_core.driver.driver import GraphProvider
 
 import numpy as np
 from dotenv import load_dotenv
 from numpy._typing import NDArray
 from pydantic import BaseModel
 
-from graphiti_core.driver.driver import GraphProvider
 from graphiti_core.errors import GroupIdValidationError
 
 load_dotenv()
@@ -66,11 +68,13 @@ def parse_db_date(input_date: datetime | str | None) -> datetime | None:
     return input_date
 
 
-def get_default_group_id(provider: GraphProvider) -> str:
+def get_default_group_id(provider: 'GraphProvider') -> str:
     """
     This function differentiates the default group id based on the database type.
     For most databases, the default group id is an empty string, while there are database types that require a specific default group id.
     """
+    # Import locally to avoid circular import
+    from graphiti_core.driver.driver import GraphProvider
     if provider == GraphProvider.FALKORDB:
         return '\\_'
     else:
