@@ -412,11 +412,11 @@ async def debug_nlp_test():
 @app.get('/debug/status')
 async def debug_status():
     """Comprehensive status check for all service components"""
-    from graph_service.zep_graphiti import get_graphiti
+    from graphiti_core.driver.falkordb_driver import FalkorDriver
     from datetime import datetime, timezone
     settings = get_settings()
     import os
-    
+
     status_result = {
         'service': 'Zep-Compatible Graphiti Service',
         'version': '2.0.0',
@@ -424,53 +424,42 @@ async def debug_status():
         'port': os.getenv('PORT', '8000'),
         'components': {}
     }
-    
-    # Check FalkorDB connection
+
+    # Check FalkorDB connection directly (no user context needed)
     try:
-        async for graphiti in get_graphiti(settings):
-            # Test basic graph operation
-            await graphiti.driver.execute_query("RETURN 1 as test")
-            status_result['components']['falkordb'] = {
-                'status': 'healthy',
-                'host': settings.falkordb_host,
-                'port': settings.falkordb_port
-            }
-            break
+        driver = FalkorDriver(
+            host=settings.falkordb_host,
+            port=int(settings.falkordb_port),
+            username=settings.falkordb_username,
+            password=settings.falkordb_password,
+        )
+        await driver.execute_query("RETURN 1 as test")
+        status_result['components']['falkordb'] = {
+            'status': 'healthy',
+            'host': settings.falkordb_host,
+            'port': settings.falkordb_port
+        }
     except Exception as e:
         status_result['components']['falkordb'] = {
             'status': 'error',
-            'error': str(e)
+            'error': str(e)[:100]
         }
-    
-    # Check LLM client
-    try:
-        async for graphiti in get_graphiti(settings):
-            if graphiti.llm_client:
-                status_result['components']['llm_client'] = {
-                    'status': 'configured',
-                    'model': getattr(graphiti.llm_client, 'model', 'unknown'),
-                    'api_key_configured': bool(settings.openai_api_key)
-                }
-            else:
-                status_result['components']['llm_client'] = {
-                    'status': 'not_configured',
-                    'api_key_configured': bool(settings.openai_api_key)
-                }
-            break
-    except Exception as e:
-        status_result['components']['llm_client'] = {
-            'status': 'error',
-            'error': str(e)
-        }
-    
+
+    # Check LLM client configuration
+    status_result['components']['llm_client'] = {
+        'status': 'configured' if settings.openai_api_key else 'not_configured',
+        'model': settings.model_name,
+        'api_key_configured': bool(settings.openai_api_key)
+    }
+
     # Overall health
     all_healthy = all(
-        comp.get('status') in ['healthy', 'configured'] 
+        comp.get('status') in ['healthy', 'configured']
         for comp in status_result['components'].values()
     )
-    
+
     status_result['overall_status'] = 'healthy' if all_healthy else 'degraded'
-    
+
     return JSONResponse(
         content=status_result,
         status_code=200 if all_healthy else 503
