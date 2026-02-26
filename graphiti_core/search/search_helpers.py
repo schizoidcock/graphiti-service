@@ -57,17 +57,17 @@ def search_results_to_context_string(
 
     These are the most relevant facts and their valid and invalid dates. Facts are considered valid
     between their valid_at and invalid_at dates. Facts with an invalid_at date of "Present" are considered valid.
-
-            {to_prompt_json(fact_json, indent=12)}
+    <FACTS>
+            {to_prompt_json(fact_json)}
     </FACTS>
     <ENTITIES>
-            {to_prompt_json(entity_json, indent=12)}
+            {to_prompt_json(entity_json)}
     </ENTITIES>
     <EPISODES>
-            {to_prompt_json(episode_json, indent=12)}
+            {to_prompt_json(episode_json)}
     </EPISODES>
     <COMMUNITIES>
-            {to_prompt_json(community_json, indent=12)}
+            {to_prompt_json(community_json)}
     </COMMUNITIES>
 """
 

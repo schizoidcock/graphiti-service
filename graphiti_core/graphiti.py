@@ -27,6 +27,7 @@ from graphiti_core.cross_encoder.client import CrossEncoderClient
 from graphiti_core.cross_encoder.openai_reranker_client import OpenAIRerankerClient
 from graphiti_core.decorators import handle_multiple_group_ids
 from graphiti_core.driver.driver import GraphDriver
+from graphiti_core.tracer import Tracer, create_tracer
 from graphiti_core.driver.falkordb_driver import FalkorDriver
 from graphiti_core.errors import EdgeNotFoundError
 from graphiti_core.edges import (
@@ -218,11 +219,16 @@ class Graphiti:
         else:
             self.cross_encoder = OpenAIRerankerClient()
 
+        # Create tracer (no-op by default)
+        self.tracer = create_tracer()
+        self.llm_client.set_tracer(self.tracer)
+
         self.clients = GraphitiClients(
             driver=self.driver,
             llm_client=self.llm_client,
             embedder=self.embedder,
             cross_encoder=self.cross_encoder,
+            tracer=self.tracer,
         )
 
         # Capture telemetry event
@@ -277,6 +283,17 @@ class Graphiti:
             return 'voyage'
         else:
             return 'unknown'
+
+    @property
+    def token_tracker(self):
+        """Get the token usage tracker from the LLM client.
+
+        Returns
+        -------
+        TokenUsageTracker
+            The token tracker instance that records LLM token usage.
+        """
+        return self.llm_client.token_tracker
 
     async def close(self):
         """
