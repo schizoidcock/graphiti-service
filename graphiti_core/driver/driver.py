@@ -88,6 +88,9 @@ class GraphDriver(QueryExecutor, ABC):
     _database: str
     default_group_id: str = ''
     aoss_client: Any = None  # type: ignore
+    # Legacy interfaces (kept for backwards compatibility)
+    search_interface: Any = None
+    graph_operations_interface: Any = None
 
     @abstractmethod
     def execute_query(self, cypher_query_: str, **kwargs: Any) -> Coroutine:

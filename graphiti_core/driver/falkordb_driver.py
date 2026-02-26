@@ -463,6 +463,21 @@ class FalkorDriver(GraphDriver):
         sanitized = ' '.join(sanitized.split())
         return sanitized
 
+    def _escape_redisearch_value(self, value: str) -> str:
+        """Escape special characters in a value for RediSearch queries.
+
+        RediSearch treats these characters specially even inside double quotes:
+        - hyphen (-) as negation operator
+        - other punctuation as query operators
+        """
+        special_chars = r',.<>{}[]"\':;!@#$%^&*()-+=~|/\\'
+        result = []
+        for char in value:
+            if char in special_chars:
+                result.append('\\')
+            result.append(char)
+        return ''.join(result)
+
     def build_fulltext_query(
         self, query: str, group_ids: list[str] | None = None, max_query_length: int = 128
     ) -> str:
@@ -472,7 +487,8 @@ class FalkorDriver(GraphDriver):
         if group_ids is None or len(group_ids) == 0:
             group_filter = ''
         else:
-            escaped_group_ids = [f'"{gid}"' for gid in group_ids]
+            # Escape special characters in group_ids to prevent RediSearch interpretation
+            escaped_group_ids = [f'"{self._escape_redisearch_value(gid)}"' for gid in group_ids]
             group_values = '|'.join(escaped_group_ids)
             group_filter = f'(@group_id:{group_values})'
 
