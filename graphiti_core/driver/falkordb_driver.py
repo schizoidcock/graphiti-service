@@ -14,23 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import datetime
 import asyncio
 import logging
 from typing import TYPE_CHECKING, Any
-
-try:
-    import boto3
-    from opensearchpy import OpenSearch
-    from opensearchpy.connection.http_urllib3 import Urllib3HttpConnection
-    from opensearchpy_aws import Urllib3AWSV4SignerAuth
-    _HAS_OPENSEARCH = True
-except ImportError:
-    boto3 = None
-    OpenSearch = None
-    Urllib3AWSV4SignerAuth = None
-    Urllib3HttpConnection = None
-    _HAS_OPENSEARCH = False
 
 if TYPE_CHECKING:
     from falkordb import Graph as FalkorGraph
@@ -47,50 +33,46 @@ else:
         ) from None
 
 from graphiti_core.driver.driver import GraphDriver, GraphDriverSession, GraphProvider
+from graphiti_core.driver.falkordb import STOPWORDS
+from graphiti_core.driver.falkordb.operations.community_edge_ops import (
+    FalkorCommunityEdgeOperations,
+)
+from graphiti_core.driver.falkordb.operations.community_node_ops import (
+    FalkorCommunityNodeOperations,
+)
+from graphiti_core.driver.falkordb.operations.entity_edge_ops import FalkorEntityEdgeOperations
+from graphiti_core.driver.falkordb.operations.entity_node_ops import FalkorEntityNodeOperations
+from graphiti_core.driver.falkordb.operations.episode_node_ops import FalkorEpisodeNodeOperations
+from graphiti_core.driver.falkordb.operations.episodic_edge_ops import FalkorEpisodicEdgeOperations
+from graphiti_core.driver.falkordb.operations.graph_ops import FalkorGraphMaintenanceOperations
+from graphiti_core.driver.falkordb.operations.has_episode_edge_ops import (
+    FalkorHasEpisodeEdgeOperations,
+)
+from graphiti_core.driver.falkordb.operations.next_episode_edge_ops import (
+    FalkorNextEpisodeEdgeOperations,
+)
+from graphiti_core.driver.falkordb.operations.saga_node_ops import FalkorSagaNodeOperations
+from graphiti_core.driver.falkordb.operations.search_ops import FalkorSearchOperations
+from graphiti_core.driver.operations.community_edge_ops import CommunityEdgeOperations
+from graphiti_core.driver.operations.community_node_ops import CommunityNodeOperations
+from graphiti_core.driver.operations.entity_edge_ops import EntityEdgeOperations
+from graphiti_core.driver.operations.entity_node_ops import EntityNodeOperations
+from graphiti_core.driver.operations.episode_node_ops import EpisodeNodeOperations
+from graphiti_core.driver.operations.episodic_edge_ops import EpisodicEdgeOperations
+from graphiti_core.driver.operations.graph_ops import GraphMaintenanceOperations
+from graphiti_core.driver.operations.has_episode_edge_ops import HasEpisodeEdgeOperations
+from graphiti_core.driver.operations.next_episode_edge_ops import NextEpisodeEdgeOperations
+from graphiti_core.driver.operations.saga_node_ops import SagaNodeOperations
+from graphiti_core.driver.operations.search_ops import SearchOperations
 from graphiti_core.graph_queries import get_fulltext_indices, get_range_indices
 from graphiti_core.utils.datetime_utils import convert_datetimes_to_strings
 
 logger = logging.getLogger(__name__)
 
-STOPWORDS = [
-    'a',
-    'is',
-    'the',
-    'an',
-    'and',
-    'are',
-    'as',
-    'at',
-    'be',
-    'but',
-    'by',
-    'for',
-    'if',
-    'in',
-    'into',
-    'it',
-    'no',
-    'not',
-    'of',
-    'on',
-    'or',
-    'such',
-    'that',
-    'their',
-    'then',
-    'there',
-    'these',
-    'they',
-    'this',
-    'to',
-    'was',
-    'will',
-    'with',
-]
-
 
 class FalkorDriverSession(GraphDriverSession):
     provider = GraphProvider.FALKORDB
+
     def __init__(self, graph: FalkorGraph):
         self.graph = graph
 
@@ -137,8 +119,6 @@ class FalkorDriver(GraphDriver):
         password: str | None = None,
         falkor_db: FalkorDB | None = None,
         database: str = 'default_db',
-        aoss_host: str | None = None,
-        aoss_port: int | None = None,
     ):
         """
         Initialize the FalkorDB driver.
@@ -146,16 +126,14 @@ class FalkorDriver(GraphDriver):
         FalkorDB is a multi-tenant graph database.
         To connect, provide the host and port.
         The default parameters assume a local (on-premises) FalkorDB instance.
-        
+
         Args:
             host: FalkorDB host address
-            port: FalkorDB port number  
+            port: FalkorDB port number
             username: FalkorDB username (optional)
             password: FalkorDB password (optional)
             falkor_db: Existing FalkorDB instance (optional)
             database: Database name
-            aoss_host: AWS OpenSearch Service host (optional)
-            aoss_port: AWS OpenSearch Service port (optional)
         """
         super().__init__()
 
@@ -164,11 +142,24 @@ class FalkorDriver(GraphDriver):
             # If a FalkorDB instance is provided, use it directly
             self.client = falkor_db
         else:
-            # Initialize FalkorDB client with Railway-compatible settings
+            # Initialize FalkorDB client
             self.client = FalkorDB(host=host, port=port, username=username, password=password)
-            
+
         # Configure Redis to avoid persistence issues on Railway
         self._configure_redis_for_railway()
+
+        # Instantiate FalkorDB operations
+        self._entity_node_ops = FalkorEntityNodeOperations()
+        self._episode_node_ops = FalkorEpisodeNodeOperations()
+        self._community_node_ops = FalkorCommunityNodeOperations()
+        self._saga_node_ops = FalkorSagaNodeOperations()
+        self._entity_edge_ops = FalkorEntityEdgeOperations()
+        self._episodic_edge_ops = FalkorEpisodicEdgeOperations()
+        self._community_edge_ops = FalkorCommunityEdgeOperations()
+        self._has_episode_edge_ops = FalkorHasEpisodeEdgeOperations()
+        self._next_episode_edge_ops = FalkorNextEpisodeEdgeOperations()
+        self._search_ops = FalkorSearchOperations()
+        self._graph_ops = FalkorGraphMaintenanceOperations()
 
         # Schedule the indices and constraints to be built
         try:
@@ -183,77 +174,114 @@ class FalkorDriver(GraphDriver):
     def _configure_redis_for_railway(self):
         """Configure Redis settings for Railway with persistent volume"""
         try:
-            import asyncio
-
             async def _config_redis():
                 """Async Redis configuration for Railway environment"""
                 try:
-                    logger.info("🔧 Configuring Redis for Railway environment with persistent volume...")
+                    logger.info('Configuring Redis for Railway environment with persistent volume...')
 
                     # Redis commands to ensure persistence works with Railway volume
                     # FalkorDB graph operations don't replay correctly from AOF
                     # Use RDB snapshots only for reliable persistence
                     redis_commands = [
-                        ('CONFIG', 'SET', 'appendonly', 'no'),  # Disable AOF - causes replay errors with graph operations
+                        ('CONFIG', 'SET', 'appendonly', 'no'),  # Disable AOF - causes replay errors
                         ('CONFIG', 'SET', 'save', '60 1 300 10 900 1'),  # Enable aggressive RDB snapshots
-                        ('CONFIG', 'SET', 'stop-writes-on-bgsave-error', 'no'),  # Don't block writes on save errors
+                        ('CONFIG', 'SET', 'stop-writes-on-bgsave-error', 'no'),  # Don't block writes
                     ]
-                    
+
                     success_count = 0
                     for cmd in redis_commands:
                         try:
                             # Try different FalkorDB client interfaces for Redis commands
                             if hasattr(self.client, 'redis') and hasattr(self.client.redis, 'execute_command'):
-                                # Use redis client directly if available
                                 await self.client.redis.execute_command(*cmd)
                                 success_count += 1
                             elif hasattr(self.client, 'execute_command'):
-                                # Try FalkorDB's execute_command method
                                 await self.client.execute_command(*cmd)
                                 success_count += 1
-                            elif hasattr(self.client, '_redis') and hasattr(self.client._redis, 'execute_command'):
-                                # Try internal redis connection
+                            elif hasattr(self.client, '_redis') and hasattr(
+                                self.client._redis, 'execute_command'
+                            ):
                                 await self.client._redis.execute_command(*cmd)
                                 success_count += 1
                         except Exception as cmd_err:
-                            logger.debug(f"Redis config command {cmd[1]} failed: {cmd_err}")
+                            logger.debug(f'Redis config command {cmd[1]} failed: {cmd_err}')
                             continue
-                    
+
                     if success_count > 0:
-                        logger.info(f"✅ Redis configured for Railway with persistent volume ({success_count}/3 settings applied)")
-                        logger.info("💾 RDB persistence enabled - AOF disabled due to graph operation incompatibility")
-                        logger.info("💾 Snapshots: 60s/1key, 300s/10keys, 900s/1key")
+                        logger.info(
+                            f'Redis configured for Railway ({success_count}/3 settings applied)'
+                        )
                     else:
-                        logger.info("ℹ️ Using default Redis configuration")
-                        logger.info("⚠️ Persistence configuration may not be optimal for FalkorDB")
-                        
+                        logger.info('Using default Redis configuration')
+
                 except Exception as config_err:
-                    logger.warning(f"Redis configuration error: {config_err}")
-                    logger.info("Proceeding with default Redis configuration")
-            
+                    logger.warning(f'Redis configuration error: {config_err}')
+                    logger.info('Proceeding with default Redis configuration')
+
             # Handle async execution properly without blocking
             try:
-                # Check if we're already in an async context
                 loop = asyncio.get_running_loop()
-                # If we're in an async context, schedule the task
                 asyncio.create_task(_config_redis())
-                logger.debug("Redis configuration scheduled as async task")
-                
+                logger.debug('Redis configuration scheduled as async task')
             except RuntimeError:
-                # No event loop running, we can run it directly
                 try:
                     asyncio.run(_config_redis())
-                    logger.debug("Redis configuration completed synchronously")
+                    logger.debug('Redis configuration completed synchronously')
                 except Exception as run_err:
-                    logger.warning(f"Could not run Redis configuration: {run_err}")
-                    logger.info("Redis configuration will be attempted during first query")
-                    
+                    logger.warning(f'Could not run Redis configuration: {run_err}')
+
         except Exception as e:
-            logger.warning(f"Redis configuration setup failed: {e}")
-            logger.info("Service will continue with default Redis configuration")
+            logger.warning(f'Redis configuration setup failed: {e}')
+            logger.info('Service will continue with default Redis configuration')
+
+    # --- Operations properties ---
+
+    @property
+    def entity_node_ops(self) -> EntityNodeOperations:
+        return self._entity_node_ops
+
+    @property
+    def episode_node_ops(self) -> EpisodeNodeOperations:
+        return self._episode_node_ops
+
+    @property
+    def community_node_ops(self) -> CommunityNodeOperations:
+        return self._community_node_ops
+
+    @property
+    def saga_node_ops(self) -> SagaNodeOperations:
+        return self._saga_node_ops
+
+    @property
+    def entity_edge_ops(self) -> EntityEdgeOperations:
+        return self._entity_edge_ops
+
+    @property
+    def episodic_edge_ops(self) -> EpisodicEdgeOperations:
+        return self._episodic_edge_ops
+
+    @property
+    def community_edge_ops(self) -> CommunityEdgeOperations:
+        return self._community_edge_ops
+
+    @property
+    def has_episode_edge_ops(self) -> HasEpisodeEdgeOperations:
+        return self._has_episode_edge_ops
+
+    @property
+    def next_episode_edge_ops(self) -> NextEpisodeEdgeOperations:
+        return self._next_episode_edge_ops
+
+    @property
+    def search_ops(self) -> SearchOperations:
+        return self._search_ops
+
+    @property
+    def graph_ops(self) -> GraphMaintenanceOperations:
+        return self._graph_ops
 
     def _get_graph(self, graph_name: str | None) -> FalkorGraph:
-        # FalkorDB requires a non-None database name for multi-tenant graphs; the default is "default_db"
+        # FalkorDB requires a non-None database name for multi-tenant graphs
         if graph_name is None:
             graph_name = self._database
         return self.client.select_graph(graph_name)
@@ -261,43 +289,41 @@ class FalkorDriver(GraphDriver):
     async def execute_query(self, cypher_query_, **kwargs: Any):
         graph = self._get_graph(self._database)
 
-        # Convert datetime objects to ISO strings (FalkorDB does not support datetime objects directly)
+        # Convert datetime objects to ISO strings (FalkorDB does not support datetime objects)
         params = convert_datetimes_to_strings(dict(kwargs))
-
-        # DEBUG: Log parameter types to identify unary + string issues
-        for key, value in params.items():
-            if isinstance(value, str) and key in ['reference_time', 'valid_at', 'created_at']:
-                logger.debug(f"FalkorDB parameter {key}: '{value}' (type: {type(value)})")
 
         try:
             result = await graph.query(cypher_query_, params)  # type: ignore[reportUnknownArgumentType]
         except Exception as e:
             if 'already indexed' in str(e):
-                # check if index already exists
                 logger.info(f'Index already exists: {e}')
                 return None
 
             # Check if this is a Redis persistence error
             if 'MISCONF' in str(e) and 'stop-writes-on-bgsave-error' in str(e):
-                logger.warning(f"Redis persistence error detected: {e}")
-                logger.info("Attempting to fix Redis configuration...")
-                
+                logger.warning(f'Redis persistence error detected: {e}')
+                logger.info('Attempting to fix Redis configuration...')
+
                 try:
-                    # Try to fix Redis configuration dynamically
                     redis_client = self.client
-                    if hasattr(redis_client, 'connection') and hasattr(redis_client.connection, 'execute_command'):
+                    if hasattr(redis_client, 'connection') and hasattr(
+                        redis_client.connection, 'execute_command'
+                    ):
                         await redis_client.connection.execute_command('CONFIG', 'SET', 'save', '')
-                        await redis_client.connection.execute_command('CONFIG', 'SET', 'stop-writes-on-bgsave-error', 'no')
-                        await redis_client.connection.execute_command('CONFIG', 'SET', 'appendonly', 'no')
-                        logger.info("✅ Redis configuration fixed dynamically")
-                        
+                        await redis_client.connection.execute_command(
+                            'CONFIG', 'SET', 'stop-writes-on-bgsave-error', 'no'
+                        )
+                        await redis_client.connection.execute_command(
+                            'CONFIG', 'SET', 'appendonly', 'no'
+                        )
+                        logger.info('Redis configuration fixed dynamically')
+
                         # Retry the query after fixing configuration
-                        logger.info("Retrying query after Redis configuration fix...")
-                        result = await graph.query(cypher_query_, params)  # type: ignore[reportUnknownArgumentType]
+                        result = await graph.query(cypher_query_, params)  # type: ignore
                     else:
                         raise e
                 except Exception as fix_err:
-                    logger.error(f"Failed to fix Redis configuration: {fix_err}")
+                    logger.error(f'Failed to fix Redis configuration: {fix_err}')
                     logger.error(f'Original FalkorDB query error: {e}\n{cypher_query_}\n{params}')
                     raise e
             else:
@@ -307,7 +333,7 @@ class FalkorDriver(GraphDriver):
         # Convert the result header to a list of strings
         header = [h[1] for h in result.header]
 
-        # Convert FalkorDB's result format (list of lists) to the format expected by Graphiti (list of dicts)
+        # Convert FalkorDB's result format (list of lists) to list of dicts
         records = []
         for row in result.result_set:
             record = {}
@@ -315,7 +341,6 @@ class FalkorDriver(GraphDriver):
                 if i < len(row):
                     record[field_name] = row[i]
                 else:
-                    # If there are more fields in header than values in row, set to None
                     record[field_name] = None
             records.append(record)
 
@@ -368,7 +393,7 @@ class FalkorDriver(GraphDriver):
     async def build_indices_and_constraints(self, delete_existing=False):
         if delete_existing:
             await self.delete_all_indexes()
-        index_queries = get_range_indices(self.provider) + get_fulltext_indices(self.provider)
+        index_queries = get_range_indices() + get_fulltext_indices()
         for query in index_queries:
             await self.execute_query(query)
 
@@ -382,7 +407,6 @@ class FalkorDriver(GraphDriver):
         elif database == self.default_group_id:
             cloned = FalkorDriver(falkor_db=self.client)
         else:
-            # Create a new instance of FalkorDriver with the same connection but a different database
             cloned = FalkorDriver(falkor_db=self.client, database=database)
 
         return cloned
@@ -390,10 +414,10 @@ class FalkorDriver(GraphDriver):
     async def health_check(self) -> None:
         """Check FalkorDB connectivity by running a simple query."""
         try:
-            await self.execute_query("MATCH (n) RETURN 1 LIMIT 1")
+            await self.execute_query('MATCH (n) RETURN 1 LIMIT 1')
             return None
         except Exception as e:
-            print(f"FalkorDB health check failed: {e}")
+            print(f'FalkorDB health check failed: {e}')
             raise
 
     def sanitize(self, query: str) -> str:
@@ -401,7 +425,6 @@ class FalkorDriver(GraphDriver):
         Replace FalkorDB special characters with whitespace.
         Based on FalkorDB tokenization rules: ,.<>{}[]"':;!@#$%^&*()-+=~
         """
-        # FalkorDB separator characters that break text into tokens
         separator_map = str.maketrans(
             {
                 ',': ' ',
@@ -431,10 +454,12 @@ class FalkorDriver(GraphDriver):
                 '=': ' ',
                 '~': ' ',
                 '?': ' ',
+                '|': ' ',
+                '/': ' ',
+                '\\': ' ',
             }
         )
         sanitized = query.translate(separator_map)
-        # Clean up multiple spaces
         sanitized = ' '.join(sanitized.split())
         return sanitized
 
@@ -443,27 +468,20 @@ class FalkorDriver(GraphDriver):
     ) -> str:
         """
         Build a fulltext query string for FalkorDB using RedisSearch syntax.
-        FalkorDB uses RedisSearch-like syntax where:
-        - Field queries use @ prefix: @field:value
-        - Multiple values for same field: (@field:value1|value2)
-        - Text search doesn't need @ prefix for content fields
-        - AND is implicit with space: (@group_id:value) (text)
-        - OR uses pipe within parentheses: (@group_id:value1|value2)
         """
         if group_ids is None or len(group_ids) == 0:
             group_filter = ''
         else:
-            group_values = '|'.join(group_ids)
+            escaped_group_ids = [f'"{gid}"' for gid in group_ids]
+            group_values = '|'.join(escaped_group_ids)
             group_filter = f'(@group_id:{group_values})'
 
         sanitized_query = self.sanitize(query)
 
-        # Remove stopwords from the sanitized query
         query_words = sanitized_query.split()
-        filtered_words = [word for word in query_words if word.lower() not in STOPWORDS]
+        filtered_words = [word for word in query_words if word and word.lower() not in STOPWORDS]
         sanitized_query = ' | '.join(filtered_words)
 
-        # If the query is too long return no query
         if len(sanitized_query.split(' ')) + len(group_ids or '') >= max_query_length:
             return ''
 

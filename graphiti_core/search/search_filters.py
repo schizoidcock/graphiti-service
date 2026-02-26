@@ -20,8 +20,6 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from graphiti_core.driver.driver import GraphProvider
-
 
 
 class ComparisonOperator(Enum):
@@ -36,9 +34,19 @@ class ComparisonOperator(Enum):
 
 
 class DateFilter(BaseModel):
-    date: datetime | None = Field(description='A datetime to filter on')
+    date: datetime | None = Field(default=None, description='A datetime to filter on')
     comparison_operator: ComparisonOperator = Field(
         description='Comparison operator for date filter'
+    )
+
+
+class PropertyFilter(BaseModel):
+    property_name: str = Field(description='Property name')
+    property_value: str | int | float | None = Field(
+        default=None, description='Value you want to match on for the property'
+    )
+    comparison_operator: ComparisonOperator = Field(
+        description='Comparison operator for the property'
     )
 
 
@@ -54,11 +62,11 @@ class SearchFilters(BaseModel):
     created_at: list[list[DateFilter]] | None = Field(default=None)
     expired_at: list[list[DateFilter]] | None = Field(default=None)
     edge_uuids: list[str] | None = Field(default=None)
+    property_filters: list[PropertyFilter] | None = Field(default=None)
 
 
 def node_search_filter_query_constructor(
     filters: SearchFilters,
-    provider: GraphProvider,
 ) -> tuple[list[str], dict[str, Any]]:
     filter_queries: list[str] = []
     filter_params: dict[str, Any] = {}
@@ -99,7 +107,6 @@ def date_filter_query_constructor(
 
 def edge_search_filter_query_constructor(
     filters: SearchFilters,
-    provider: GraphProvider,
 ) -> tuple[list[str], dict[str, Any]]:
     filter_queries: list[str] = []
     filter_params: dict[str, Any] = {}

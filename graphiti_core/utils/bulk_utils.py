@@ -211,17 +211,17 @@ async def add_nodes_and_edges_bulk_tx(
         edge_data.update(edge.attributes or {})
         edges.append(edge_data)
 
-    await tx.run(get_episode_node_save_bulk_query(driver.provider), episodes=episodes)
+    await tx.run(get_episode_node_save_bulk_query(), episodes=episodes)
     await tx.run(
-        get_entity_node_save_bulk_query(driver.provider, nodes),
+        get_entity_node_save_bulk_query(nodes),
         nodes=nodes,
     )
     await tx.run(
-        get_episodic_edge_save_bulk_query(driver.provider),
+        get_episodic_edge_save_bulk_query(),
         episodic_edges=[edge.model_dump() for edge in episodic_edges],
     )
     await tx.run(
-        get_entity_edge_save_bulk_query(driver.provider),
+        get_entity_edge_save_bulk_query(),
         entity_edges=edges,
     )
 

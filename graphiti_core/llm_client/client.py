@@ -21,8 +21,9 @@ import typing
 from abc import ABC, abstractmethod
 
 import httpx
-from diskcache import Cache
 from pydantic import BaseModel
+
+from graphiti_core.llm_client.cache import LLMCache
 from tenacity import retry, retry_if_exception, stop_after_attempt, wait_random_exponential
 
 from ..prompts.models import Message
@@ -39,14 +40,19 @@ def get_extraction_language_instruction(group_id: str | None = None) -> str:
     Override this function to customize language extraction:
     - Return empty string to disable multilingual instructions
     - Return custom instructions for specific language requirements
+    - Use group_id to provide different instructions per group/partition
 
     Args:
-        group_id: Optional group identifier for group-specific instructions
+        group_id: Optional partition identifier for the graph
 
     Returns:
         str: Language instruction to append to system messages
     """
-    return '\n\nAny extracted information should be returned in the same language as it was written in.'
+    return (
+        '\n\nAny extracted information should be returned in the same language as it was written in. '
+        'Only output non-English text when the user has written full sentences or phrases in that non-English language. '
+        'Otherwise, output English.'
+    )
 
 
 logger = logging.getLogger(__name__)
@@ -76,7 +82,7 @@ class LLMClient(ABC):
 
         # Only create the cache directory if caching is enabled
         if self.cache_enabled:
-            self.cache_dir = Cache(DEFAULT_CACHE_DIR)
+            self.cache_dir = LLMCache(DEFAULT_CACHE_DIR)
 
     def _clean_input(self, input: str) -> str:
         """Clean input string of invalid unicode and control characters.
@@ -185,15 +191,13 @@ class LLMClient(ABC):
 
     def _get_failed_generation_log(self, messages: list[Message], output: str | None) -> str:
         """
-        Log the full input messages, the raw output (if any), and the exception for debugging failed generations.
+        Log metadata about failed generations without exposing PII.
+        Only logs message count and roles, not content.
         """
         log = ''
-        log += f'Input messages: {json.dumps([m.model_dump() for m in messages], indent=2)}\n'
+        log += f'Message count: {len(messages)}, roles: {[m.role for m in messages]}\n'
         if output is not None:
-            if len(output) > 4000:
-                log += f'Raw output: {output[:2000]}... (truncated) ...{output[-2000:]}\n'
-            else:
-                log += f'Raw output: {output}\n'
+            log += f'Output length: {len(output)} chars\n'
         else:
             log += 'No raw output available'
         return log
