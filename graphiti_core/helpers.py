@@ -23,7 +23,6 @@ from typing import Any
 
 import numpy as np
 from dotenv import load_dotenv
-from neo4j import time as neo4j_time
 from numpy._typing import NDArray
 from pydantic import BaseModel
 
@@ -53,9 +52,13 @@ CHUNK_MIN_TOKENS = int(os.getenv('CHUNK_MIN_TOKENS', 1000))
 CHUNK_DENSITY_THRESHOLD = float(os.getenv('CHUNK_DENSITY_THRESHOLD', 0.15))
 
 
-def parse_db_date(input_date: neo4j_time.DateTime | str | None) -> datetime | None:
-    if isinstance(input_date, neo4j_time.DateTime):
-        return input_date.to_native()
+def parse_db_date(input_date: datetime | str | None) -> datetime | None:
+    """Parse database date values to Python datetime.
+
+    FalkorDB returns dates as ISO strings or datetime objects.
+    """
+    if isinstance(input_date, datetime):
+        return input_date
 
     if isinstance(input_date, str):
         return datetime.fromisoformat(input_date)
