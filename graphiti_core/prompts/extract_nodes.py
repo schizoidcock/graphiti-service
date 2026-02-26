@@ -61,6 +61,18 @@ class EntitySummary(BaseModel):
     )
 
 
+class SummarizedEntity(BaseModel):
+    name: str = Field(..., description='Name of the entity being summarized')
+    summary: str = Field(..., description='Updated summary for the entity')
+
+
+class SummarizedEntities(BaseModel):
+    summaries: list[SummarizedEntity] = Field(
+        ...,
+        description='List of entity summaries. Only include entities that need summary updates.',
+    )
+
+
 class Prompt(Protocol):
     extract_message: PromptVersion
     extract_json: PromptVersion
@@ -69,6 +81,7 @@ class Prompt(Protocol):
     classify_nodes: PromptVersion
     extract_attributes: PromptVersion
     extract_summary: PromptVersion
+    extract_summaries_batch: PromptVersion
 
 
 class Versions(TypedDict):
