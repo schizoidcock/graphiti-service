@@ -48,7 +48,8 @@ async def start_background_tasks():
                 await _initialization_client.close()  # Close the initialization client
         
         # Use managed background task system for proper coordination
-        task_name = "init_build_indices_default_db"
+        # CRITICAL: Task name must match get_graphiti() to prevent duplicate index building
+        task_name = "build_indices_default_db"
         try:
             async with _task_lock:
                 if task_name not in _background_tasks:
@@ -138,6 +139,7 @@ current_user_context: ContextVar[str | None] = ContextVar('current_user_context'
 
 # Global flag to track if indices have been built per database
 _indices_initialized = set()
+_indices_lock = asyncio.Lock()  # Lock to prevent race conditions during index building
 
 # Enhanced connection pool with limits and async management
 _graphiti_pool: dict[str, "ZepGraphiti"] = {}
@@ -528,27 +530,36 @@ class ZepGraphiti(Graphiti):
     async def build_indices_and_constraints(self):
         """Override to prevent duplicate index creation per database with improved performance"""
         global _indices_initialized
-        
-        if self._database_name in _indices_initialized:
-            logger.debug(f"Indices already initialized for database {self._database_name}, skipping...")
-            return
-            
+
+        # Use lock to prevent race condition between check and add
+        async with _indices_lock:
+            if self._database_name in _indices_initialized:
+                logger.debug(f"Indices already initialized for database {self._database_name}, skipping...")
+                return
+            # Mark as initialized immediately to prevent concurrent attempts
+            _indices_initialized.add(self._database_name)
+
         logger.debug(f"Building indices and constraints for database {self._database_name}...")
-        
+
         # Temporarily increase log level to reduce noise from duplicate index attempts
         falkor_logger = logging.getLogger('graphiti_core.driver.falkordb_driver')
         original_level = falkor_logger.level
         falkor_logger.setLevel(logging.WARNING)  # Hide INFO messages about existing indices
-        
+
         try:
             # Run index building with timeout to prevent hanging
             await asyncio.wait_for(super().build_indices_and_constraints(), timeout=300.0)  # 5 minute timeout
-            _indices_initialized.add(self._database_name)
             logger.debug(f"Indices and constraints built successfully for database {self._database_name}")
         except asyncio.TimeoutError:
             logger.warning(f"Index building timed out for database {self._database_name} (non-critical)")
+            # Remove from initialized set so it can be retried
+            async with _indices_lock:
+                _indices_initialized.discard(self._database_name)
         except Exception as e:
             logger.warning(f"Index building failed for database {self._database_name}: {e} (non-critical)")
+            # Remove from initialized set so it can be retried
+            async with _indices_lock:
+                _indices_initialized.discard(self._database_name)
         finally:
             # Restore original log level
             falkor_logger.setLevel(original_level)
