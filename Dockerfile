@@ -41,6 +41,6 @@ ENV PYTHONPATH=/app
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:${PORT}/healthcheck || exit 1
 
-# Start the FastAPI server with debug logging - use Railway's PORT
-# Bind to 0.0.0.0 for public access (Railway internal DNS handles routing)
-CMD ["sh", "-c", "echo '🚀 Starting uvicorn server...' && python -m uvicorn graph_service.main:app --host 0.0.0.0 --port ${PORT} --log-level info --access-log"]
+# Start with Gunicorn + Uvicorn workers for dual-stack binding (IPv4 + IPv6)
+# This enables both public access AND Railway private networking
+CMD ["sh", "-c", "echo '🚀 Starting gunicorn with uvicorn workers...' && gunicorn -w 2 -k uvicorn.workers.UvicornWorker -b [::]:${PORT} --access-logfile - --error-logfile - graph_service.main:app"]
