@@ -271,8 +271,11 @@ def derive_user_id_from_session_id(session_id: str) -> str:
         if len(user_part) >= 3 and user_part.isalnum():
             return user_part
 
-    # For unstructured IDs without underscore, use the full ID with zep_ prefix
-    # Don't truncate - the full session_id is needed for proper database isolation
+    # Fast path: Generate from first 8 chars for unstructured IDs
+    if len(session_id) >= 8 and not session_id.startswith('zep_'):
+        return f"zep_{session_id[:8]}"
+
+    # Fallback: If it doesn't start with zep_, add prefix
     if not session_id.startswith('zep_'):
         return f"zep_{session_id}"
 
