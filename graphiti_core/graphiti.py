@@ -397,6 +397,7 @@ class Graphiti:
         last_n: int = EPISODE_WINDOW_LEN,
         group_ids: list[str] | None = None,
         source: EpisodeType | None = None,
+        saga: str | None = None,
     ) -> list[EpisodicNode]:
         """
         Retrieve the last n episodic nodes from the graph.
@@ -412,6 +413,10 @@ class Graphiti:
             The number of episodes to retrieve. Defaults to EPISODE_WINDOW_LEN.
         group_ids : list[str | None], optional
             The group ids to return data from.
+        source : EpisodeType | None, optional
+            Filter episodes by source type.
+        saga : str | None, optional
+            If provided, only retrieve episodes that belong to the saga with this name.
 
         Returns
         -------
@@ -421,9 +426,9 @@ class Graphiti:
         Notes
         -----
         The actual retrieval is performed by the `retrieve_episodes` function
-        from the `graphiti_core.utils` module.
+        from the `graphiti_core.utils` module, unless a saga is specified.
         """
-        return await retrieve_episodes(self.driver, reference_time, last_n, group_ids, source)
+        return await retrieve_episodes(self.driver, reference_time, last_n, group_ids, source, saga)
 
     async def add_episode(
         self,
@@ -700,6 +705,8 @@ class Graphiti:
         excluded_entity_types: list[str] | None = None,
         edge_types: dict[str, type[BaseModel]] | None = None,
         edge_type_map: dict[tuple[str, str], list[str]] | None = None,
+        custom_extraction_instructions: str | None = None,
+        saga: str | SagaNode | None = None,
     ) -> AddBulkEpisodeResults:
         """
         Process multiple episodes in bulk and update the graph.
@@ -713,10 +720,25 @@ class Graphiti:
             A list of RawEpisode objects to be processed and added to the graph.
         group_id : str | None
             An id for the graph partition the episode is a part of.
+        entity_types : dict[str, type[BaseModel]] | None
+            Optional. A dictionary mapping entity type names to Pydantic models.
+        excluded_entity_types : list[str] | None
+            Optional. A list of entity type names to exclude from extraction.
+        edge_types : dict[str, type[BaseModel]] | None
+            Optional. A dictionary mapping edge type names to Pydantic models.
+        edge_type_map : dict[tuple[str, str], list[str]] | None
+            Optional. A mapping of (source_type, target_type) to allowed edge types.
+        custom_extraction_instructions : str | None
+            Optional. Custom extraction instructions string to be included in the
+            extract entities and extract edges prompts.
+        saga : str | SagaNode | None
+            Optional. Either a saga name (str) or a SagaNode object to associate all episodes with.
+            If a string is provided and a saga with this name already exists in the group, the episodes
+            will be added to it. Otherwise, a new saga will be created.
 
         Returns
         -------
-        None
+        AddBulkEpisodeResults
 
         Notes
         -----
@@ -798,6 +820,7 @@ class Graphiti:
                 edge_types=edge_types,
                 entity_types=entity_types,
                 excluded_entity_types=excluded_entity_types,
+                custom_extraction_instructions=custom_extraction_instructions,
             )
 
             # Dedupe extracted nodes in memory
@@ -970,6 +993,56 @@ class Graphiti:
                 self.embedder,
             )
 
+            # Handle saga association if provided
+            if saga is not None:
+                # Get or create saga node based on input type
+                if isinstance(saga, str):
+                    saga_node = await self._get_or_create_saga(saga, group_id, now)
+                else:
+                    saga_node = saga
+
+                # Create edges for each episode in sequence
+                previous_episode_uuid: str | None = None
+
+                # First, find the most recent episode in the saga (if any exist)
+                previous_episode_records, _, _ = await self.driver.execute_query(
+                    """
+                    MATCH (s:Saga {uuid: $saga_uuid})-[:HAS_EPISODE]->(e:Episodic)
+                    RETURN e.uuid AS uuid
+                    ORDER BY e.valid_at DESC, e.created_at DESC
+                    LIMIT 1
+                    """,
+                    saga_uuid=saga_node.uuid,
+                )
+                if previous_episode_records:
+                    previous_episode_uuid = previous_episode_records[0]['uuid']
+
+                # Sort episodes by valid_at to ensure correct ordering
+                sorted_episodes = sorted(episodes, key=lambda ep: ep.valid_at)
+
+                for episode in sorted_episodes:
+                    # Create NEXT_EPISODE edge from the previous episode to this one
+                    if previous_episode_uuid is not None:
+                        next_episode_edge = NextEpisodeEdge(
+                            source_node_uuid=previous_episode_uuid,
+                            target_node_uuid=episode.uuid,
+                            group_id=group_id,
+                            created_at=now,
+                        )
+                        await next_episode_edge.save(self.driver)
+
+                    # Create HAS_EPISODE edge from saga to this episode
+                    has_episode_edge = HasEpisodeEdge(
+                        source_node_uuid=saga_node.uuid,
+                        target_node_uuid=episode.uuid,
+                        group_id=group_id,
+                        created_at=now,
+                    )
+                    await has_episode_edge.save(self.driver)
+
+                    # This episode becomes the previous for the next iteration
+                    previous_episode_uuid = episode.uuid
+
             end = time()
             logger.info(f'Completed add_episode_bulk in {(end - start) * 1000} ms')
 
@@ -1141,12 +1214,36 @@ class Graphiti:
         if edge.fact_embedding is None:
             await edge.generate_embedding(self.embedder)
 
-
-        nodes, uuid_map, _ = await resolve_extracted_nodes(
+        # Resolve nodes against existing graph
+        resolved_nodes, uuid_map, _ = await resolve_extracted_nodes(
             self.clients,
             [source_node, target_node],
         )
 
+        # Get resolved source and target
+        resolved_source = resolved_nodes[0]
+        resolved_target = resolved_nodes[1] if len(resolved_nodes) > 1 else resolved_nodes[0]
+
+        # Merge user-provided properties from original nodes into resolved nodes
+        # Update attributes dictionary (merge rather than replace)
+        if source_node.attributes:
+            resolved_source.attributes.update(source_node.attributes)
+        if target_node.attributes:
+            resolved_target.attributes.update(target_node.attributes)
+
+        # Update summary if provided by user (non-empty string)
+        if source_node.summary:
+            resolved_source.summary = source_node.summary
+        if target_node.summary:
+            resolved_target.summary = target_node.summary
+
+        # Update labels (merge with existing)
+        if source_node.labels:
+            resolved_source.labels = list(set(resolved_source.labels) | set(source_node.labels))
+        if target_node.labels:
+            resolved_target.labels = list(set(resolved_target.labels) | set(target_node.labels))
+
+        nodes = [resolved_source, resolved_target]
         updated_edge = resolve_edge_pointers([edge], uuid_map)[0]
 
         # Check if an edge with this UUID already exists with different source/target nodes.
