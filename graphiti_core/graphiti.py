@@ -90,7 +90,6 @@ from graphiti_core.utils.maintenance.edge_operations import (
 )
 from graphiti_core.utils.maintenance.graph_data_operations import (
     EPISODE_WINDOW_LEN,
-    build_indices_and_constraints,
     retrieve_episodes,
 )
 from graphiti_core.utils.maintenance.node_operations import (
@@ -339,7 +338,7 @@ class Graphiti:
         Caution: Running this method on a large existing database may take some time
         and could impact database performance during execution.
         """
-        await build_indices_and_constraints(self.driver, delete_existing)
+        await self.driver.build_indices_and_constraints(delete_existing)
 
     async def retrieve_episodes(
         self,
