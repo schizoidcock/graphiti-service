@@ -19,11 +19,7 @@ COPY requirements.txt .
 
 # Install Python dependencies BEFORE copying application code
 # This creates a cached layer that only rebuilds when dependencies change
-# CRITICAL FIX: Use proper pip cache directory with Railway service ID
-# Pip cache directory: ~/.cache/pip (expands to /root/.cache/pip)
-# Railway service ID: f1aa2989-4471-40e3-8919-eaf59d38f4a1
-RUN --mount=type=cache,id=s/f1aa2989-4471-40e3-8919-eaf59d38f4a1-~/.cache/pip,target=/app/.cache/pip \
-    pip install -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code AFTER dependencies are installed
 # Code changes won't trigger dependency reinstalls
