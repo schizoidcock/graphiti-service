@@ -263,22 +263,19 @@ def derive_user_id_from_session_id(session_id: str) -> str:
     # Fast path: If already a proper zep_ user ID, return as-is
     if session_id.startswith('zep_') and len(session_id) > 4:
         return session_id
-    
+
     # Fast path: Structured session IDs (user_context_session)
     # BUT avoid splitting zep_ prefixed IDs which are already complete user IDs
     if '_' in session_id and len(session_id) > 3 and not session_id.startswith('zep_'):
         user_part = session_id.split('_')[0]
         if len(user_part) >= 3 and user_part.isalnum():
             return user_part
-    
-    # Fast path: Generate from first 8 chars for unstructured IDs
-    if len(session_id) >= 8 and not session_id.startswith('zep_'):
-        return f"zep_{session_id[:8]}"
-    
-    # Fallback: If it doesn't start with zep_, add prefix
+
+    # For unstructured IDs without underscore, use the full ID with zep_ prefix
+    # Don't truncate - the full session_id is needed for proper database isolation
     if not session_id.startswith('zep_'):
         return f"zep_{session_id}"
-    
+
     # If it already starts with zep_ but somehow didn't match above, return as-is
     return session_id
 
