@@ -16,6 +16,15 @@ limitations under the License.
 
 from typing import Any
 
+from graphiti_core.helpers import validate_node_labels
+
+
+def _validate_entity_labels(labels: str | list[str]) -> list[str]:
+    resolved_labels = labels.split(':') if isinstance(labels, str) else labels
+    filtered_labels = [label for label in resolved_labels if label]
+    validate_node_labels(filtered_labels)
+    return filtered_labels
+
 
 def get_episode_node_save_query() -> str:
     return """
@@ -50,6 +59,9 @@ EPISODIC_NODE_RETURN = """
 
 
 def get_entity_node_save_query(labels: str) -> str:
+    validated_labels = _validate_entity_labels(labels)
+    labels = ':'.join(validated_labels)
+
     return f"""
         MERGE (n:Entity {{uuid: $entity_data.uuid}})
         SET n:{labels}
@@ -60,6 +72,9 @@ def get_entity_node_save_query(labels: str) -> str:
 
 
 def get_entity_node_save_bulk_query(nodes: list[dict]) -> list[tuple[str, dict[str, Any]]]:
+    for node in nodes:
+        _validate_entity_labels(node.get('labels', []))
+
     queries = []
     for node in nodes:
         for label in node['labels']:

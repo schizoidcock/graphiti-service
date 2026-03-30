@@ -18,8 +18,9 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
+from graphiti_core.helpers import validate_node_labels
 
 
 class ComparisonOperator(Enum):
@@ -64,6 +65,12 @@ class SearchFilters(BaseModel):
     edge_uuids: list[str] | None = Field(default=None)
     property_filters: list[PropertyFilter] | None = Field(default=None)
 
+    @field_validator('node_labels')
+    @classmethod
+    def validate_node_label_filters(cls, value: list[str] | None) -> list[str] | None:
+        validate_node_labels(value)
+        return value
+
 
 def node_search_filter_query_constructor(
     filters: SearchFilters,
@@ -72,6 +79,8 @@ def node_search_filter_query_constructor(
     filter_params: dict[str, Any] = {}
 
     if filters.node_labels is not None:
+        # Defense-in-depth for model_construct()/other validation bypasses.
+        validate_node_labels(filters.node_labels)
         node_labels = '|'.join(filters.node_labels)
         node_label_filter = 'n:' + node_labels
         filter_queries.append(node_label_filter)
@@ -117,6 +126,8 @@ def edge_search_filter_query_constructor(
         filter_params['edge_types'] = edge_types
 
     if filters.node_labels is not None:
+        # Defense-in-depth for model_construct()/other validation bypasses.
+        validate_node_labels(filters.node_labels)
         node_labels = '|'.join(filters.node_labels)
         node_label_filter = 'n:' + node_labels + ' AND m:' + node_labels
         filter_queries.append(node_label_filter)
