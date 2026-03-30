@@ -24,7 +24,7 @@ from graphiti_core.edges import EntityEdge
 from graphiti_core.embedder.client import EMBEDDING_DIM
 from graphiti_core.errors import SearchRerankerError
 from graphiti_core.graphiti_types import GraphitiClients
-from graphiti_core.helpers import semaphore_gather
+from graphiti_core.helpers import semaphore_gather, validate_group_ids
 from graphiti_core.nodes import CommunityNode, EntityNode, EpisodicNode
 from graphiti_core.search.search_config import (
     DEFAULT_SEARCH_LIMIT,
@@ -75,6 +75,8 @@ async def search(
     bfs_origin_node_uuids: list[str] | None = None,
     query_vector: list[float] | None = None,
 ) -> SearchResults:
+    validate_group_ids(group_ids)
+
     start = time()
 
     driver = clients.driver

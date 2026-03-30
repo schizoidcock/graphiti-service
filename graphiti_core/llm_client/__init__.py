@@ -20,9 +20,16 @@ from .errors import RateLimitError
 from .openai_client import OpenAIClient
 from .token_tracker import TokenUsage, TokenUsageTracker
 
+# GLiNER2Client is optional - requires gliner2 package
+try:
+    from .gliner2_client import GLiNER2Client
+except ImportError:
+    GLiNER2Client = None  # type: ignore[misc, assignment]
+
 __all__ = [
     'LLMClient',
     'OpenAIClient',
+    'GLiNER2Client',
     'LLMConfig',
     'RateLimitError',
     'TokenUsage',

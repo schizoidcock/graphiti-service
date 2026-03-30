@@ -1,6 +1,6 @@
 [project]
 name = "graphiti-api-service"
-version = "0.28.1"
+version = "0.28.2"
 description = "Zep-Compatible Graphiti API service with FalkorDB backend"
 authors = [{name = "Zep AI", email = "support@getzep.com"}]
 license = {text = "Apache-2.0"}
@@ -51,6 +51,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+gliner2 = [
+    "gliner2>=1.2.0; python_version>='3.11'"
+]
 dev = [
     "pytest>=7.4.0",
     "pytest-asyncio>=0.21.0",

@@ -39,6 +39,7 @@ from graphiti_core.helpers import (
     lucene_sanitize,
     normalize_l2,
     semaphore_gather,
+    validate_group_ids,
 )
 from graphiti_core.models.edges.edge_db_queries import get_entity_edge_return_query
 from graphiti_core.models.nodes.node_db_queries import (
@@ -133,6 +134,8 @@ async def edge_fulltext_search(
     group_ids: list[str] | None = None,
     limit=RELEVANT_SCHEMA_LIMIT,
 ) -> list[EntityEdge]:
+    validate_group_ids(group_ids)
+
     # fulltext search over facts
     fuzzy_query = fulltext_query(query, group_ids, driver)
 
@@ -304,6 +307,8 @@ async def node_fulltext_search(
     group_ids: list[str] | None = None,
     limit=RELEVANT_SCHEMA_LIMIT,
 ) -> list[EntityNode]:
+    validate_group_ids(group_ids)
+
     # BM25 search to get top nodes
     fuzzy_query = fulltext_query(query, group_ids, driver)
     if fuzzy_query == '':
